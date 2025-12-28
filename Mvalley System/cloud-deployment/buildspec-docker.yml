@@ -8,36 +8,35 @@ phases:
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/mv-os-backend
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
-  build:
-    commands:
-      - echo Build started on `date`
+      - echo "Repository URI: $REPOSITORY_URI"
       - echo "Current directory: $(pwd)"
       - echo "Listing files:"
       - ls -la
-      - echo "Finding backend directory..."
-      - find . -name "Dockerfile" -type f
-      - echo Building the Docker image...
+      - echo "Finding Dockerfile..."
+      - find . -name "Dockerfile" -type f 2>/dev/null | head -5
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo "Building Docker image..."
       - |
-        if [ -d "Mvalley System/backend" ]; then
+        # Find backend directory
+        if [ -f "Mvalley System/backend/Dockerfile" ]; then
           cd "Mvalley System/backend"
-        elif [ -d "backend" ]; then
+        elif [ -f "backend/Dockerfile" ]; then
           cd backend
         else
-          echo "Error: backend directory not found"
+          echo "ERROR: Dockerfile not found!"
+          find . -name "Dockerfile" -type f
           exit 1
         fi
       - echo "Building from: $(pwd)"
+      - echo "Dockerfile exists: $(test -f Dockerfile && echo 'YES' || echo 'NO')"
       - docker build -t $REPOSITORY_URI:latest -f Dockerfile .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
-      - echo Pushing the Docker images...
+      - echo "Pushing Docker images..."
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Writing image definitions file...
-      - printf '{"ImageUri":"%s"}' $REPOSITORY_URI:latest > ../imagedefinitions.json
-artifacts:
-  files:
-    - imagedefinitions.json
-
+      - echo "✅ Image pushed successfully: $REPOSITORY_URI:latest"
