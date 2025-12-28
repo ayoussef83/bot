@@ -19,7 +19,6 @@ phases:
       - echo Build started on `date`
       - echo "Building Docker image..."
       - |
-        # Find backend directory
         if [ -f "Mvalley System/backend/Dockerfile" ]; then
           cd "Mvalley System/backend"
         elif [ -f "backend/Dockerfile" ]; then
