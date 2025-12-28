@@ -11,8 +11,22 @@ phases:
   build:
     commands:
       - echo Build started on `date`
+      - echo "Current directory: $(pwd)"
+      - echo "Listing files:"
+      - ls -la
+      - echo "Finding backend directory..."
+      - find . -name "Dockerfile" -type f
       - echo Building the Docker image...
-      - cd "Mvalley System/backend" || cd backend
+      - |
+        if [ -d "Mvalley System/backend" ]; then
+          cd "Mvalley System/backend"
+        elif [ -d "backend" ]; then
+          cd backend
+        else
+          echo "Error: backend directory not found"
+          exit 1
+        fi
+      - echo "Building from: $(pwd)"
       - docker build -t $REPOSITORY_URI:latest -f Dockerfile .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
