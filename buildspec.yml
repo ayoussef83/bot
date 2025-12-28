@@ -19,19 +19,18 @@ phases:
       - echo Build started
       - echo Building Docker image
       - |
-        if [ -f "Mvalley System/backend/Dockerfile" ]; then
-          cd "Mvalley System/backend"
-        elif [ -f "backend/Dockerfile" ]; then
-          cd backend
-        else
+        DOCKERFILE_PATH=$(find . -name Dockerfile -type f -path "*/backend/Dockerfile" | head -1)
+        if [ -z "$DOCKERFILE_PATH" ]; then
           echo ERROR: Dockerfile not found
           find . -name Dockerfile -type f
           exit 1
         fi
-      - echo Building from current directory
-      - pwd
-      - docker build -t $REPOSITORY_URI:latest -f Dockerfile .
-      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+        BACKEND_DIR=$(dirname "$DOCKERFILE_PATH")
+        echo Changing to directory: $BACKEND_DIR
+        cd "$BACKEND_DIR"
+        echo Building from: $(pwd)
+        docker build -t $REPOSITORY_URI:latest -f Dockerfile .
+        docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed
