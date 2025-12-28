@@ -1,0 +1,227 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateClassDto, UpdateClassDto } from './dto';
+
+@Injectable()
+export class ClassesService {
+  constructor(private prisma: PrismaService) {}
+
+  async create(data: CreateClassDto, createdBy: string) {
+    const classEntity = await this.prisma.class.create({
+      data: {
+        ...data,
+      },
+      include: {
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        students: {
+          where: { deletedAt: null },
+        },
+        sessions: {
+          orderBy: { scheduledDate: 'desc' },
+          take: 10,
+        },
+      },
+    });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId: createdBy,
+        action: 'create',
+        entityType: 'Class',
+        entityId: classEntity.id,
+      },
+    });
+
+    return classEntity;
+  }
+
+  async findAll() {
+    return this.prisma.class.findMany({
+      where: { deletedAt: null },
+      include: {
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        students: {
+          where: { deletedAt: null },
+        },
+        _count: {
+          select: {
+            sessions: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async findOne(id: string) {
+    const classEntity = await this.prisma.class.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        students: {
+          where: { deletedAt: null },
+          include: {
+            parent: true,
+          },
+        },
+        sessions: {
+          orderBy: { scheduledDate: 'desc' },
+          include: {
+            attendances: {
+              include: {
+                student: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!classEntity) {
+      throw new NotFoundException('Class not found');
+    }
+
+    return classEntity;
+  }
+
+  async update(id: string, data: UpdateClassDto, updatedBy: string) {
+    const classEntity = await this.prisma.class.update({
+      where: { id },
+      data,
+      include: {
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        students: {
+          where: { deletedAt: null },
+        },
+      },
+    });
+
+    // Recalculate metrics
+    await this.recalculateMetrics(id);
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId: updatedBy,
+        action: 'update',
+        entityType: 'Class',
+        entityId: id,
+        changes: JSON.stringify(data),
+      },
+    });
+
+    return classEntity;
+  }
+
+  async remove(id: string, deletedBy: string) {
+    const classEntity = await this.prisma.class.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId: deletedBy,
+        action: 'delete',
+        entityType: 'Class',
+        entityId: id,
+      },
+    });
+
+    return classEntity;
+  }
+
+  async recalculateMetrics(classId: string) {
+    const classEntity = await this.prisma.class.findUnique({
+      where: { id: classId },
+      include: {
+        sessions: {
+          include: {
+            attendances: {
+              where: { attended: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!classEntity) return;
+
+    const sessions = classEntity.sessions.filter((s) => s.status === 'completed');
+    if (sessions.length === 0) {
+      await this.prisma.class.update({
+        where: { id: classId },
+        data: {
+          avgStudentsPerSession: 0,
+          utilizationPercentage: 0,
+          isUnderfilled: false,
+        },
+      });
+      return;
+    }
+
+    const totalAttendances = sessions.reduce(
+      (sum, session) => sum + session.attendances.length,
+      0,
+    );
+    const avgStudentsPerSession = totalAttendances / sessions.length;
+    const utilizationPercentage = (avgStudentsPerSession / classEntity.capacity) * 100;
+    const isUnderfilled = utilizationPercentage < 60; // Flag if less than 60% capacity
+
+    await this.prisma.class.update({
+      where: { id: classId },
+      data: {
+        avgStudentsPerSession,
+        utilizationPercentage,
+        isUnderfilled,
+      },
+    });
+  }
+}
+
