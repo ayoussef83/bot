@@ -10,8 +10,8 @@ COPY prisma ./prisma/
 # Install dependencies
 RUN npm install --legacy-peer-deps
 
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client (pin CLI to avoid accidental Prisma 6/7 installs in CI)
+RUN npx prisma@5.22.0 generate
 
 # Copy source code
 COPY . .
@@ -31,8 +31,8 @@ COPY prisma ./prisma/
 # Install production dependencies only
 RUN npm install --only=production --legacy-peer-deps
 
-# Generate Prisma client for production
-RUN npx prisma generate
+# Generate Prisma client for production (pin CLI to avoid accidental Prisma 6/7 installs in CI)
+RUN npx prisma@5.22.0 generate
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
