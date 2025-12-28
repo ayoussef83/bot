@@ -1,0 +1,521 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Seed script configuration
+// Run with: npm run prisma:seed
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTH & USERS
+// ============================================
+
+enum UserRole {
+  super_admin
+  management
+  operations
+  accounting
+  sales
+  instructor
+  student
+  parent
+  school_admin
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // hashed
+  firstName String
+  lastName  String
+  role      UserRole
+  status    UserStatus @default(active)
+  
+  // Relations
+  instructorProfile Instructor?
+  studentProfile    Student?
+  parentProfile     Parent?
+  
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete
+  
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ============================================
+// STUDENTS
+// ============================================
+
+enum StudentStatus {
+  active
+  paused
+  finished
+}
+
+enum LearningTrack {
+  AI
+  robotics
+  coding
+  general
+}
+
+model Student {
+  id          String   @id @default(uuid())
+  userId      String?  @unique // Link to User if they have account
+  firstName   String
+  lastName    String
+  age         Int
+  learningTrack LearningTrack
+  status      StudentStatus @default(active)
+  
+  // Contact
+  email       String?
+  phone       String?
+  
+  // Parent info
+  parentId    String?
+  parent      Parent?  @relation(fields: [parentId], references: [id])
+  
+  // Class assignment
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id])
+  
+  // Relations
+  user        User?    @relation(fields: [userId], references: [id])
+  payments    Payment[]
+  attendances SessionAttendance[]
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([classId])
+  @@index([parentId])
+  @@index([status])
+  @@map("students")
+}
+
+model Parent {
+  id        String   @id @default(uuid())
+  userId    String?  @unique
+  firstName String
+  lastName  String
+  email     String?
+  phone     String
+  address   String?
+  
+  // Relations
+  user      User?    @relation(fields: [userId], references: [id])
+  students  Student[]
+  
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  
+  @@index([phone])
+  @@map("parents")
+}
+
+// ============================================
+// CLASSES & SESSIONS
+// ============================================
+
+enum Location {
+  MOA
+  Espace
+  SODIC
+  PalmHills
+}
+
+model Class {
+  id          String   @id @default(uuid())
+  name        String
+  location    Location
+  capacity    Int
+  instructorId String?
+  instructor  Instructor? @relation(fields: [instructorId], references: [id])
+  
+  // Schedule (recurring pattern)
+  dayOfWeek   Int      // 0 = Sunday, 1 = Monday, etc.
+  startTime   String   // HH:mm format
+  endTime     String   // HH:mm format
+  startDate   DateTime
+  endDate     DateTime?
+  
+  // Relations
+  students    Student[]
+  sessions    Session[]
+  
+  // Auto-calculated (cached)
+  avgStudentsPerSession Float?  @default(0)
+  utilizationPercentage Float?  @default(0)
+  isUnderfilled         Boolean @default(false)
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([instructorId])
+  @@index([location])
+  @@map("classes")
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  
+  scheduledDate DateTime
+  startTime     DateTime
+  endTime       DateTime
+  
+  instructorId  String?
+  instructor    Instructor? @relation(fields: [instructorId], references: [id])
+  
+  // Status
+  status        String   @default("scheduled") // scheduled, completed, cancelled
+  instructorConfirmed Boolean @default(false)
+  
+  // Relations
+  attendances   SessionAttendance[]
+  
+  // Audit
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  @@index([classId])
+  @@index([instructorId])
+  @@index([scheduledDate])
+  @@map("sessions")
+}
+
+model SessionAttendance {
+  id        String   @id @default(uuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  
+  attended  Boolean  @default(false)
+  notes     String?
+  
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([sessionId, studentId])
+  @@index([sessionId])
+  @@index([studentId])
+  @@map("session_attendances")
+}
+
+// ============================================
+// INSTRUCTORS
+// ============================================
+
+enum InstructorCostType {
+  hourly
+  monthly
+}
+
+model Instructor {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  // Cost
+  costType  InstructorCostType
+  costAmount Float   // hourly rate or monthly salary
+  
+  // Relations
+  classes   Class[]
+  sessions  Session[]
+  expenses  Expense[]
+  
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  
+  @@map("instructors")
+}
+
+// ============================================
+// FINANCE
+// ============================================
+
+enum PaymentType {
+  subscription
+  camp
+  b2b
+  other
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum ExpenseCategory {
+  rent
+  instructor
+  marketing
+  operations
+  other
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  studentId   String?
+  student     Student? @relation(fields: [studentId], references: [id])
+  
+  amount      Float
+  type        PaymentType
+  status      PaymentStatus @default(pending)
+  
+  // Payment details
+  paymentDate DateTime?
+  dueDate     DateTime?
+  notes       String?
+  
+  // B2B fields
+  schoolName  String?
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  createdBy   String?  // User ID who created
+  
+  @@index([studentId])
+  @@index([status])
+  @@index([paymentDate])
+  @@map("payments")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  category    ExpenseCategory
+  amount      Float
+  description String
+  
+  // Optional links
+  instructorId String?
+  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+  
+  expenseDate DateTime
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  createdBy   String?  // User ID
+  
+  @@index([category])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+model MonthlySnapshot {
+  id          String   @id @default(uuid())
+  year        Int
+  month       Int      // 1-12
+  
+  // Revenue
+  totalRevenue Float   @default(0)
+  subscriptionRevenue Float @default(0)
+  campRevenue  Float   @default(0)
+  b2bRevenue   Float   @default(0)
+  
+  // Expenses
+  totalExpenses Float  @default(0)
+  rentExpenses  Float  @default(0)
+  instructorExpenses Float @default(0)
+  marketingExpenses Float @default(0)
+  operationsExpenses Float @default(0)
+  
+  // Metrics
+  activeStudents Int   @default(0)
+  avgStudentsPerSession Float @default(0)
+  instructorUtilization Float @default(0)
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([year, month], name: "year_month")
+  @@index([year, month])
+  @@map("monthly_snapshots")
+}
+
+// ============================================
+// SALES (CRM)
+// ============================================
+
+enum LeadSource {
+  website
+  referral
+  social_media
+  event
+  walk_in
+  other
+}
+
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  converted
+  lost
+}
+
+model Lead {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String
+  source      LeadSource
+  status      LeadStatus @default(new)
+  
+  // Details
+  notes       String?
+  interestedIn LearningTrack?
+  
+  // Conversion
+  convertedToStudentId String?
+  convertedAt         DateTime?
+  
+  // Relations
+  followUps   LeadFollowUp[]
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  createdBy   String?  // User ID (sales person)
+  
+  @@index([status])
+  @@index([source])
+  @@index([phone])
+  @@map("leads")
+}
+
+model LeadFollowUp {
+  id          String   @id @default(uuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  notes       String
+  nextAction  String?
+  nextActionDate DateTime?
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  createdBy   String?  // User ID
+  
+  @@index([leadId])
+  @@map("lead_follow_ups")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationChannel {
+  email
+  sms
+  whatsapp
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  channel     NotificationChannel
+  recipient   String   // email, phone, etc.
+  template    String?  // Template identifier
+  subject     String?
+  message     String
+  
+  status      NotificationStatus @default(pending)
+  sentAt      DateTime?
+  errorMessage String?
+  
+  // Links
+  studentId   String?
+  leadId      String?
+  parentId    String?
+  
+  // Payload (JSON)
+  payload     String?  // JSON string for template variables
+  
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([status])
+  @@index([channel])
+  @@index([studentId])
+  @@index([leadId])
+  @@map("notifications")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+enum AuditAction {
+  create
+  update
+  delete
+  view
+  login
+  logout
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      AuditAction
+  entityType  String   // e.g., "Student", "Payment"
+  entityId    String?
+  changes     String?  // JSON string of changes
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
