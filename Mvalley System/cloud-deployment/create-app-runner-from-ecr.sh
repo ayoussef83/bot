@@ -9,7 +9,8 @@ echo ""
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION=$(aws configure get region || echo "us-east-1")
 
-ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/mv-os-backend:latest"
+ECR_REPO="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/mv-os-backend"
+ECR_TAG="latest"
 
 # Create/ensure ECR access role for App Runner (required to pull from private ECR)
 ECR_ACCESS_ROLE_NAME="AppRunnerECRAccessRole"
@@ -50,16 +51,16 @@ aws iam attach-role-policy \
 echo "✅ ECR access role: $ECR_ACCESS_ROLE_ARN"
 echo ""
 
-# Check if image exists
+# Check if image exists and resolve digest (use digest to avoid any "latest tag" caching ambiguity)
 echo "📦 Checking ECR Image..."
-IMAGE_EXISTS=$(aws ecr describe-images \
+IMAGE_DIGEST=$(aws ecr describe-images \
     --repository-name mv-os-backend \
-    --image-ids imageTag=latest \
-    --query 'imageDetails[0].imageTags[0]' \
+    --image-ids imageTag=$ECR_TAG \
+    --query 'imageDetails[0].imageDigest' \
     --output text 2>/dev/null || echo "")
 
-if [ -z "$IMAGE_EXISTS" ] || [ "$IMAGE_EXISTS" = "None" ]; then
-    echo "❌ Docker image not found in ECR: $ECR_URI"
+if [ -z "$IMAGE_DIGEST" ] || [ "$IMAGE_DIGEST" = "None" ]; then
+    echo "❌ Docker image not found in ECR: $ECR_REPO:$ECR_TAG"
     echo ""
     echo "You need to build and push the image first:"
     echo "  1. Use CodeBuild: ./cloud-deployment/setup-codebuild.sh"
@@ -67,7 +68,9 @@ if [ -z "$IMAGE_EXISTS" ] || [ "$IMAGE_EXISTS" = "None" ]; then
     exit 1
 fi
 
-echo "✅ Docker image found: $ECR_URI"
+ECR_IMAGE_ID="$ECR_REPO@$IMAGE_DIGEST"
+echo "✅ Docker image found: $ECR_REPO:$ECR_TAG"
+echo "✅ Using image digest: $ECR_IMAGE_ID"
 echo ""
 
 # Get secrets ARNs
@@ -108,7 +111,7 @@ cat > /tmp/ecr-apprunner-config.json <<EOF
       "AccessRoleArn": "$ECR_ACCESS_ROLE_ARN"
     },
     "ImageRepository": {
-      "ImageIdentifier": "$ECR_URI",
+      "ImageIdentifier": "$ECR_IMAGE_ID",
       "ImageConfiguration": {
         "Port": "3000",
         "RuntimeEnvironmentVariables": {
@@ -122,7 +125,7 @@ cat > /tmp/ecr-apprunner-config.json <<EOF
       },
       "ImageRepositoryType": "ECR"
     },
-    "AutoDeploymentsEnabled": true
+    "AutoDeploymentsEnabled": false
   },
   "InstanceConfiguration": {
     "Cpu": "0.25 vCPU",
