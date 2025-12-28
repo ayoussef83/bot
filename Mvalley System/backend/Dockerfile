@@ -1,7 +1,11 @@
 # Build stage
-FROM public.ecr.aws/docker/library/node:18-alpine AS builder
+FROM public.ecr.aws/docker/library/node:18-bullseye-slim AS builder
 
 WORKDIR /app
+
+# Prisma native engines need OpenSSL at runtime; ensure it's present in builder too
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -20,9 +24,13 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM public.ecr.aws/docker/library/node:18-alpine
+FROM public.ecr.aws/docker/library/node:18-bullseye-slim
 
 WORKDIR /app
+
+# Ensure OpenSSL is present for Prisma query engine
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
