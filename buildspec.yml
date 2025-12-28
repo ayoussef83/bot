@@ -6,36 +6,36 @@ phases:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/mv-os-backend
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=latest
-      - echo "Repository URI: $REPOSITORY_URI"
-      - echo "Current directory: $(pwd)"
-      - echo "Listing files:"
+      - echo Repository URI is $REPOSITORY_URI
+      - echo Current directory
+      - pwd
+      - echo Listing files
       - ls -la
-      - echo "Finding Dockerfile..."
-      - find . -name "Dockerfile" -type f 2>/dev/null | head -5
+      - echo Finding Dockerfile
+      - find . -name Dockerfile -type f 2>/dev/null | head -5
   build:
     commands:
-      - echo Build started on `date`
-      - echo "Building Docker image..."
+      - echo Build started
+      - echo Building Docker image
       - |
         if [ -f "Mvalley System/backend/Dockerfile" ]; then
           cd "Mvalley System/backend"
         elif [ -f "backend/Dockerfile" ]; then
           cd backend
         else
-          echo "ERROR: Dockerfile not found!"
-          find . -name "Dockerfile" -type f
+          echo ERROR: Dockerfile not found
+          find . -name Dockerfile -type f
           exit 1
         fi
-      - echo "Building from: $(pwd)"
-      - echo "Dockerfile exists: $(test -f Dockerfile && echo 'YES' || echo 'NO')"
+      - echo Building from current directory
+      - pwd
       - docker build -t $REPOSITORY_URI:latest -f Dockerfile .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo "Pushing Docker images..."
+      - echo Build completed
+      - echo Pushing Docker images
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "✅ Image pushed successfully: $REPOSITORY_URI:latest"
+      - echo Image pushed successfully
