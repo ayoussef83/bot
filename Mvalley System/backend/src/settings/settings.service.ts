@@ -6,12 +6,14 @@ import {
   UpdateCustomFieldDto,
   UpdateMessageTemplateDto,
   UpsertIntegrationConfigDto,
+  TestSmsDto,
 } from './dto';
 import {
   CustomFieldEntity,
   IntegrationProvider,
   MessageChannel,
 } from '@prisma/client';
+import { sendSmsMisr, SmsMisrLanguage } from '../notifications/smsmisr.client';
 
 @Injectable()
 export class SettingsService {
@@ -203,6 +205,53 @@ export class SettingsService {
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
+  }
+
+  async sendTestSms(dto: TestSmsDto) {
+    const cfg = await this.prisma.integrationConfig.findUnique({
+      where: { provider: 'smsmisr' },
+    });
+    if (!cfg || !cfg.isActive) {
+      throw new BadRequestException('SMSMisr is not configured or not active');
+    }
+
+    const config = (cfg.config || {}) as any;
+    const secrets = (cfg.secrets || {}) as any;
+    const username = String(config.username || '').trim();
+    const sender = String(config.senderId || '').trim();
+    const apiUrl = String(config.apiUrl || 'https://smsmisr.com/api/SMS/').trim();
+    const password = String(secrets.password || '').trim();
+    const environment = Number(config.environment || 1) as 1 | 2; // default: live
+    const language = Number(config.language || 1) as SmsMisrLanguage; // default: english
+
+    if (!username || !password || !sender) {
+      throw new BadRequestException(
+        'SMSMisr settings are incomplete (username/password/senderId required)',
+      );
+    }
+
+    const mobileRaw = (dto.mobile || '').trim();
+    const mobile =
+      mobileRaw.startsWith('+')
+        ? mobileRaw.slice(1)
+        : mobileRaw.startsWith('0')
+          ? `20${mobileRaw.slice(1)}`
+          : mobileRaw;
+
+    const message = dto.message?.trim() || 'Test SMS from MV-OS';
+
+    const resp = await sendSmsMisr({
+      apiUrl,
+      environment,
+      username,
+      password,
+      sender,
+      mobile,
+      language,
+      message,
+    });
+
+    return { success: true, response: resp };
   }
 }
 

@@ -92,8 +92,15 @@ export default function SettingsPage() {
     username: '',
     senderId: '',
     apiUrl: 'https://smsmisr.com/api/SMS/',
+    environment: 1, // 1=Live, 2=Test
+    language: 1, // 1=English, 2=Arabic, 3=Unicode
     password: '', // write-only
     isActive: true,
+  });
+
+  const [testSms, setTestSms] = useState({
+    mobile: '',
+    message: 'Test SMS from MV-OS',
   });
 
   const [showTemplateForm, setShowTemplateForm] = useState(false);
@@ -178,6 +185,8 @@ export default function SettingsPage() {
           username: smsForm.username,
           senderId: smsForm.senderId,
           apiUrl: smsForm.apiUrl,
+          environment: Number(smsForm.environment) || 1,
+          language: Number(smsForm.language) || 1,
         },
         secrets: smsForm.password ? { password: smsForm.password } : undefined,
       });
@@ -740,6 +749,33 @@ export default function SettingsPage() {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Environment</label>
+                <select
+                  value={smsForm.environment}
+                  onChange={(e) =>
+                    setSmsForm({ ...smsForm, environment: Number(e.target.value) as any })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                >
+                  <option value={1}>Live (1)</option>
+                  <option value={2}>Test (2)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Language</label>
+                <select
+                  value={smsForm.language}
+                  onChange={(e) =>
+                    setSmsForm({ ...smsForm, language: Number(e.target.value) as any })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                >
+                  <option value={1}>English (1)</option>
+                  <option value={2}>Arabic (2)</option>
+                  <option value={3}>Unicode (3)</option>
+                </select>
+              </div>
             </div>
 
             <div className="flex items-center gap-6 mt-4">
@@ -757,6 +793,44 @@ export default function SettingsPage() {
               >
                 Save SMS Settings
               </button>
+            </div>
+
+            <div className="mt-6 border-t pt-4">
+              <h3 className="text-md font-semibold mb-2">Send Test SMS</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Mobile</label>
+                  <input
+                    value={testSms.mobile}
+                    onChange={(e) => setTestSms({ ...testSms, mobile: e.target.value })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                    placeholder="e.g. 0127..., +20127..., 20127..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Message</label>
+                  <input
+                    value={testSms.message}
+                    onChange={(e) => setTestSms({ ...testSms, message: e.target.value })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  />
+                </div>
+              </div>
+              <div className="mt-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      await settingsService.sendTestSms(testSms.mobile, testSms.message);
+                      alert('Test SMS request sent (check SMSMisr delivery)');
+                    } catch (e: any) {
+                      setError(e.response?.data?.message || 'Failed to send test SMS');
+                    }
+                  }}
+                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+                >
+                  Send Test SMS
+                </button>
+              </div>
             </div>
           </div>
 

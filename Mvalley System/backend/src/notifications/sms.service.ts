@@ -1,10 +1,20 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-// Note: In production, use SMS Misr API
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { sendSmsMisr, SmsMisrLanguage } from './smsmisr.client';
 
 @Injectable()
 export class SmsService {
-  constructor(private configService: ConfigService) {}
+  constructor(private prisma: PrismaService) {}
+
+  private normalizeMobile(to: string) {
+    // Accept: +2012..., 2012..., 012...
+    const raw = (to || '').trim().replace(/\s+/g, '');
+    if (!raw) return '';
+    if (raw.startsWith('+')) return raw.slice(1);
+    if (raw.startsWith('00')) return raw.slice(2);
+    if (raw.startsWith('0')) return `20${raw.slice(1)}`;
+    return raw;
+  }
 
   async send(
     to: string,
@@ -12,35 +22,45 @@ export class SmsService {
     template?: string,
     payload?: any,
   ) {
-    // TODO: Implement SMS Misr API integration
-    // For now, just log
-    console.log('SMS Service:', {
-      to,
-      message,
-      template,
-      payload,
+    const cfg = await this.prisma.integrationConfig.findUnique({
+      where: { provider: 'smsmisr' },
     });
 
-    // Example SMS Misr implementation:
-    // const apiKey = this.configService.get('SMS_MISR_API_KEY');
-    // const senderId = this.configService.get('SMS_MISR_SENDER_ID');
-    //
-    // const response = await fetch('https://smsmisr.com/api/send', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${apiKey}`,
-    //   },
-    //   body: JSON.stringify({
-    //     sender: senderId,
-    //     mobile: to,
-    //     message: message,
-    //   }),
-    // });
-    //
-    // return await response.json();
+    if (!cfg || !cfg.isActive) {
+      throw new BadRequestException('SMSMisr is not configured or not active');
+    }
 
-    return { success: true, messageId: 'mock-sms-id' };
+    const config = (cfg.config || {}) as any;
+    const secrets = (cfg.secrets || {}) as any;
+
+    const username = String(config.username || '').trim();
+    const sender = String(config.senderId || '').trim();
+    const apiUrl = String(config.apiUrl || 'https://smsmisr.com/api/SMS/').trim();
+    const password = String(secrets.password || '').trim();
+    const environment = Number(config.environment || 1) as 1 | 2; // default: live
+    const language = Number(config.language || 1) as SmsMisrLanguage; // default: english
+
+    if (!username || !password || !sender) {
+      throw new BadRequestException(
+        'SMSMisr settings are incomplete (username/password/senderId required)',
+      );
+    }
+
+    const mobile = this.normalizeMobile(to);
+    if (!mobile) throw new BadRequestException('Invalid recipient mobile');
+
+    const resp = await sendSmsMisr({
+      apiUrl,
+      environment,
+      username,
+      password,
+      sender,
+      mobile,
+      language,
+      message,
+    });
+
+    return { success: true, provider: 'smsmisr', response: resp };
   }
 }
 

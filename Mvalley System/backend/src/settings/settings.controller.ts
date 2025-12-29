@@ -26,6 +26,7 @@ import {
   UpdateCustomFieldDto,
   UpdateMessageTemplateDto,
   UpsertIntegrationConfigDto,
+  TestSmsDto,
 } from './dto';
 
 @Controller('settings')
@@ -99,6 +100,12 @@ export class SettingsController {
   @Roles(UserRole.super_admin)
   deleteTemplate(@Param('id') id: string) {
     return this.settingsService.deleteTemplate(id);
+  }
+
+  @Post('test-sms')
+  @Roles(UserRole.super_admin)
+  sendTestSms(@Body() dto: TestSmsDto) {
+    return this.settingsService.sendTestSms(dto);
   }
 }
 

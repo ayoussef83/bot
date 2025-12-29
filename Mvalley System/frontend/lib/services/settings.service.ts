@@ -71,6 +71,9 @@ export const settingsService = {
   updateTemplate: (id: string, data: Partial<MessageTemplate>) =>
     api.patch<MessageTemplate>(`/settings/templates/${id}`, data),
   deleteTemplate: (id: string) => api.delete(`/settings/templates/${id}`),
+
+  sendTestSms: (mobile: string, message?: string) =>
+    api.post('/settings/test-sms', { mobile, message }),
 };
 
 
