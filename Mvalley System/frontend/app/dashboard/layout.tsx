@@ -68,10 +68,6 @@ export default function DashboardLayout({
     navigation.push({ name: 'Settings', href: '/dashboard/settings' });
   }
 
-  if (user.role === 'sales' || user.role === 'super_admin') {
-    navigation.push({ name: 'Leads', href: '/dashboard/leads' });
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-sm">
