@@ -10,6 +10,28 @@ export class SmsMisrError extends Error {
   }
 }
 
+const SMSMISR_CODE_HINT: Record<string, string> = {
+  '1902': 'Invalid request',
+  '1903': 'Invalid username/password',
+  '1904': 'Invalid sender (sender token / sender id not accepted)',
+  '1905': 'Invalid mobile',
+  '1906': 'Insufficient credit',
+  '1907': 'Server updating',
+  '1908': 'Invalid DelayUntil format',
+  '1909': 'Invalid message',
+  '1910': 'Invalid language',
+  '1911': 'Text too long',
+  '1912': 'Invalid environment',
+  '4903': 'Invalid username/password (OTP)',
+  '4904': 'Invalid sender (OTP)',
+  '4905': 'Invalid mobile (OTP)',
+  '4906': 'Insufficient credit (OTP)',
+  '4907': 'Server updating (OTP)',
+  '4908': 'Invalid OTP',
+  '4909': 'Invalid template token (OTP)',
+  '4912': 'Invalid environment (OTP)',
+};
+
 export async function sendSmsMisr(params: {
   apiUrl: string; // e.g. https://smsmisr.com/api/SMS/
   environment: 1 | 2; // 1=Live, 2=Test
@@ -56,7 +78,11 @@ export async function sendSmsMisr(params: {
   const code = json?.code;
   if (code !== '1901' && code !== '4901') {
     // 1901: SMS success, 4901: OTP success (same response shape)
-    throw new SmsMisrError(`SMSMisr error code ${code || 'unknown'}`, code, json ?? text);
+    const hint = code ? SMSMISR_CODE_HINT[String(code)] : undefined;
+    const msg = hint
+      ? `SMSMisr error (${code}): ${hint}`
+      : `SMSMisr error code ${code || 'unknown'}`;
+    throw new SmsMisrError(msg, code, json ?? text);
   }
 
   return json ?? { ok: true };
