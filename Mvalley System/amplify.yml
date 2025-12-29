@@ -5,7 +5,7 @@ frontend:
       commands:
         - echo "Installing dependencies in frontend directory..."
         - cd frontend
-        - npm ci --legacy-peer-deps
+        - npm install --legacy-peer-deps
     build:
       commands:
         - echo "Building Next.js application..."
