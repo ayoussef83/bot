@@ -4,19 +4,31 @@ frontend:
     preBuild:
       commands:
         - echo "Installing dependencies..."
-        - cd "Mvalley System/frontend"
+        - |
+          if [ -d "Mvalley System/frontend" ]; then
+            cd "Mvalley System/frontend"
+          elif [ -d "frontend" ]; then
+            cd "frontend"
+          fi
+          pwd
         - npm install --legacy-peer-deps
     build:
       commands:
         - echo "Building Next.js application..."
-        - cd "Mvalley System/frontend"
+        - |
+          if [ -d "Mvalley System/frontend" ]; then
+            cd "Mvalley System/frontend"
+          elif [ -d "frontend" ]; then
+            cd "frontend"
+          fi
+          pwd
         - npm run build
   artifacts:
-    baseDirectory: "Mvalley System/frontend/.next"
+    baseDirectory: .next
     files:
       - '**/*'
   cache:
     paths:
-      - "Mvalley System/frontend/node_modules/**/*"
-      - "Mvalley System/frontend/.next/cache/**/*"
+      - node_modules/**/*
+      - .next/cache/**/*
 
