@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function DashboardLayout({
   children,
@@ -12,6 +13,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -75,7 +77,20 @@ export default function DashboardLayout({
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold">MV-OS</h1>
+                <Link href={`/dashboard/${getDashboardPath(user.role)}`} className="flex items-center">
+                  {!logoError ? (
+                    <Image
+                      src="/mindvalley-logo.png"
+                      alt="MindValley"
+                      width={120}
+                      height={40}
+                      className="object-contain"
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <h1 className="text-xl font-bold">MV-OS</h1>
+                  )}
+                </Link>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 {navigation.map((item) => (

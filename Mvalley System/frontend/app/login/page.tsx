@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import api from '@/lib/api';
 
 export default function LoginPage() {
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +49,20 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
+        <div className="flex flex-col items-center">
+          {!logoError ? (
+            <div className="mb-4">
+              <Image
+                src="/mindvalley-logo.png"
+                alt="MindValley Logo"
+                width={200}
+                height={80}
+                className="object-contain"
+                priority
+                onError={() => setLogoError(true)}
+              />
+            </div>
+          ) : null}
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             MV-OS Login
           </h2>
