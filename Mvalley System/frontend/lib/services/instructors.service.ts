@@ -19,3 +19,4 @@ export const instructorsService = {
   delete: (id: string) => api.delete(`/instructors/${id}`),
 };
 
+

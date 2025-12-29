@@ -37,3 +37,4 @@ export const salesService = {
   getFollowUpsByLead: (leadId: string) => api.get(`/follow-ups/lead/${leadId}`),
 };
 
+

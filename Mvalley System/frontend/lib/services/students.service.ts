@@ -23,3 +23,4 @@ export const studentsService = {
   delete: (id: string) => api.delete(`/students/${id}`),
 };
 
+

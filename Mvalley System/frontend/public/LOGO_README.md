@@ -12,3 +12,4 @@ The logo should be:
 - Brain graphic (green left, purple right) with tree/neural patterns
 - "MINDVALLEY" text below (MIND in purple, VALLEY in green)
 
+

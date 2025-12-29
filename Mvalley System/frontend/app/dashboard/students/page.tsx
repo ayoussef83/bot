@@ -347,7 +347,7 @@ export default function StudentsPage() {
               <tr key={student.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Link
-                    href={`/dashboard/students/${student.id}`}
+                    href={`/dashboard/students/details?id=${encodeURIComponent(student.id)}`}
                     className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
                   >
                     {student.firstName} {student.lastName}

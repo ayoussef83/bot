@@ -1,25 +1,31 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { studentsService, Student } from '@/lib/services';
 
 export default function StudentDetailPage() {
-  const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
+
   const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (params.id) {
-      fetchStudent(params.id as string);
+    if (id) {
+      fetchStudent(id);
+    } else {
+      setError('Missing student id');
+      setLoading(false);
     }
-  }, [params.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  const fetchStudent = async (id: string) => {
+  const fetchStudent = async (studentId: string) => {
     try {
-      const response = await studentsService.getById(id);
+      const response = await studentsService.getById(studentId);
       setStudent(response.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load student');
@@ -78,8 +84,8 @@ export default function StudentDetailPage() {
                 student.status === 'active'
                   ? 'bg-green-100 text-green-800'
                   : student.status === 'paused'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-gray-100 text-gray-800'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
               }`}
             >
               {student.status}
@@ -120,4 +126,5 @@ export default function StudentDetailPage() {
     </div>
   );
 }
+
 
