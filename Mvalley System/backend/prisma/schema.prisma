@@ -95,6 +95,56 @@ enum CustomFieldType {
   select
 }
 
+// ============================================
+// COMMUNICATION SETTINGS (Email/SMS) + TEMPLATES
+// ============================================
+
+enum IntegrationProvider {
+  zoho_email
+  smsmisr
+}
+
+enum MessageChannel {
+  email
+  sms
+}
+
+model IntegrationConfig {
+  id       String              @id @default(uuid())
+  provider IntegrationProvider @unique
+  isActive Boolean             @default(true)
+
+  // Non-secret config (safe to return to UI)
+  config Json?
+
+  // Secret config (passwords / tokens). We will NOT return this to UI.
+  secrets Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("integration_configs")
+}
+
+model MessageTemplate {
+  id       String         @id @default(uuid())
+  channel  MessageChannel
+  key      String // unique per channel, e.g. "payment_due_reminder"
+  name     String
+  subject  String? // email only
+  body     String // template string
+  isActive Boolean        @default(true)
+
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([channel, key])
+  @@index([channel, isActive])
+  @@map("message_templates")
+}
+
 model CustomFieldDefinition {
   id       String            @id @default(uuid())
   entity   CustomFieldEntity

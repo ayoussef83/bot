@@ -13,9 +13,20 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole, CustomFieldEntity } from '@prisma/client';
+import {
+  UserRole,
+  CustomFieldEntity,
+  IntegrationProvider,
+  MessageChannel,
+} from '@prisma/client';
 import { SettingsService } from './settings.service';
-import { CreateCustomFieldDto, UpdateCustomFieldDto } from './dto';
+import {
+  CreateCustomFieldDto,
+  CreateMessageTemplateDto,
+  UpdateCustomFieldDto,
+  UpdateMessageTemplateDto,
+  UpsertIntegrationConfigDto,
+} from './dto';
 
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,6 +55,50 @@ export class SettingsController {
   @Roles(UserRole.super_admin)
   deleteCustomField(@Param('id') id: string) {
     return this.settingsService.deleteCustomField(id);
+  }
+
+  // -----------------------------
+  // Integration configs
+  // -----------------------------
+
+  @Get('integrations/:provider')
+  @Roles(UserRole.super_admin)
+  getIntegration(@Param('provider') provider: IntegrationProvider) {
+    return this.settingsService.getIntegrationConfig(provider);
+  }
+
+  @Post('integrations')
+  @Roles(UserRole.super_admin)
+  upsertIntegration(@Body() dto: UpsertIntegrationConfigDto) {
+    return this.settingsService.upsertIntegrationConfig(dto);
+  }
+
+  // -----------------------------
+  // Templates
+  // -----------------------------
+
+  @Get('templates')
+  @Roles(UserRole.super_admin)
+  listTemplates(@Query('channel') channel?: MessageChannel) {
+    return this.settingsService.listTemplates(channel);
+  }
+
+  @Post('templates')
+  @Roles(UserRole.super_admin)
+  createTemplate(@Body() dto: CreateMessageTemplateDto, @CurrentUser() user: any) {
+    return this.settingsService.createTemplate(dto, user?.id);
+  }
+
+  @Patch('templates/:id')
+  @Roles(UserRole.super_admin)
+  updateTemplate(@Param('id') id: string, @Body() dto: UpdateMessageTemplateDto) {
+    return this.settingsService.updateTemplate(id, dto);
+  }
+
+  @Delete('templates/:id')
+  @Roles(UserRole.super_admin)
+  deleteTemplate(@Param('id') id: string) {
+    return this.settingsService.deleteTemplate(id);
   }
 }
 
