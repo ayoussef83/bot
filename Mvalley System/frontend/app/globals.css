@@ -2,27 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  MV-OS is an internal dashboard and we currently ship a light UI.
+  Don't inherit OS dark-mode defaults because Tailwind form controls inherit `color`
+  (which makes input text look "invisible" on light backgrounds).
+*/
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+  color-scheme: light;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: #111827; /* gray-900 */
+  background: #f9fafb; /* gray-50 */
+}
+
+/* Safe default: make form control text readable even if a page forgot `text-gray-900`. */
+input,
+textarea,
+select {
+  color: #111827; /* gray-900 */
 }
 
