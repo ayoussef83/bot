@@ -104,6 +104,8 @@ export default function SettingsPage() {
   });
   const [testSmsResult, setTestSmsResult] = useState<any>(null);
   const [testSmsError, setTestSmsError] = useState<any>(null);
+  const [smsBalanceResult, setSmsBalanceResult] = useState<any>(null);
+  const [smsBalanceError, setSmsBalanceError] = useState<any>(null);
 
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
@@ -858,6 +860,49 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+
+              <div className="mt-6 border-t pt-4">
+                <h3 className="text-md font-semibold mb-2">SMSMisr Balance</h3>
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={async () => {
+                      try {
+                        setSmsBalanceResult(null);
+                        setSmsBalanceError(null);
+                        const resp = await settingsService.getSmsMisrBalance();
+                        setSmsBalanceResult(resp.data);
+                      } catch (e: any) {
+                        const apiReply = e?.response?.data ?? e?.message ?? e;
+                        setSmsBalanceError(apiReply);
+                        setError(apiReply?.message || apiReply || 'Failed to fetch SMSMisr balance');
+                      }
+                    }}
+                    className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+                  >
+                    Check Balance
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    Uses your saved SMSMisr username/password
+                  </span>
+                </div>
+
+                {(smsBalanceResult || smsBalanceError) && (
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 border rounded p-3">
+                      <div className="text-xs font-semibold text-gray-700 mb-2">API Reply (success)</div>
+                      <pre className="whitespace-pre-wrap text-xs text-gray-800">
+                        {smsBalanceResult ? JSON.stringify(smsBalanceResult, null, 2) : '—'}
+                      </pre>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded p-3">
+                      <div className="text-xs font-semibold text-red-700 mb-2">API Reply (error)</div>
+                      <pre className="whitespace-pre-wrap text-xs text-red-800">
+                        {smsBalanceError ? JSON.stringify(smsBalanceError, null, 2) : '—'}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

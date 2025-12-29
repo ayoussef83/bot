@@ -19,6 +19,30 @@ import { sendSmsMisr, SmsMisrError, SmsMisrLanguage } from '../notifications/sms
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
+  private async getSmsMisrActiveConfig() {
+    const cfg = await this.prisma.integrationConfig.findUnique({
+      where: { provider: 'smsmisr' },
+    });
+    if (!cfg || !cfg.isActive) {
+      throw new BadRequestException('SMSMisr is not configured or not active');
+    }
+
+    const config = (cfg.config || {}) as any;
+    const secrets = (cfg.secrets || {}) as any;
+    const username = String(config.username || '').trim();
+    const sender = String(config.senderId || '').trim();
+    const apiUrl = String(config.apiUrl || 'https://smsmisr.com/api/SMS/').trim();
+    const password = String(secrets.password || '').trim();
+    const environment = Number(config.environment || 1) as 1 | 2; // default: live
+    const language = Number(config.language || 1) as SmsMisrLanguage; // default: english
+
+    if (!username || !password) {
+      throw new BadRequestException('SMSMisr settings are incomplete (username/password required)');
+    }
+
+    return { username, password, sender, apiUrl, environment, language };
+  }
+
   async listCustomFields(entity: CustomFieldEntity) {
     return this.prisma.customFieldDefinition.findMany({
       where: {
@@ -208,26 +232,10 @@ export class SettingsService {
   }
 
   async sendTestSms(dto: TestSmsDto) {
-    const cfg = await this.prisma.integrationConfig.findUnique({
-      where: { provider: 'smsmisr' },
-    });
-    if (!cfg || !cfg.isActive) {
-      throw new BadRequestException('SMSMisr is not configured or not active');
-    }
-
-    const config = (cfg.config || {}) as any;
-    const secrets = (cfg.secrets || {}) as any;
-    const username = String(config.username || '').trim();
-    const sender = String(config.senderId || '').trim();
-    const apiUrl = String(config.apiUrl || 'https://smsmisr.com/api/SMS/').trim();
-    const password = String(secrets.password || '').trim();
-    const environment = Number(config.environment || 1) as 1 | 2; // default: live
-    const language = Number(config.language || 1) as SmsMisrLanguage; // default: english
-
-    if (!username || !password || !sender) {
-      throw new BadRequestException(
-        'SMSMisr settings are incomplete (username/password/senderId required)',
-      );
+    const { username, password, sender, apiUrl, environment, language } =
+      await this.getSmsMisrActiveConfig();
+    if (!sender) {
+      throw new BadRequestException('SMSMisr settings are incomplete (senderId required)');
     }
 
     const mobileRaw = (dto.mobile || '').trim();
@@ -262,6 +270,32 @@ export class SettingsService {
     }
 
     return { success: true, response: resp };
+  }
+
+  async getSmsMisrBalance() {
+    const { username, password } = await this.getSmsMisrActiveConfig();
+    const url = new URL('https://smsmisr.com/api/Balance/');
+    url.searchParams.set('username', username);
+    url.searchParams.set('password', password);
+
+    const res = await fetch(url.toString(), { method: 'GET' });
+    const text = await res.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // keep text
+    }
+
+    if (!res.ok) {
+      throw new BadRequestException({
+        message: `SMSMisr balance HTTP error (${res.status})`,
+        status: res.status,
+        body: json ?? text,
+      } as any);
+    }
+
+    return { success: true, response: json ?? text };
   }
 }
 

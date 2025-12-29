@@ -107,6 +107,12 @@ export class SettingsController {
   sendTestSms(@Body() dto: TestSmsDto) {
     return this.settingsService.sendTestSms(dto);
   }
+
+  @Get('smsmisr/balance')
+  @Roles(UserRole.super_admin)
+  getSmsMisrBalance() {
+    return this.settingsService.getSmsMisrBalance();
+  }
 }
 
 

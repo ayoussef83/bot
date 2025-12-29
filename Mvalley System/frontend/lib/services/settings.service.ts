@@ -74,6 +74,8 @@ export const settingsService = {
 
   sendTestSms: (mobile: string, message?: string) =>
     api.post('/settings/test-sms', { mobile, message }),
+
+  getSmsMisrBalance: () => api.get('/settings/smsmisr/balance'),
 };
 
 
