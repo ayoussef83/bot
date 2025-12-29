@@ -5,36 +5,47 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/mv-os-backend
-      - IMAGE_TAG=latest
-      - echo Repository URI is $REPOSITORY_URI
-      - echo Current directory
-      - pwd
-      - echo Listing files
+      - TARGET=${TARGET:=backend}
+      - ECR_REPO=${ECR_REPO:=mv-os-backend}
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "Repository URI: $REPOSITORY_URI"
+      - echo "Target: $TARGET"
+      - echo "Current directory: $(pwd)"
+      - echo "Listing files:"
       - ls -la
-      - echo Finding Dockerfile
-      - find . -name Dockerfile -type f 2>/dev/null | head -5
+      - echo "Finding Dockerfile..."
+      - find . -name "Dockerfile" -type f 2>/dev/null | head -10
+
   build:
     commands:
-      - echo Build started
-      - echo Building Docker image
+      - echo Build started on `date`
+      - echo "Building Docker image..."
       - |
-        DOCKERFILE_PATH=$(find . -name Dockerfile -type f -path "*/backend/Dockerfile" | head -1)
-        if [ -z "$DOCKERFILE_PATH" ]; then
-          echo ERROR: Dockerfile not found
-          find . -name Dockerfile -type f
+        if [ -f "Mvalley System/$TARGET/Dockerfile" ]; then
+          cd "Mvalley System/$TARGET"
+        elif [ -f "$TARGET/Dockerfile" ]; then
+          cd "$TARGET"
+        else
+          echo "ERROR: Dockerfile not found for target=$TARGET"
+          find . -name "Dockerfile" -type f
           exit 1
         fi
-        BACKEND_DIR=$(dirname "$DOCKERFILE_PATH")
-        echo Changing to directory: $BACKEND_DIR
-        cd "$BACKEND_DIR"
-        echo Building from: $(pwd)
-        docker build -t $REPOSITORY_URI:latest -f Dockerfile .
-        docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+      - echo "Building from: $(pwd)"
+      - |
+        BUILD_ARGS=""
+        if [ -n "${NEXT_PUBLIC_API_URL:-}" ]; then
+          BUILD_ARGS="$BUILD_ARGS --build-arg NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL"
+        fi
+        echo "Docker build args: $BUILD_ARGS"
+        docker build $BUILD_ARGS -t $REPOSITORY_URI:latest -f Dockerfile .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+
   post_build:
     commands:
-      - echo Build completed
-      - echo Pushing Docker images
+      - echo Build completed on `date`
+      - echo "Pushing Docker images..."
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Image pushed successfully
+      - echo "✅ Image pushed successfully: $REPOSITORY_URI:latest"
