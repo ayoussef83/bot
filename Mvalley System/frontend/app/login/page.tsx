@@ -53,7 +53,7 @@ export default function LoginPage() {
           {!logoError ? (
             <div className="mb-4">
               <Image
-                src="/mindvalley-logo.jpg"
+                src="/mindvalley-logo.png"
                 alt="MindValley Logo"
                 width={200}
                 height={80}
