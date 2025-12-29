@@ -82,8 +82,8 @@ export default function DashboardLayout({
                     <Image
                       src="/mindvalley-logo.png"
                       alt="MindValley"
-                      width={120}
-                      height={40}
+                      width={180}
+                      height={60}
                       className="object-contain"
                       onError={() => setLogoError(true)}
                     />

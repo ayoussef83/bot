@@ -55,8 +55,8 @@ export default function LoginPage() {
               <Image
                 src="/mindvalley-logo.png"
                 alt="MindValley Logo"
-                width={200}
-                height={80}
+                width={300}
+                height={120}
                 className="object-contain"
                 priority
                 onError={() => setLogoError(true)}
