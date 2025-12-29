@@ -9,10 +9,10 @@ async function main() {
   // Create Super Admin
   const hashedPassword = await bcrypt.hash('admin123', 10);
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'admin@mindvalley.eg' },
+    where: { email: 'admin@mvalley.eg' },
     update: {},
     create: {
-      email: 'admin@mindvalley.eg',
+      email: 'admin@mvalley.eg',
       password: hashedPassword,
       firstName: 'Super',
       lastName: 'Admin',
@@ -25,10 +25,10 @@ async function main() {
 
   // Create sample management user
   const management = await prisma.user.upsert({
-    where: { email: 'management@mindvalley.eg' },
+    where: { email: 'management@mvalley.eg' },
     update: {},
     create: {
-      email: 'management@mindvalley.eg',
+      email: 'management@mvalley.eg',
       password: hashedPassword,
       firstName: 'Management',
       lastName: 'User',
@@ -41,10 +41,10 @@ async function main() {
 
   // Create sample instructor user
   const instructorUser = await prisma.user.upsert({
-    where: { email: 'instructor@mindvalley.eg' },
+    where: { email: 'instructor@mvalley.eg' },
     update: {},
     create: {
-      email: 'instructor@mindvalley.eg',
+      email: 'instructor@mvalley.eg',
       password: hashedPassword,
       firstName: 'John',
       lastName: 'Instructor',
@@ -69,9 +69,9 @@ async function main() {
   // Create sample locations data (if needed)
   console.log('✅ Seed completed!');
   console.log('\n📝 Default credentials:');
-  console.log('   Super Admin: admin@mindvalley.eg / admin123');
-  console.log('   Management: management@mindvalley.eg / admin123');
-  console.log('   Instructor: instructor@mindvalley.eg / admin123');
+  console.log('   Super Admin: admin@mvalley.eg / admin123');
+  console.log('   Management: management@mvalley.eg / admin123');
+  console.log('   Instructor: instructor@mvalley.eg / admin123');
 }
 
 main()
@@ -82,4 +82,5 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
 
