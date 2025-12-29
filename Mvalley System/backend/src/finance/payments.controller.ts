@@ -47,6 +47,12 @@ export class PaymentsController {
     return this.paymentsService.getOutstandingBalances();
   }
 
+  @Get('student/:studentId/summary')
+  @Roles(UserRole.super_admin, UserRole.management, UserRole.accounting)
+  getStudentSummary(@Param('studentId') studentId: string) {
+    return this.paymentsService.getStudentSummary(studentId);
+  }
+
   @Get(':id')
   @Roles(UserRole.super_admin, UserRole.management, UserRole.accounting)
   findOne(@Param('id') id: string) {

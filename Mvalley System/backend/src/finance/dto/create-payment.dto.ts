@@ -1,17 +1,18 @@
 import {
   IsNumber,
   IsEnum,
-  IsOptional,
   IsDateString,
   IsString,
   Min,
+  IsUUID,
 } from 'class-validator';
 import { PaymentType, PaymentStatus } from '@prisma/client';
 
 export class CreatePaymentDto {
-  @IsOptional()
+  // Payments must be linked to a student (internal ops requirement).
   @IsString()
-  studentId?: string;
+  @IsUUID()
+  studentId: string;
 
   @IsNumber()
   @Min(0)
