@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { classesService, Class } from '@/lib/services';
 import Link from 'next/link';
+import { downloadExport } from '@/lib/export';
 
 export default function ClassesPage() {
   const [classes, setClasses] = useState<Class[]>([]);
@@ -122,16 +123,30 @@ export default function ClassesPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Classes</h1>
-        <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingClass(null);
-            resetForm();
-          }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Add Class
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => downloadExport('classes', 'xlsx')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+          >
+            Export Excel
+          </button>
+          <button
+            onClick={() => downloadExport('classes', 'pdf')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => {
+              setShowForm(true);
+              setEditingClass(null);
+              resetForm();
+            }}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          >
+            Add Class
+          </button>
+        </div>
       </div>
 
       {error && (

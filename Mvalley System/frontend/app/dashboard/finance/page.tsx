@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { financeService, Payment, Expense, studentsService, Student } from '@/lib/services';
+import { downloadExport } from '@/lib/export';
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<'payments' | 'expenses'>('payments');
@@ -178,12 +179,26 @@ export default function FinancePage() {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Payments</h2>
-            <button
-              onClick={() => setShowPaymentForm(true)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-            >
-              Add Payment
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => downloadExport('payments', 'xlsx')}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+              >
+                Export Excel
+              </button>
+              <button
+                onClick={() => downloadExport('payments', 'pdf')}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+              >
+                Export PDF
+              </button>
+              <button
+                onClick={() => setShowPaymentForm(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+              >
+                Add Payment
+              </button>
+            </div>
           </div>
 
           {showPaymentForm && (
@@ -361,12 +376,26 @@ export default function FinancePage() {
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Expenses</h2>
-            <button
-              onClick={() => setShowExpenseForm(true)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-            >
-              Add Expense
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => downloadExport('expenses', 'xlsx')}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+              >
+                Export Excel
+              </button>
+              <button
+                onClick={() => downloadExport('expenses', 'pdf')}
+                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+              >
+                Export PDF
+              </button>
+              <button
+                onClick={() => setShowExpenseForm(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+              >
+                Add Expense
+              </button>
+            </div>
           </div>
 
           {showExpenseForm && (

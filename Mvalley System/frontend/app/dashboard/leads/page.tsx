@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { salesService, Lead, LeadFollowUp } from '@/lib/services';
+import { downloadExport } from '@/lib/export';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -104,12 +105,26 @@ export default function LeadsPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Leads</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Add Lead
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => downloadExport('leads', 'xlsx')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+          >
+            Export Excel
+          </button>
+          <button
+            onClick={() => downloadExport('leads', 'pdf')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          >
+            Add Lead
+          </button>
+        </div>
       </div>
 
       {error && (

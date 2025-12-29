@@ -243,9 +243,55 @@ export class ExportsService {
         };
       }
 
+      case 'instructors': {
+        const instructors = await this.prisma.instructor.findMany({
+          where: { deletedAt: null },
+          include: { user: true, _count: { select: { classes: true, sessions: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        return {
+          sheetName: 'instructors',
+          rows: instructors.map((i) => ({
+            id: i.id,
+            name: `${i.user.firstName} ${i.user.lastName}`,
+            email: i.user.email,
+            costType: i.costType,
+            costAmount: i.costAmount,
+            classesCount: (i as any)._count?.classes ?? 0,
+            sessionsCount: (i as any)._count?.sessions ?? 0,
+            createdAt: i.createdAt,
+          })),
+        };
+      }
+
+      case 'sessions': {
+        const sessions = await this.prisma.session.findMany({
+          where: { deletedAt: null },
+          include: { class: true, instructor: { include: { user: true } } },
+          orderBy: { scheduledDate: 'desc' },
+          take: 5000,
+        });
+        return {
+          sheetName: 'sessions',
+          rows: sessions.map((s) => ({
+            id: s.id,
+            className: s.class?.name,
+            location: s.class?.location,
+            scheduledDate: s.scheduledDate,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            status: s.status,
+            instructor: s.instructor?.user
+              ? `${s.instructor.user.firstName} ${s.instructor.user.lastName}`
+              : null,
+            createdAt: s.createdAt,
+          })),
+        };
+      }
+
       default:
         throw new BadRequestException(
-          `Unknown export entity: ${entityRaw}. Allowed: students, classes, payments, expenses, leads`,
+          `Unknown export entity: ${entityRaw}. Allowed: students, classes, payments, expenses, leads, instructors, sessions`,
         );
     }
   }

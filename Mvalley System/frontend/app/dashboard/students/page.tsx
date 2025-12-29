@@ -5,6 +5,7 @@ import { studentsService, Student } from '@/lib/services';
 import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
 import FilterBar from '@/components/FilterBar';
+import { downloadExport } from '@/lib/export';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -121,24 +122,38 @@ export default function StudentsPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Students</h1>
-        <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingStudent(null);
-            setFormData({
-              firstName: '',
-              lastName: '',
-              age: '',
-              learningTrack: 'general',
-              status: 'active',
-              email: '',
-              phone: '',
-            });
-          }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Add Student
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => downloadExport('students', 'xlsx')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+          >
+            Export Excel
+          </button>
+          <button
+            onClick={() => downloadExport('students', 'pdf')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => {
+              setShowForm(true);
+              setEditingStudent(null);
+              setFormData({
+                firstName: '',
+                lastName: '',
+                age: '',
+                learningTrack: 'general',
+                status: 'active',
+                email: '',
+                phone: '',
+              });
+            }}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          >
+            Add Student
+          </button>
+        </div>
       </div>
 
       {error && (
