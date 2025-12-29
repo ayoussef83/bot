@@ -13,7 +13,7 @@ import {
   IntegrationProvider,
   MessageChannel,
 } from '@prisma/client';
-import { sendSmsMisr, SmsMisrLanguage } from '../notifications/smsmisr.client';
+import { sendSmsMisr, SmsMisrError, SmsMisrLanguage } from '../notifications/smsmisr.client';
 
 @Injectable()
 export class SettingsService {
@@ -240,16 +240,26 @@ export class SettingsService {
 
     const message = dto.message?.trim() || 'Test SMS from MV-OS';
 
-    const resp = await sendSmsMisr({
-      apiUrl,
-      environment,
-      username,
-      password,
-      sender,
-      mobile,
-      language,
-      message,
-    });
+    let resp: any;
+    try {
+      resp = await sendSmsMisr({
+        apiUrl,
+        environment,
+        username,
+        password,
+        sender,
+        mobile,
+        language,
+        message,
+      });
+    } catch (e: any) {
+      if (e instanceof SmsMisrError) {
+        throw new BadRequestException(
+          `SMSMisr failed (${e.code || 'unknown'}): ${e.message}`,
+        );
+      }
+      throw e;
+    }
 
     return { success: true, response: resp };
   }

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { sendSmsMisr, SmsMisrLanguage } from './smsmisr.client';
+import { sendSmsMisr, SmsMisrError, SmsMisrLanguage } from './smsmisr.client';
 
 @Injectable()
 export class SmsService {
@@ -49,16 +49,26 @@ export class SmsService {
     const mobile = this.normalizeMobile(to);
     if (!mobile) throw new BadRequestException('Invalid recipient mobile');
 
-    const resp = await sendSmsMisr({
-      apiUrl,
-      environment,
-      username,
-      password,
-      sender,
-      mobile,
-      language,
-      message,
-    });
+    let resp: any;
+    try {
+      resp = await sendSmsMisr({
+        apiUrl,
+        environment,
+        username,
+        password,
+        sender,
+        mobile,
+        language,
+        message,
+      });
+    } catch (e: any) {
+      if (e instanceof SmsMisrError) {
+        throw new BadRequestException(
+          `SMSMisr failed (${e.code || 'unknown'}): ${e.message}`,
+        );
+      }
+      throw e;
+    }
 
     return { success: true, provider: 'smsmisr', response: resp };
   }
