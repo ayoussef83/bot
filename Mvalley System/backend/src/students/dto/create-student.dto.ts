@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsEmail,
+  IsObject,
   Min,
   Max,
 } from 'class-validator';
@@ -43,5 +44,10 @@ export class CreateStudentDto {
   @IsOptional()
   @IsString()
   classId?: string;
+
+  // Admin-defined custom fields
+  @IsOptional()
+  @IsObject()
+  customData?: Record<string, any>;
 }
 

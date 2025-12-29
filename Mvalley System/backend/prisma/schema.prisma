@@ -36,24 +36,24 @@ enum UserStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // hashed
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String // hashed
   firstName String
   lastName  String
   role      UserRole
   status    UserStatus @default(active)
-  
+
   // Relations
   instructorProfile Instructor?
   studentProfile    Student?
   parentProfile     Parent?
-  
+
   // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime? // Soft delete
-  
+
   @@index([email])
   @@index([role])
   @@map("users")
@@ -76,37 +76,80 @@ enum LearningTrack {
   general
 }
 
+// ============================================
+// SYSTEM SETTINGS (Custom Fields)
+// ============================================
+
+enum CustomFieldEntity {
+  student
+  class
+  payment
+  lead
+}
+
+enum CustomFieldType {
+  text
+  number
+  boolean
+  date
+  select
+}
+
+model CustomFieldDefinition {
+  id       String            @id @default(uuid())
+  entity   CustomFieldEntity
+  key      String // machine key (unique per entity)
+  label    String
+  type     CustomFieldType
+  required Boolean           @default(false)
+  options  Json? // for select: { choices: ["A","B"] }
+  order    Int               @default(0)
+  isActive Boolean           @default(true)
+
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([entity, key])
+  @@index([entity, isActive])
+  @@map("custom_field_definitions")
+}
+
 model Student {
-  id          String   @id @default(uuid())
-  userId      String?  @unique // Link to User if they have account
-  firstName   String
-  lastName    String
-  age         Int
+  id            String        @id @default(uuid())
+  userId        String?       @unique // Link to User if they have account
+  firstName     String
+  lastName      String
+  age           Int
   learningTrack LearningTrack
-  status      StudentStatus @default(active)
-  
+  status        StudentStatus @default(active)
+
   // Contact
-  email       String?
-  phone       String?
-  
+  email String?
+  phone String?
+
+  // Custom attributes (admin-defined)
+  customData Json?
+
   // Parent info
-  parentId    String?
-  parent      Parent?  @relation(fields: [parentId], references: [id])
-  
+  parentId String?
+  parent   Parent? @relation(fields: [parentId], references: [id])
+
   // Class assignment
-  classId     String?
-  class       Class?   @relation(fields: [classId], references: [id])
-  
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id])
+
   // Relations
-  user        User?    @relation(fields: [userId], references: [id])
+  user        User?               @relation(fields: [userId], references: [id])
   payments    Payment[]
   attendances SessionAttendance[]
-  
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
   @@index([classId])
   @@index([parentId])
   @@index([status])
@@ -114,23 +157,23 @@ model Student {
 }
 
 model Parent {
-  id        String   @id @default(uuid())
-  userId    String?  @unique
+  id        String  @id @default(uuid())
+  userId    String? @unique
   firstName String
   lastName  String
   email     String?
   phone     String
   address   String?
-  
+
   // Relations
-  user      User?    @relation(fields: [userId], references: [id])
-  students  Student[]
-  
+  user     User?     @relation(fields: [userId], references: [id])
+  students Student[]
+
   // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  
+
   @@index([phone])
   @@map("parents")
 }
@@ -147,63 +190,66 @@ enum Location {
 }
 
 model Class {
-  id          String   @id @default(uuid())
-  name        String
-  location    Location
-  capacity    Int
+  id           String      @id @default(uuid())
+  name         String
+  location     Location
+  capacity     Int
   instructorId String?
-  instructor  Instructor? @relation(fields: [instructorId], references: [id])
-  
+  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+
   // Schedule (recurring pattern)
-  dayOfWeek   Int      // 0 = Sunday, 1 = Monday, etc.
-  startTime   String   // HH:mm format
-  endTime     String   // HH:mm format
-  startDate   DateTime
-  endDate     DateTime?
-  
+  dayOfWeek Int // 0 = Sunday, 1 = Monday, etc.
+  startTime String // HH:mm format
+  endTime   String // HH:mm format
+  startDate DateTime
+  endDate   DateTime?
+
+  // Custom attributes (admin-defined)
+  customData Json?
+
   // Relations
-  students    Student[]
-  sessions    Session[]
-  
+  students Student[]
+  sessions Session[]
+
   // Auto-calculated (cached)
   avgStudentsPerSession Float?  @default(0)
   utilizationPercentage Float?  @default(0)
   isUnderfilled         Boolean @default(false)
-  
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
   @@index([instructorId])
   @@index([location])
   @@map("classes")
 }
 
 model Session {
-  id          String   @id @default(uuid())
-  classId     String
-  class       Class    @relation(fields: [classId], references: [id])
-  
+  id      String @id @default(uuid())
+  classId String
+  class   Class  @relation(fields: [classId], references: [id])
+
   scheduledDate DateTime
   startTime     DateTime
   endTime       DateTime
-  
-  instructorId  String?
-  instructor    Instructor? @relation(fields: [instructorId], references: [id])
-  
+
+  instructorId String?
+  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+
   // Status
-  status        String   @default("scheduled") // scheduled, completed, cancelled
+  status              String  @default("scheduled") // scheduled, completed, cancelled
   instructorConfirmed Boolean @default(false)
-  
+
   // Relations
-  attendances   SessionAttendance[]
-  
+  attendances SessionAttendance[]
+
   // Audit
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  deletedAt     DateTime?
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
   @@index([classId])
   @@index([instructorId])
   @@index([scheduledDate])
@@ -211,19 +257,19 @@ model Session {
 }
 
 model SessionAttendance {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   sessionId String
-  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   studentId String
-  student   Student  @relation(fields: [studentId], references: [id])
-  
-  attended  Boolean  @default(false)
-  notes     String?
-  
+  student   Student @relation(fields: [studentId], references: [id])
+
+  attended Boolean @default(false)
+  notes    String?
+
   // Audit
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([sessionId, studentId])
   @@index([sessionId])
   @@index([studentId])
@@ -240,24 +286,24 @@ enum InstructorCostType {
 }
 
 model Instructor {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
   // Cost
-  costType  InstructorCostType
-  costAmount Float   // hourly rate or monthly salary
-  
+  costType   InstructorCostType
+  costAmount Float // hourly rate or monthly salary
+
   // Relations
-  classes   Class[]
-  sessions  Session[]
-  expenses  Expense[]
-  
+  classes  Class[]
+  sessions Session[]
+  expenses Expense[]
+
   // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  
+
   @@map("instructors")
 }
 
@@ -288,28 +334,30 @@ enum ExpenseCategory {
 }
 
 model Payment {
-  id          String   @id @default(uuid())
-  studentId   String?
-  student     Student? @relation(fields: [studentId], references: [id])
-  
-  amount      Float
-  type        PaymentType
-  status      PaymentStatus @default(pending)
-  
+  id        String   @id @default(uuid())
+  studentId String?
+  student   Student? @relation(fields: [studentId], references: [id])
+
+  amount Float
+  type   PaymentType
+  status PaymentStatus @default(pending)
+
   // Payment details
   paymentDate DateTime?
   dueDate     DateTime?
   notes       String?
-  
+  // Custom attributes (admin-defined)
+  customData  Json?
+
   // B2B fields
-  schoolName  String?
-  
+  schoolName String?
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  createdBy   String?  // User ID who created
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String? // User ID who created
+
   @@index([studentId])
   @@index([status])
   @@index([paymentDate])
@@ -317,55 +365,55 @@ model Payment {
 }
 
 model Expense {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   category    ExpenseCategory
   amount      Float
   description String
-  
+
   // Optional links
   instructorId String?
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
-  
+
   expenseDate DateTime
-  
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  createdBy   String?  // User ID
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String? // User ID
+
   @@index([category])
   @@index([expenseDate])
   @@map("expenses")
 }
 
 model MonthlySnapshot {
-  id          String   @id @default(uuid())
-  year        Int
-  month       Int      // 1-12
-  
+  id    String @id @default(uuid())
+  year  Int
+  month Int // 1-12
+
   // Revenue
-  totalRevenue Float   @default(0)
+  totalRevenue        Float @default(0)
   subscriptionRevenue Float @default(0)
-  campRevenue  Float   @default(0)
-  b2bRevenue   Float   @default(0)
-  
+  campRevenue         Float @default(0)
+  b2bRevenue          Float @default(0)
+
   // Expenses
-  totalExpenses Float  @default(0)
-  rentExpenses  Float  @default(0)
+  totalExpenses      Float @default(0)
+  rentExpenses       Float @default(0)
   instructorExpenses Float @default(0)
-  marketingExpenses Float @default(0)
+  marketingExpenses  Float @default(0)
   operationsExpenses Float @default(0)
-  
+
   // Metrics
-  activeStudents Int   @default(0)
+  activeStudents        Int   @default(0)
   avgStudentsPerSession Float @default(0)
   instructorUtilization Float @default(0)
-  
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([year, month], name: "year_month")
   @@index([year, month])
   @@map("monthly_snapshots")
@@ -393,31 +441,33 @@ enum LeadStatus {
 }
 
 model Lead {
-  id          String   @id @default(uuid())
-  firstName   String
-  lastName    String
-  email       String?
-  phone       String
-  source      LeadSource
-  status      LeadStatus @default(new)
-  
+  id        String     @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String
+  source    LeadSource
+  status    LeadStatus @default(new)
+
   // Details
-  notes       String?
+  notes        String?
   interestedIn LearningTrack?
-  
+  // Custom attributes (admin-defined)
+  customData   Json?
+
   // Conversion
   convertedToStudentId String?
-  convertedAt         DateTime?
-  
+  convertedAt          DateTime?
+
   // Relations
-  followUps   LeadFollowUp[]
-  
+  followUps LeadFollowUp[]
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  createdBy   String?  // User ID (sales person)
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String? // User ID (sales person)
+
   @@index([status])
   @@index([source])
   @@index([phone])
@@ -425,18 +475,18 @@ model Lead {
 }
 
 model LeadFollowUp {
-  id          String   @id @default(uuid())
-  leadId      String
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  
-  notes       String
-  nextAction  String?
+  id     String @id @default(uuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  notes          String
+  nextAction     String?
   nextActionDate DateTime?
-  
+
   // Audit
-  createdAt   DateTime @default(now())
-  createdBy   String?  // User ID
-  
+  createdAt DateTime @default(now())
+  createdBy String? // User ID
+
   @@index([leadId])
   @@map("lead_follow_ups")
 }
@@ -458,29 +508,29 @@ enum NotificationStatus {
 }
 
 model Notification {
-  id          String   @id @default(uuid())
-  channel     NotificationChannel
-  recipient   String   // email, phone, etc.
-  template    String?  // Template identifier
-  subject     String?
-  message     String
-  
-  status      NotificationStatus @default(pending)
-  sentAt      DateTime?
+  id        String              @id @default(uuid())
+  channel   NotificationChannel
+  recipient String // email, phone, etc.
+  template  String? // Template identifier
+  subject   String?
+  message   String
+
+  status       NotificationStatus @default(pending)
+  sentAt       DateTime?
   errorMessage String?
-  
+
   // Links
-  studentId   String?
-  leadId      String?
-  parentId    String?
-  
+  studentId String?
+  leadId    String?
+  parentId  String?
+
   // Payload (JSON)
-  payload     String?  // JSON string for template variables
-  
+  payload String? // JSON string for template variables
+
   // Audit
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([status])
   @@index([channel])
   @@index([studentId])
@@ -502,20 +552,19 @@ enum AuditAction {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?
-  action      AuditAction
-  entityType  String   // e.g., "Student", "Payment"
-  entityId    String?
-  changes     String?  // JSON string of changes
-  ipAddress   String?
-  userAgent   String?
-  
-  createdAt   DateTime @default(now())
-  
+  id         String      @id @default(uuid())
+  userId     String?
+  action     AuditAction
+  entityType String // e.g., "Student", "Payment"
+  entityId   String?
+  changes    String? // JSON string of changes
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
   @@index([userId])
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
 }
-

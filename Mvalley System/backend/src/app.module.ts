@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { HealthController } from './health/health.controller';
 import { ExportsModule } from './exports/exports.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ExportsModule } from './exports/exports.module';
     NotificationsModule,
     DashboardModule,
     ExportsModule,
+    SettingsModule,
   ],
   controllers: [HealthController],
 })

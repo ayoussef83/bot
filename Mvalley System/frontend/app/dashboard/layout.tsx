@@ -64,6 +64,10 @@ export default function DashboardLayout({
     navigation.push({ name: 'Finance', href: '/dashboard/finance' });
   }
 
+  if (user.role === 'super_admin') {
+    navigation.push({ name: 'Settings', href: '/dashboard/settings' });
+  }
+
   if (user.role === 'sales' || user.role === 'super_admin') {
     navigation.push({ name: 'Leads', href: '/dashboard/leads' });
   }

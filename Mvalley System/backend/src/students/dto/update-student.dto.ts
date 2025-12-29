@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsEmail,
+  IsObject,
   Min,
   Max,
 } from 'class-validator';
@@ -47,5 +48,9 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsString()
   classId?: string;
+
+  @IsOptional()
+  @IsObject()
+  customData?: Record<string, any>;
 }
 
