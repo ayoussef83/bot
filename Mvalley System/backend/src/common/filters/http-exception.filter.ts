@@ -14,15 +14,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    // Emit a server-side log for debugging (CloudWatch in prod).
+    // We keep the client response sanitized.
+    // eslint-disable-next-line no-console
+    console.error('Unhandled exception:', exception);
 
-    const message =
-      exception instanceof HttpException
-        ? exception.getResponse()
-        : 'Internal server error';
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message: any = 'Internal server error';
+
+    if (exception instanceof HttpException) {
+      const ex = exception as HttpException;
+      status = ex.getStatus();
+      message = ex.getResponse();
+    }
 
     response.status(status).json({
       statusCode: status,
