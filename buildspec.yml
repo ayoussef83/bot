@@ -9,19 +9,21 @@ phases:
       - ECR_REPO=${ECR_REPO:=mv-os-backend}
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
-      - echo "Target: $TARGET"
-      - echo "ECR repo: $ECR_REPO"
-      - echo "Image tag: $IMAGE_TAG"
+      - echo "Target=$TARGET"
+      - echo "ECR_REPO=$ECR_REPO"
+      - echo "IMAGE_TAG=$IMAGE_TAG"
+
   build:
     commands:
-      - echo Build started on `date`
+      - echo "Build started on $(date)"
       - chmod +x ./codebuild-build-image.sh
       - ./codebuild-build-image.sh
+
   post_build:
     commands:
-      - echo Build completed on `date`
+      - echo "Build completed on $(date)"
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO
-      - echo "Pushing Docker images to $REPOSITORY_URI ..."
+      - echo "Pushing Docker images to $REPOSITORY_URI"
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "✅ Image pushed successfully: $REPOSITORY_URI:latest"
+      - echo "Image pushed successfully: $REPOSITORY_URI:latest"
