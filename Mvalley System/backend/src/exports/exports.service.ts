@@ -105,7 +105,11 @@ export class ExportsService {
       };
     }
 
-    const buffer = (await workbook.xlsx.writeBuffer()) as Buffer;
+    // exceljs typings vary by environment (Buffer vs ArrayBuffer); normalize to Node Buffer.
+    const xlsxOut = (await workbook.xlsx.writeBuffer()) as unknown;
+    const buffer = Buffer.isBuffer(xlsxOut)
+      ? xlsxOut
+      : Buffer.from(xlsxOut as ArrayBuffer);
     return {
       filename: `${toSafeFilename(sheetName)}.xlsx`,
       mimeType:
