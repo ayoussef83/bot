@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto, UpdateClassDto } from './dto';
 
@@ -6,10 +6,26 @@ import { CreateClassDto, UpdateClassDto } from './dto';
 export class ClassesService {
   constructor(private prisma: PrismaService) {}
 
+  private normalizeDateInput(value?: string) {
+    if (!value) return undefined;
+    // Accept both full ISO datetime and HTML date input (YYYY-MM-DD).
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const date = isDateOnly ? new Date(`${value}T00:00:00.000Z`) : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`Invalid date: ${value}`);
+    }
+    return date;
+  }
+
   async create(data: CreateClassDto, createdBy: string) {
+    const startDate = this.normalizeDateInput(data.startDate);
+    const endDate = this.normalizeDateInput(data.endDate);
     const classEntity = await this.prisma.class.create({
       data: {
         ...data,
+        instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
+        startDate,
+        endDate,
       },
       include: {
         instructor: {
@@ -120,9 +136,16 @@ export class ClassesService {
   }
 
   async update(id: string, data: UpdateClassDto, updatedBy: string) {
+    const startDate = this.normalizeDateInput(data.startDate);
+    const endDate = this.normalizeDateInput(data.endDate);
     const classEntity = await this.prisma.class.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
+        startDate,
+        endDate,
+      },
       include: {
         instructor: {
           include: {
