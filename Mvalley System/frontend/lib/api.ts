@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+// In production we serve frontend + backend behind the same origin (ALB/Global Accelerator),
+// so prefer same-origin API to avoid cross-origin/CORS issues.
+// In development, keep using NEXT_PUBLIC_API_URL (or localhost backend) for local workflows.
+const isProd = process.env.NODE_ENV === 'production';
+const API_URL =
+  typeof window !== 'undefined' && isProd
+    ? '/api'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
   baseURL: API_URL,
