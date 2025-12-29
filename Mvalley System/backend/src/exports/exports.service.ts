@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 
 type ExportFormat = 'xlsx' | 'pdf';
 
@@ -16,7 +16,7 @@ function toTitle(s: string) {
     .trim();
 }
 
-async function pdfToBuffer(render: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
+async function pdfToBuffer(render: (doc: any) => void): Promise<Buffer> {
   return await new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const chunks: Buffer[] = [];
