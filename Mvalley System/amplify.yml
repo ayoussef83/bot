@@ -3,16 +3,14 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "Installing dependencies in frontend directory..."
-        - |
-          cd frontend
-          npm install --legacy-peer-deps
+        - echo "Installing dependencies..."
+        - cd frontend
+        - npm install --legacy-peer-deps
     build:
       commands:
         - echo "Building Next.js application..."
-        - |
-          cd frontend
-          npm run build
+        - cd frontend
+        - npm run build
   artifacts:
     baseDirectory: frontend/.next
     files:
