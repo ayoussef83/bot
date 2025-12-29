@@ -274,11 +274,33 @@ export class SettingsService {
 
   async getSmsMisrBalance() {
     const { username, password } = await this.getSmsMisrActiveConfig();
-    const url = new URL('https://smsmisr.com/api/Balance/');
-    url.searchParams.set('username', username);
-    url.searchParams.set('password', password);
+    const baseUrl = 'https://smsmisr.com/api/Balance/';
 
-    const res = await fetch(url.toString(), { method: 'GET' });
+    // Docs say GET with querystring, but some deployments return 405 for GET.
+    // We'll try POST first (form-encoded), then fall back to GET if needed.
+    const form = new URLSearchParams();
+    form.set('username', username);
+    form.set('password', password);
+
+    const tryRequest = async (method: 'POST' | 'GET') => {
+      if (method === 'POST') {
+        return await fetch(baseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form,
+        });
+      }
+      const url = new URL(baseUrl);
+      url.searchParams.set('username', username);
+      url.searchParams.set('password', password);
+      return await fetch(url.toString(), { method: 'GET' });
+    };
+
+    let res = await tryRequest('POST');
+    if (res.status === 405) {
+      res = await tryRequest('GET');
+    }
+
     const text = await res.text();
     let json: any = null;
     try {
