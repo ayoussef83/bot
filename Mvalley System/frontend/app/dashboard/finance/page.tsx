@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { financeService, Payment, Expense } from '@/lib/services';
+import { financeService, Payment, Expense, studentsService, Student } from '@/lib/services';
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<'payments' | 'expenses'>('payments');
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -31,6 +32,7 @@ export default function FinancePage() {
   useEffect(() => {
     fetchPayments();
     fetchExpenses();
+    fetchStudents();
   }, []);
 
   const fetchPayments = async () => {
@@ -50,6 +52,16 @@ export default function FinancePage() {
       setExpenses(response.data);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load expenses');
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const response = await studentsService.getAll();
+      setStudents(response.data);
+    } catch (err: any) {
+      // Don't block the whole page if students fail; payment form will show no options.
+      console.error('Failed to load students', err);
     }
   };
 
@@ -179,6 +191,26 @@ export default function FinancePage() {
               <h3 className="text-lg font-semibold mb-4">New Payment</h3>
               <form onSubmit={handlePaymentSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Student</label>
+                    <select
+                      required
+                      value={paymentFormData.studentId}
+                      onChange={(e) =>
+                        setPaymentFormData({ ...paymentFormData, studentId: e.target.value })
+                      }
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                    >
+                      <option value="" disabled>
+                        Select a student...
+                      </option>
+                      {students.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.firstName} {s.lastName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Amount</label>
                     <input
