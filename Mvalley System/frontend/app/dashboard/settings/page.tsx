@@ -32,7 +32,7 @@ export default function SettingsPage() {
   const [entity, setEntity] = useState<CustomFieldEntity>('student');
   const [fields, setFields] = useState<CustomFieldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<any>('');
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDefinition | null>(null);
@@ -102,6 +102,8 @@ export default function SettingsPage() {
     mobile: '',
     message: 'Test SMS from MV-OS',
   });
+  const [testSmsResult, setTestSmsResult] = useState<any>(null);
+  const [testSmsError, setTestSmsError] = useState<any>(null);
 
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
@@ -379,7 +381,11 @@ export default function SettingsPage() {
 
       {error && (
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {typeof error === 'string' ? error : 'Error'}
+          {typeof error === 'string' ? (
+            error
+          ) : (
+            <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(error, null, 2)}</pre>
+          )}
         </div>
       )}
 
@@ -820,10 +826,14 @@ export default function SettingsPage() {
                 <button
                   onClick={async () => {
                     try {
-                      await settingsService.sendTestSms(testSms.mobile, testSms.message);
-                      alert('Test SMS request sent (check SMSMisr delivery)');
+                      setTestSmsResult(null);
+                      setTestSmsError(null);
+                      const resp = await settingsService.sendTestSms(testSms.mobile, testSms.message);
+                      setTestSmsResult(resp.data);
                     } catch (e: any) {
-                      setError(e.response?.data?.message || 'Failed to send test SMS');
+                      const apiReply = e?.response?.data ?? e?.message ?? e;
+                      setTestSmsError(apiReply);
+                      setError(apiReply?.message || apiReply || 'Failed to send test SMS');
                     }
                   }}
                   className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
@@ -831,6 +841,23 @@ export default function SettingsPage() {
                   Send Test SMS
                 </button>
               </div>
+
+              {(testSmsResult || testSmsError) && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 border rounded p-3">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">API Reply (success)</div>
+                    <pre className="whitespace-pre-wrap text-xs text-gray-800">
+                      {testSmsResult ? JSON.stringify(testSmsResult, null, 2) : '—'}
+                    </pre>
+                  </div>
+                  <div className="bg-red-50 border border-red-200 rounded p-3">
+                    <div className="text-xs font-semibold text-red-700 mb-2">API Reply (error)</div>
+                    <pre className="whitespace-pre-wrap text-xs text-red-800">
+                      {testSmsError ? JSON.stringify(testSmsError, null, 2) : '—'}
+                    </pre>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
