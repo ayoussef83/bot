@@ -6,10 +6,24 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Enable CORS for frontend
+  // Enable CORS for dashboard clients.
+  // - If FRONTEND_URL is set (comma-separated), only allow those origins.
+  // - If not set, allow any origin (token auth uses Authorization header; no cookies needed).
+  const allowedOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
-    credentials: true,
+    origin: (origin, callback) => {
+      // allow non-browser clients (no Origin header)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.length === 0) return callback(null, true);
+
+      return callback(null, allowedOrigins.includes(origin));
+    },
+    credentials: false,
   });
   
   // Global exception filter
