@@ -80,7 +80,7 @@ export default function DashboardLayout({
                 <Link href={`/dashboard/${getDashboardPath(user.role)}`} className="flex items-center">
                   {!logoError ? (
                     <Image
-                      src="/mindvalley-logo.png"
+                      src="/mindvalley-logo.jpg"
                       alt="MindValley"
                       width={120}
                       height={40}
