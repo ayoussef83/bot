@@ -218,19 +218,13 @@ export default function CommunicationsLogsPage() {
         </div>
       }
       filters={filters}
-      searchTerm={searchTerm}
-      onSearchChange={setSearchTerm}
+      columns={columns}
+      data={filteredNotifications}
+      searchValue={searchTerm}
+      onSearch={setSearchTerm}
       loading={loading}
-      error={error}
       emptyMessage="No messages found"
-    >
-      <DataTable
-        columns={columns}
-        data={filteredNotifications}
-        emptyMessage="No messages found"
-        loading={loading}
-      />
-    </StandardListView>
+    />
   );
 }
 
