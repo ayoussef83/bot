@@ -81,11 +81,13 @@ export class FinanceService {
     });
 
     // Unpaid Instructor Balances
+    const instructorCategory = await this.prisma.expenseCategory.findFirst({
+      where: { code: 'INSTR' },
+    });
+
     const unpaidInstructorExpenses = await this.prisma.expense.aggregate({
       where: {
-        category: {
-          code: 'INSTR',
-        },
+        categoryId: instructorCategory?.id,
         status: {
           in: ['approved', 'pending_approval'],
         },
