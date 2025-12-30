@@ -123,16 +123,36 @@ const navigationSections: NavigationSection[] = [
     label: 'Finance',
     icon: <FiDollarSign className="w-4 h-4" />,
     group: 'Main',
-    roles: ['super_admin', 'management', 'accounting'],
+    roles: ['super_admin', 'management', 'accounting', 'operations'],
     children: [
       {
-        id: 'payments',
+        id: 'finance-overview',
+        label: 'Overview',
+        icon: <FiBarChart2 className="w-4 h-4" />,
+        path: '/dashboard/finance',
+        roles: ['super_admin', 'management', 'accounting', 'operations'],
+      },
+      {
+        id: 'finance-payments',
         label: 'Payments',
         icon: <FiCreditCard className="w-4 h-4" />,
-        path: '/dashboard/finance',
+        path: '/dashboard/finance/payments',
         roles: ['super_admin', 'management', 'accounting'],
       },
-      // Future: Expenses, Taxes can be added here
+      {
+        id: 'finance-expenses',
+        label: 'Expenses',
+        icon: <FiFileText className="w-4 h-4" />,
+        path: '/dashboard/finance/expenses',
+        roles: ['super_admin', 'management', 'accounting'],
+      },
+      {
+        id: 'finance-accounts',
+        label: 'Accounts',
+        icon: <FiDollarSign className="w-4 h-4" />,
+        path: '/dashboard/finance/accounts',
+        roles: ['super_admin', 'management', 'accounting'],
+      },
     ],
   },
   {
