@@ -1121,30 +1121,23 @@ function SchedulerStatus() {
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
     
     const fetchStatus = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Add timeout for the request
-        const controller = new AbortController();
-        timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
         const resp = await settingsService.getSchedulerStatus();
         
         if (mounted) {
-          clearTimeout(timeoutId);
           setStatus(resp.data);
           setError(null);
         }
       } catch (e: any) {
         if (mounted) {
-          clearTimeout(timeoutId);
           let errorMsg: string;
           
-          if (e.name === 'AbortError' || e.code === 'ECONNABORTED') {
+          if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
             errorMsg = 'Request timed out. The backend may not be available yet.';
           } else if (e.response?.status === 404) {
             errorMsg = 'Scheduler endpoint not found. Backend may need to be deployed.';
@@ -1168,7 +1161,6 @@ function SchedulerStatus() {
     const interval = setInterval(fetchStatus, 30000);
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
       clearInterval(interval);
     };
   }, []);

@@ -78,7 +78,7 @@ export const settingsService = {
   getSmsMisrBalance: () => api.get('/settings/smsmisr/balance'),
 
   // Scheduler
-  getSchedulerStatus: () => api.get('/scheduler/status'),
+  getSchedulerStatus: () => api.get('/scheduler/status', { timeout: 10000 }), // 10 second timeout
   testPaymentDueReminders: () => api.post('/scheduler/test/payment-due-reminders'),
   testOverduePaymentReminders: () => api.post('/scheduler/test/overdue-payment-reminders'),
   testSessionReminders: () => api.post('/scheduler/test/session-reminders'),
