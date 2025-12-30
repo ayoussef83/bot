@@ -116,11 +116,11 @@ export default function SessionsPage() {
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/classes/${row.classId}`}
+          href={`/dashboard/classes/details?id=${row.classId}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
-            router.push(`/dashboard/classes/${row.classId}`);
+            router.push(`/dashboard/classes/details?id=${row.classId}`);
           }}
         >
           {row.class?.name || '-'}
