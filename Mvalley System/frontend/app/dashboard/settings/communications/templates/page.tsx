@@ -419,7 +419,7 @@ export default function CommunicationsTemplatesPage() {
             </div>
           }
           columns={columns}
-          data={filteredTemplates}
+          data={templates}
           searchValue={searchTerm}
           onSearch={setSearchTerm}
           loading={loading}
