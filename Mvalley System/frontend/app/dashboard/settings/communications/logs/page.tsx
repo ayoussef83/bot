@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column } from '@/components/DataTable';
@@ -27,7 +26,6 @@ interface Notification {
 }
 
 export default function CommunicationsLogsPage() {
-  const searchParams = useSearchParams();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,12 +34,15 @@ export default function CommunicationsLogsPage() {
   const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
-    // Read URL params on mount
-    const channel = searchParams.get('channel');
-    const status = searchParams.get('status');
-    if (channel) setChannelFilter(channel);
-    if (status) setStatusFilter(status);
-  }, [searchParams]);
+    // Read URL params on mount (client-side only)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const channel = params.get('channel');
+      const status = params.get('status');
+      if (channel) setChannelFilter(channel);
+      if (status) setStatusFilter(status);
+    }
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
