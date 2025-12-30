@@ -156,8 +156,7 @@ export default function InvoicesPage() {
     {
       label: 'View',
       onClick: () => {
-        // TODO: Navigate to invoice details
-        alert('Invoice details coming soon');
+        router.push(`/dashboard/finance/revenue/invoices/details?id=${row.id}`);
       },
       icon: <FiEye className="w-4 h-4" />,
     },
