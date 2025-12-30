@@ -426,11 +426,6 @@ export default function CommunicationsTemplatesPage() {
           emptyMessage={`No ${channel} templates found. Click "Add Template" to create one.`}
           actions={actions}
         />
-            data={templates}
-            emptyMessage={`No ${channel} templates found`}
-            loading={loading}
-          />
-        </StandardListView>
       )}
 
       {/* Preview Modal */}
