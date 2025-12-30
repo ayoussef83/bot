@@ -329,7 +329,6 @@ export default function OrganizationSettingsPage() {
         message="Are you sure you want to save these organization settings? This will update your organization information across the system."
         confirmLabel="Save"
         cancelLabel="Cancel"
-        loading={loading}
       />
     </div>
   );

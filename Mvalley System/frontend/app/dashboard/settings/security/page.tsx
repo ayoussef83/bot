@@ -501,7 +501,6 @@ export default function SecuritySettingsPage() {
         confirmLabel="Save"
         cancelLabel="Cancel"
         variant="default"
-        loading={loading}
       />
     </div>
   );
