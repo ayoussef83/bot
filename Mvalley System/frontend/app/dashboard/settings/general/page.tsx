@@ -348,9 +348,8 @@ export default function GeneralSettingsPage() {
         onConfirm={handleSave}
         title="Save General Settings"
         message="Are you sure you want to save these general settings? This will update system-wide preferences."
-        confirmText="Save"
-        cancelText="Cancel"
-        loading={loading}
+        confirmLabel="Save"
+        cancelLabel="Cancel"
       />
     </div>
   );
