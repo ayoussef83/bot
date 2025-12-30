@@ -165,11 +165,11 @@ export default function LeadsPage() {
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/crm/leads/${row.id}`}
+          href={`/dashboard/crm/leads/details?id=${row.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
-            router.push(`/dashboard/crm/leads/${row.id}`);
+            router.push(`/dashboard/crm/leads/details?id=${row.id}`);
           }}
         >
           {row.firstName} {row.lastName}

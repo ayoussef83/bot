@@ -1,21 +1,35 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { salesService, Lead, LeadFollowUp } from '@/lib/services';
+import api from '@/lib/api';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
-import { FiEdit, FiTrash2, FiUserPlus, FiMail, FiPhone, FiCheckCircle, FiCalendar, FiMessageSquare, FiPlus } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiUserPlus, FiMail, FiPhone, FiCheckCircle, FiCalendar, FiMessageSquare, FiPlus, FiActivity, FiArrowLeft } from 'react-icons/fi';
+
+interface Notification {
+  id: string;
+  channel: 'email' | 'sms' | 'whatsapp';
+  recipient: string;
+  subject?: string;
+  message: string;
+  status: 'pending' | 'sent' | 'failed';
+  sentAt?: string;
+  createdAt: string;
+  errorMessage?: string;
+}
 
 export default function LeadDetailPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const id = searchParams.get('id');
+  const [mounted, setMounted] = useState(false);
+  const [id, setId] = useState<string | null>(null);
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [followUps, setFollowUps] = useState<LeadFollowUp[]>([]);
+  const [activities, setActivities] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showFollowUpForm, setShowFollowUpForm] = useState(false);
@@ -26,14 +40,25 @@ export default function LeadDetailPage() {
   });
 
   useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const leadId = params.get('id');
+      if (leadId) {
+        setId(leadId);
+      } else {
+        setError('Missing lead id');
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (id) {
       fetchLead(id);
       fetchFollowUps(id);
-    } else {
-      setError('Missing lead id');
-      setLoading(false);
+      fetchActivities(id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchLead = async (leadId: string) => {
@@ -54,10 +79,18 @@ export default function LeadDetailPage() {
       setFollowUps(response.data);
     } catch (err: any) {
       console.error('Failed to load follow-ups', err);
-      // If endpoint doesn't exist, try to get from lead data
       if (lead?.followUps) {
         setFollowUps(lead.followUps);
       }
+    }
+  };
+
+  const fetchActivities = async (leadId: string) => {
+    try {
+      const response = await api.get('/notifications', { params: { leadId } });
+      setActivities(response.data);
+    } catch (err: any) {
+      console.error('Failed to load activities', err);
     }
   };
 
@@ -65,7 +98,7 @@ export default function LeadDetailPage() {
     if (!lead || !confirm('Are you sure you want to delete this lead?')) return;
     try {
       await salesService.deleteLead(lead.id);
-      router.push('/dashboard/leads');
+      router.push('/dashboard/crm/leads');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete lead');
     }
@@ -112,6 +145,14 @@ export default function LeadDetailPage() {
     }
   };
 
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -127,7 +168,7 @@ export default function LeadDetailPage() {
           {error || 'Lead not found'}
         </div>
         <button
-          onClick={() => router.push('/dashboard/leads')}
+          onClick={() => router.push('/dashboard/crm/leads')}
           className="text-indigo-600 hover:text-indigo-900"
         >
           ← Back to Leads
@@ -138,9 +179,9 @@ export default function LeadDetailPage() {
 
   // Breadcrumbs
   const breadcrumbs: Breadcrumb[] = [
-    { label: 'Dashboard', href: '/dashboard/management' },
-    { label: 'Leads', href: '/dashboard/leads' },
-    { label: `${lead.firstName} ${lead.lastName}`, href: `/dashboard/leads/details?id=${id}` },
+    { label: 'CRM', href: '/dashboard/crm' },
+    { label: 'Leads', href: '/dashboard/crm/leads' },
+    { label: `${lead.firstName} ${lead.lastName}`, href: `/dashboard/crm/leads/details?id=${id}` },
   ];
 
   // Action buttons
@@ -150,13 +191,6 @@ export default function LeadDetailPage() {
       onClick: handleConvertToStudent,
       variant: 'primary',
       icon: <FiUserPlus className="w-4 h-4" />,
-    },
-    {
-      label: 'Edit',
-      onClick: () => {
-        router.push(`/dashboard/leads/edit?id=${id}`);
-      },
-      icon: <FiEdit className="w-4 h-4" />,
     },
     {
       label: 'Delete',
@@ -199,6 +233,61 @@ export default function LeadDetailPage() {
           {value ? new Date(value).toLocaleDateString() : '-'}
         </span>
       ),
+    },
+  ];
+
+  // Activity columns
+  const activityColumns: Column<Notification>[] = [
+    {
+      key: 'date',
+      label: 'Date',
+      render: (_, row) => (
+        <span className="text-sm text-gray-900">
+          {new Date(row.createdAt).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: 'channel',
+      label: 'Channel',
+      render: (value) => (
+        <div className="flex items-center gap-2">
+          {value === 'email' ? (
+            <FiMail className="w-4 h-4 text-blue-600" />
+          ) : value === 'sms' ? (
+            <FiMessageSquare className="w-4 h-4 text-green-600" />
+          ) : (
+            <FiMessageSquare className="w-4 h-4 text-purple-600" />
+          )}
+          <span className="text-sm text-gray-700 capitalize">{value}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'message',
+      label: 'Message',
+      render: (value) => {
+        if (!value) return <span className="text-sm text-gray-400">-</span>;
+        const text = String(value);
+        return (
+          <span className="text-sm text-gray-600 line-clamp-2">
+            {text.substring(0, 100)}
+            {text.length > 100 ? '...' : ''}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (value) => {
+        const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' | 'error' } = {
+          sent: 'active',
+          pending: 'warning',
+          failed: 'error',
+        };
+        return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
+      },
     },
   ];
 
@@ -260,7 +349,7 @@ export default function LeadDetailPage() {
             {lead.interestedIn && (
               <div className="col-span-2">
                 <h3 className="text-sm font-medium text-gray-500 mb-1">Interested In</h3>
-                <p className="text-lg text-gray-900">{lead.interestedIn}</p>
+                <p className="text-lg text-gray-900 capitalize">{lead.interestedIn}</p>
               </div>
             )}
             {lead.notes && (
@@ -269,7 +358,43 @@ export default function LeadDetailPage() {
                 <p className="text-lg text-gray-900 whitespace-pre-wrap">{lead.notes}</p>
               </div>
             )}
+            {lead.convertedToStudentId && (
+              <div className="col-span-2">
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Converted</h3>
+                <p className="text-lg text-gray-900">
+                  Converted to Student on {lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : 'N/A'}
+                </p>
+                <button
+                  onClick={() => router.push(`/dashboard/students/details?id=${lead.convertedToStudentId}`)}
+                  className="text-sm text-indigo-600 hover:text-indigo-700 mt-2"
+                >
+                  View Student →
+                </button>
+              </div>
+            )}
           </div>
+        </div>
+      ),
+    },
+    {
+      id: 'activities',
+      label: 'Activities',
+      count: activities.length,
+      icon: <FiActivity className="w-4 h-4" />,
+      content: (
+        <div className="space-y-4">
+          {activities.length > 0 ? (
+            <DataTable
+              columns={activityColumns}
+              data={activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())}
+              emptyMessage="No activities found"
+            />
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>No activities recorded</p>
+              <p className="text-sm mt-2">Activities include emails, SMS, and WhatsApp messages sent to this lead</p>
+            </div>
+          )}
         </div>
       ),
     },
@@ -363,7 +488,7 @@ export default function LeadDetailPage() {
           {followUps.length > 0 ? (
             <DataTable
               columns={followUpColumns}
-              data={followUps}
+              data={followUps.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())}
               emptyMessage="No follow-ups found"
             />
           ) : (
@@ -442,6 +567,18 @@ export default function LeadDetailPage() {
             <span className="text-gray-500">Follow-ups:</span>
             <span className="font-medium text-gray-900">{followUps.length}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Activities:</span>
+            <span className="font-medium text-gray-900">{activities.length}</span>
+          </div>
+          {lead.createdAt && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Created:</span>
+              <span className="font-medium text-gray-900">
+                {new Date(lead.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -458,4 +595,3 @@ export default function LeadDetailPage() {
     />
   );
 }
-
