@@ -27,15 +27,18 @@ type SettingsSection = {
   path: string;
   roles?: string[];
   children?: SettingsSection[];
+  group?: string; // Visual grouping
 };
 
 const settingsSections: SettingsSection[] = [
+  // System Group
   {
     id: 'general',
     label: 'General',
     icon: <FiSettings className="w-4 h-4" />,
     path: '/dashboard/settings/general',
     roles: ['super_admin'],
+    group: 'System',
   },
   {
     id: 'organization',
@@ -43,6 +46,7 @@ const settingsSections: SettingsSection[] = [
     icon: <FiHome className="w-4 h-4" />,
     path: '/dashboard/settings/organization',
     roles: ['super_admin', 'management'],
+    group: 'System',
   },
   {
     id: 'users-roles',
@@ -50,13 +54,24 @@ const settingsSections: SettingsSection[] = [
     icon: <FiUsers className="w-4 h-4" />,
     path: '/dashboard/settings/users-roles',
     roles: ['super_admin'],
+    group: 'System',
   },
+  {
+    id: 'security',
+    label: 'Security',
+    icon: <FiShield className="w-4 h-4" />,
+    path: '/dashboard/settings/security',
+    roles: ['super_admin'],
+    group: 'System',
+  },
+  // Operations Group
   {
     id: 'communications',
     label: 'Communications',
     icon: <FiMail className="w-4 h-4" />,
     path: '/dashboard/settings/communications',
     roles: ['super_admin', 'operations'],
+    group: 'Operations',
     children: [
       {
         id: 'providers',
@@ -84,13 +99,16 @@ const settingsSections: SettingsSection[] = [
     icon: <FiClock className="w-4 h-4" />,
     path: '/dashboard/settings/scheduling',
     roles: ['super_admin', 'operations'],
+    group: 'Operations',
   },
+  // Finance Group
   {
     id: 'finance',
     label: 'Finance',
     icon: <FiDollarSign className="w-4 h-4" />,
     path: '/dashboard/settings/finance',
     roles: ['super_admin', 'management', 'accounting'],
+    group: 'Finance',
     children: [
       {
         id: 'payments',
@@ -112,12 +130,14 @@ const settingsSections: SettingsSection[] = [
       },
     ],
   },
+  // Platform Group
   {
     id: 'custom-fields',
     label: 'Custom Fields',
     icon: <FiFileText className="w-4 h-4" />,
     path: '/dashboard/settings/custom-fields',
     roles: ['super_admin'],
+    group: 'Platform',
   },
   {
     id: 'integrations',
@@ -125,13 +145,7 @@ const settingsSections: SettingsSection[] = [
     icon: <FiLink className="w-4 h-4" />,
     path: '/dashboard/settings/integrations',
     roles: ['super_admin'],
-  },
-  {
-    id: 'security',
-    label: 'Security',
-    icon: <FiShield className="w-4 h-4" />,
-    path: '/dashboard/settings/security',
-    roles: ['super_admin'],
+    group: 'Platform',
   },
   {
     id: 'advanced',
@@ -139,6 +153,7 @@ const settingsSections: SettingsSection[] = [
     icon: <FiSliders className="w-4 h-4" />,
     path: '/dashboard/settings/advanced',
     roles: ['super_admin'],
+    group: 'Platform',
   },
 ];
 
@@ -155,6 +170,16 @@ export default function SettingsSidebar({ userRole }: SettingsSidebarProps) {
     if (!section.roles) return true;
     return section.roles.includes(userRole);
   });
+
+  // Group sections by group
+  const groupedSections = visibleSections.reduce((acc, section) => {
+    const group = section.group || 'Other';
+    if (!acc[group]) {
+      acc[group] = [];
+    }
+    acc[group].push(section);
+    return acc;
+  }, {} as { [key: string]: SettingsSection[] });
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) => {
@@ -191,74 +216,82 @@ export default function SettingsSidebar({ userRole }: SettingsSidebarProps) {
         <p className="text-xs text-gray-500 mt-1">System configuration</p>
       </div>
       <nav className="p-2">
-        <ul className="space-y-1">
-          {visibleSections.map((section) => {
-            const hasChildren = section.children && section.children.length > 0;
-            const expanded = isExpanded(section.id);
-            const active = isActive(section.path);
+        {Object.entries(groupedSections).map(([groupName, sections]) => (
+          <div key={groupName} className="mb-6">
+            <div className="px-3 py-2 mb-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                {groupName}
+              </h3>
+            </div>
+            <ul className="space-y-1">
+              {sections.map((section) => {
+                const hasChildren = section.children && section.children.length > 0;
+                const expanded = isExpanded(section.id);
+                const active = isActive(section.path);
 
-            return (
-              <li key={section.id}>
-                {hasChildren ? (
-                  <>
-                    <button
-                      onClick={() => toggleSection(section.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        active
-                          ? 'bg-indigo-50 text-indigo-700'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
+                return (
+                  <li key={section.id}>
+                    {hasChildren ? (
+                      <>
+                        <button
+                          onClick={() => toggleSection(section.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            active
+                              ? 'bg-indigo-50 text-indigo-700'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {section.icon}
+                            <span>{section.label}</span>
+                          </div>
+                          <FiChevronRight
+                            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                          />
+                        </button>
+                        {expanded && (
+                          <ul className="ml-6 mt-1 space-y-1">
+                            {section.children!.map((child) => {
+                              const childActive = isActive(child.path);
+                              return (
+                                <li key={child.id}>
+                                  <Link
+                                    href={child.path}
+                                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                      childActive
+                                        ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {child.icon}
+                                    <span>{child.label}</span>
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </>
+                    ) : (
+                      <Link
+                        href={section.path}
+                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          active
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
                         {section.icon}
                         <span>{section.label}</span>
-                      </div>
-                      <FiChevronRight
-                        className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                      />
-                    </button>
-                    {expanded && (
-                      <ul className="ml-6 mt-1 space-y-1">
-                        {section.children!.map((child) => {
-                          const childActive = isActive(child.path);
-                          return (
-                            <li key={child.id}>
-                              <Link
-                                href={child.path}
-                                className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-                                  childActive
-                                    ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                    : 'text-gray-600 hover:bg-gray-50'
-                                }`}
-                              >
-                                {child.icon}
-                                <span>{child.label}</span>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      </Link>
                     )}
-                  </>
-                ) : (
-                  <Link
-                    href={section.path}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      active
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {section.icon}
-                    <span>{section.label}</span>
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
     </div>
   );
 }
-

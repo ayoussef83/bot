@@ -4,16 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  FiHome,
-  FiUsers,
-  FiBookOpen,
-  FiCalendar,
-  FiUserCheck,
-  FiUserPlus,
-  FiDollarSign,
-  FiSettings,
-} from 'react-icons/fi';
+import DashboardSidebar from '@/components/DashboardSidebar';
 
 export default function DashboardLayout({
   children,
@@ -47,73 +38,42 @@ export default function DashboardLayout({
     return <div>Loading...</div>;
   }
 
-  // Icon mapping
-  const iconMap: { [key: string]: React.ReactNode } = {
-    'Dashboard': <FiHome className="w-4 h-4" />,
-    'Students': <FiUsers className="w-4 h-4" />,
-    'Classes': <FiBookOpen className="w-4 h-4" />,
-    'My Classes': <FiBookOpen className="w-4 h-4" />,
-    'Sessions': <FiCalendar className="w-4 h-4" />,
-    'Instructors': <FiUserCheck className="w-4 h-4" />,
-    'Leads': <FiUserPlus className="w-4 h-4" />,
-    'Finance': <FiDollarSign className="w-4 h-4" />,
-    'Settings': <FiSettings className="w-4 h-4" />,
+  const getDashboardPath = (role: string): string => {
+    switch (role) {
+      case 'super_admin':
+      case 'management':
+        return '/dashboard/management';
+      case 'operations':
+        return '/dashboard/ops';
+      case 'accounting':
+        return '/dashboard/accounting';
+      case 'instructor':
+        return '/dashboard/instructor';
+      default:
+        return '/dashboard/management';
+    }
   };
-
-  type NavigationItem = {
-    name: string;
-    href: string;
-    icon: React.ReactNode;
-  };
-
-  const navigation: NavigationItem[] = [
-    { name: 'Dashboard', href: `/dashboard/${getDashboardPath(user.role)}`, icon: iconMap['Dashboard'] },
-  ];
-
-  // Add navigation based on role
-  if (['super_admin', 'operations', 'management'].includes(user.role)) {
-    navigation.push(
-      { name: 'Students', href: '/dashboard/students', icon: iconMap['Students'] },
-      { name: 'Classes', href: '/dashboard/classes', icon: iconMap['Classes'] },
-      { name: 'Sessions', href: '/dashboard/sessions', icon: iconMap['Sessions'] },
-      { name: 'Instructors', href: '/dashboard/instructors', icon: iconMap['Instructors'] }
-    );
-  }
-
-  if (user.role === 'sales' || user.role === 'super_admin') {
-    navigation.push({ name: 'Leads', href: '/dashboard/leads', icon: iconMap['Leads'] });
-  }
-
-  if (user.role === 'instructor') {
-    navigation.push(
-      { name: 'My Classes', href: '/dashboard/classes', icon: iconMap['My Classes'] },
-      { name: 'Sessions', href: '/dashboard/sessions', icon: iconMap['Sessions'] }
-    );
-  }
-
-  if (['accounting', 'management', 'super_admin'].includes(user.role)) {
-    navigation.push({ name: 'Finance', href: '/dashboard/finance', icon: iconMap['Finance'] });
-  }
-
-  if (user.role === 'super_admin') {
-    navigation.push({ name: 'Settings', href: '/dashboard/settings', icon: iconMap['Settings'] });
-  }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center min-h-[96px] py-4">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center pr-6 overflow-visible">
-                <Link href={`/dashboard/${getDashboardPath(user.role)}`} className="flex items-center">
+    <div className="flex min-h-screen bg-gray-100">
+      {/* Left Sidebar */}
+      <DashboardSidebar userRole={user.role} />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="px-6 py-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <Link href={getDashboardPath(user.role)} className="flex items-center">
                   {!logoError ? (
                     <Image
                       src="/mindvalley-logo.png"
                       alt="MindValley"
-                      height={80}
-                      width={240}
-                      className="h-20 w-auto object-contain"
+                      height={60}
+                      width={180}
+                      className="h-15 w-auto object-contain"
                       style={{ width: 'auto' }}
                       unoptimized
                       onError={() => setLogoError(true)}
@@ -123,57 +83,28 @@ export default function DashboardLayout({
                   )}
                 </Link>
               </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-6">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={`${
-                      pathname === item.href
-                        ? 'border-indigo-500 text-gray-900'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    } inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium whitespace-nowrap`}
-                  >
-                    {item.icon}
-                    {item.name}
-                  </Link>
-                ))}
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-700 whitespace-nowrap">
+                  {user.firstName} {user.lastName} ({user.role})
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
+                >
+                  Logout
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-4 ml-6 pl-6 border-l border-gray-200">
-              <span className="text-sm text-gray-700 whitespace-nowrap">
-                {user.firstName} {user.lastName} ({user.role})
-              </span>
-              <button
-                onClick={handleLogout}
-                className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
-              >
-                Logout
-              </button>
-            </div>
           </div>
-        </div>
-      </nav>
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {children}
-      </main>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
-
-function getDashboardPath(role: string): string {
-  switch (role) {
-    case 'super_admin':
-    case 'management':
-      return 'management';
-    case 'operations':
-      return 'ops';
-    case 'accounting':
-      return 'accounting';
-    case 'instructor':
-      return 'instructor';
-    default:
-      return 'management';
-  }
-}
-
