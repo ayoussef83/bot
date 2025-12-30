@@ -114,6 +114,8 @@ export const financeService = {
   getPaymentById: (id: string) => api.get<Payment>(`/finance/payments/${id}`),
   createPayment: (data: any) => api.post<Payment>('/finance/payments', data),
   deletePayment: (id: string) => api.delete(`/finance/payments/${id}`),
+  createPaymentAllocation: (data: { paymentId: string; invoiceId: string; amount: number }) =>
+    api.post('/finance/payments/allocations', data),
 
   // Expenses
   getExpenses: () => api.get<Expense[]>('/finance/expenses'),
