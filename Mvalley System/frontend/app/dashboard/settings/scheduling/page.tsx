@@ -147,33 +147,31 @@ export default function SchedulingPage() {
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mobile Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={smsTest.mobile}
-                onChange={(e) => setSmsTest({ ...smsTest, mobile: e.target.value })}
-                className="block w-full rounded-md border-gray-300 shadow-sm"
-                placeholder="e.g. 0127..., +20127..., 20127..."
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Message <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={smsTest.message}
-                onChange={(e) => setSmsTest({ ...smsTest, message: e.target.value })}
-                className="block w-full rounded-md border-gray-300 shadow-sm"
-                placeholder="SMS message"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Mobile Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={smsTest.mobile}
+              onChange={(e) => setSmsTest({ ...smsTest, mobile: e.target.value })}
+              className="block w-full rounded-md border-gray-300 shadow-sm"
+              placeholder="e.g. 0127..., +20127..., 20127..."
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Message <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={smsTest.message}
+              onChange={(e) => setSmsTest({ ...smsTest, message: e.target.value })}
+              className="block w-full rounded-md border-gray-300 shadow-sm"
+              placeholder="SMS message (supports multiple lines)"
+              rows={4}
+              required
+            />
           </div>
 
           {/* Results */}
@@ -202,4 +200,8 @@ export default function SchedulingPage() {
     </div>
   );
 }
+
+
+
+
 
