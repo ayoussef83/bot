@@ -120,7 +120,7 @@ export default function CommunicationsLogsPage() {
       key: 'status',
       label: 'Status',
       render: (value) => {
-        const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' | 'info' } = {
+        const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' | 'error' } = {
           sent: 'active',
           delivered: 'active',
           pending: 'warning',
