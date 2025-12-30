@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { settingsService } from '@/lib/services';
 import SettingsCard from '@/components/settings/SettingsCard';
-import { FiClock } from 'react-icons/fi';
+import { FiClock, FiMessageSquare, FiList } from 'react-icons/fi';
 
 export default function SchedulingPage() {
+  const router = useRouter();
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [smsTest, setSmsTest] = useState({ mobile: '', message: '' });
@@ -82,11 +84,20 @@ export default function SchedulingPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Scheduling</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Schedule SMS messages and manage automated reminders. All times use Cairo timezone.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Scheduling</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Schedule SMS messages and manage automated reminders. All times use Cairo timezone.
+          </p>
+        </div>
+        <button
+          onClick={() => router.push('/dashboard/settings/communications/logs?channel=sms')}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          <FiList className="w-4 h-4" />
+          View SMS History
+        </button>
       </div>
 
       {/* Time Information */}
