@@ -9,7 +9,7 @@ import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { downloadExport } from '@/lib/export';
-import { FiPlus, FiEdit, FiTrash2, FiUser, FiCheckCircle, FiTrendingUp, FiLayers, FiBriefcase } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiUser, FiCheckCircle, FiTrendingUp, FiLayers, FiPhone } from 'react-icons/fi';
 
 export default function LeadsPage() {
   const router = useRouter();

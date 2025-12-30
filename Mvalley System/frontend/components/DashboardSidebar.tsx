@@ -16,7 +16,7 @@ import {
   FiTrendingDown,
   FiSettings,
   FiChevronRight,
-  FiBriefcase,
+  FiPhone,
   FiBarChart2,
   FiLayers,
   FiUser,
@@ -81,7 +81,7 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'crm',
     label: 'CRM',
-    icon: <FiBriefcase className="w-4 h-4" />,
+    icon: <FiPhone className="w-4 h-4" />,
     group: 'Main',
     roles: ['super_admin', 'sales', 'management'],
     children: [
@@ -245,7 +245,7 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
   };
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
+    <div className="w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 fixed left-0 top-0 bottom-0 overflow-y-auto">
       <div className="p-6 border-b border-gray-200">
         <Link href={getDashboardPath(userRole)} className="flex items-center justify-center">
           <Image
