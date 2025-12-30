@@ -80,10 +80,16 @@ export default function ConversationDetailPage() {
 
     setSending(true);
     try {
-      // TODO: Implement send message API call
-      // For now, just show alert
-      alert('Send message functionality coming soon');
+      await marketingService.sendMessage({
+        conversationId: conversation.id,
+        content: replyText.trim(),
+        type: 'text',
+      });
       setReplyText('');
+      // Refresh messages to show the new one
+      await fetchMessages(conversation.id);
+      // Refresh conversation to update last message time
+      await fetchConversation(conversation.id);
     } catch (err: any) {
       console.error('Error sending message:', err);
       alert(err.response?.data?.message || 'Failed to send message');

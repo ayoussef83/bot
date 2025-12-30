@@ -213,6 +213,22 @@ class MarketingService {
     return response;
   }
 
+  async sendMessage(data: {
+    conversationId: string;
+    content: string;
+    type?: 'text' | 'image' | 'video' | 'audio' | 'file';
+    mediaUrl?: string;
+  }): Promise<{ data: Message }> {
+    const response = await api.post('/marketing/messages', {
+      conversationId: data.conversationId,
+      direction: 'outbound',
+      type: data.type || 'text',
+      content: data.content,
+      mediaUrl: data.mediaUrl,
+    });
+    return response;
+  }
+
   // Participants
   async getParticipants(): Promise<{ data: Participant[] }> {
     const response = await api.get('/marketing/participants');
