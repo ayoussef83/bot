@@ -290,10 +290,17 @@ export default function FinancePage() {
       label: 'Amount',
       sortable: true,
       align: 'right',
-      render: (value) => (
-        <span className="text-sm font-medium text-red-600">
+      render: (value, row) => (
+        <a
+          href={`/dashboard/finance/expenses/details?id=${row.id}`}
+          className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
+          onClick={(e) => {
+            e.preventDefault();
+            router.push(`/dashboard/finance/expenses/details?id=${row.id}`);
+          }}
+        >
           EGP {value.toLocaleString()}
-        </span>
+        </a>
       ),
     },
     {
