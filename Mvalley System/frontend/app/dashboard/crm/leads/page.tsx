@@ -43,12 +43,17 @@ export default function LeadsPage() {
   }, []);
 
   const fetchLeads = async () => {
+    setError('');
     try {
       const response = await salesService.getLeads();
-      setLeads(response.data);
-      setError('');
+      // Handle both response.data and direct array response
+      const leadsData = Array.isArray(response.data) ? response.data : (response.data as any)?.data || [];
+      setLeads(leadsData);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load leads');
+      console.error('Error fetching leads:', err);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to load leads';
+      setError(errorMessage);
+      setLeads([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
