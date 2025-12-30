@@ -76,6 +76,8 @@ export default function PaymentDetailPage() {
   const breadcrumbs: Breadcrumb[] = [
     { label: 'Dashboard', href: '/dashboard/management' },
     { label: 'Finance', href: '/dashboard/finance' },
+    { label: 'Cash', href: '/dashboard/finance/cash/payments' },
+    { label: 'Payments', href: '/dashboard/finance/cash/payments' },
     {
       label: `Payment - EGP ${payment.amount.toLocaleString()}`,
       href: `/dashboard/finance/cash/payments/details?id=${id}`,
