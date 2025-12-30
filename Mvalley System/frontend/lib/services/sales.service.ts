@@ -11,6 +11,10 @@ export interface Lead {
   notes?: string;
   interestedIn?: string;
   followUps?: LeadFollowUp[];
+  createdAt: string;
+  updatedAt?: string;
+  convertedToStudentId?: string;
+  convertedAt?: string;
 }
 
 export interface LeadFollowUp {
@@ -36,5 +40,9 @@ export const salesService = {
   createFollowUp: (data: Partial<LeadFollowUp>) => api.post('/follow-ups', data),
   getFollowUpsByLead: (leadId: string) => api.get(`/follow-ups/lead/${leadId}`),
 };
+
+
+
+
 
 
