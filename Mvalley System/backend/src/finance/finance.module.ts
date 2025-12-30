@@ -10,6 +10,8 @@ import { CashAccountsController } from './cash-accounts.controller';
 import { CashAccountsService } from './cash-accounts.service';
 import { ExpenseCategoriesController } from './expense-categories.controller';
 import { ExpenseCategoriesService } from './expense-categories.service';
+import { InvoicesController } from './invoices.controller';
+import { InvoicesService } from './invoices.service';
 
 @Module({
   imports: [PrismaModule],
@@ -19,6 +21,7 @@ import { ExpenseCategoriesService } from './expense-categories.service';
     ExpensesController,
     CashAccountsController,
     ExpenseCategoriesController,
+    InvoicesController,
   ],
   providers: [
     FinanceService,
@@ -26,6 +29,7 @@ import { ExpenseCategoriesService } from './expense-categories.service';
     ExpensesService,
     CashAccountsService,
     ExpenseCategoriesService,
+    InvoicesService,
   ],
   exports: [
     FinanceService,
@@ -33,6 +37,7 @@ import { ExpenseCategoriesService } from './expense-categories.service';
     ExpensesService,
     CashAccountsService,
     ExpenseCategoriesService,
+    InvoicesService,
   ],
 })
 export class FinanceModule {}

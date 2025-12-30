@@ -66,6 +66,44 @@ async function main() {
 
   console.log('✅ Created instructor:', instructorUser.email);
 
+  // Create default expense categories
+  const expenseCategories = [
+    { name: 'Instructor Payouts', code: 'INSTR', description: 'Instructor fees and salaries' },
+    { name: 'Rent', code: 'RENT', description: 'Office and classroom rent' },
+    { name: 'Marketing', code: 'MKTG', description: 'Marketing and advertising expenses' },
+    { name: 'Utilities', code: 'UTIL', description: 'Electricity, water, internet' },
+    { name: 'Operations', code: 'OPS', description: 'Office supplies and operations' },
+    { name: 'Other', code: 'OTHER', description: 'Other expenses' },
+  ];
+
+  for (const category of expenseCategories) {
+    await prisma.expenseCategory.upsert({
+      where: { code: category.code },
+      update: {},
+      create: category,
+    });
+  }
+
+  console.log('✅ Created expense categories');
+
+  // Create default cash account
+  const defaultCashAccount = await prisma.cashAccount.upsert({
+    where: { id: '00000000-0000-0000-0000-000000000001' },
+    update: {},
+    create: {
+      id: '00000000-0000-0000-0000-000000000001',
+      name: 'Main Bank Account',
+      type: 'bank',
+      accountNumber: '0000000001',
+      bankName: 'Default Bank',
+      balance: 0,
+      currency: 'EGP',
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Created default cash account');
+
   // Create sample locations data (if needed)
   console.log('✅ Seed completed!');
   console.log('\n📝 Default credentials:');
