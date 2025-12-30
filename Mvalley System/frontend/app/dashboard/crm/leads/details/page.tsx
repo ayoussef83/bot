@@ -8,7 +8,7 @@ import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
-import { FiEdit, FiTrash2, FiUserPlus, FiMail, FiPhone, FiCheckCircle, FiCalendar, FiMessageSquare, FiPlus, FiActivity, FiArrowLeft } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiUser, FiMail, FiPhone, FiCheckCircle, FiCalendar, FiMessageSquare, FiPlus, FiActivity, FiArrowLeft } from 'react-icons/fi';
 
 interface Notification {
   id: string;
@@ -190,7 +190,7 @@ export default function LeadDetailPage() {
       label: 'Convert to Student',
       onClick: handleConvertToStudent,
       variant: 'primary',
-      icon: <FiUserPlus className="w-4 h-4" />,
+      icon: <FiUser className="w-4 h-4" />,
     },
     {
       label: 'Delete',
@@ -296,7 +296,7 @@ export default function LeadDetailPage() {
     {
       id: 'overview',
       label: 'Overview',
-      icon: <FiUserPlus className="w-4 h-4" />,
+      icon: <FiUser className="w-4 h-4" />,
       content: (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">

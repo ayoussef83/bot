@@ -9,7 +9,7 @@ import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { downloadExport } from '@/lib/export';
-import { FiPlus, FiEdit, FiTrash2, FiUserPlus, FiCheckCircle, FiTrendingUp, FiGrid } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiUser, FiCheckCircle, FiTrendingUp, FiLayers, FiBriefcase } from 'react-icons/fi';
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -599,16 +599,19 @@ export default function LeadsPage() {
 
       {/* Page Header with Pipeline Link */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage sales leads and track conversion pipeline</p>
+        <div className="flex items-center gap-3">
+          <FiUser className="w-8 h-8 text-indigo-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage sales leads and track conversion pipeline</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => router.push('/dashboard/crm/pipeline')}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
-            <FiGrid className="w-4 h-4" />
+            <FiLayers className="w-4 h-4" />
             Pipeline View
           </button>
           <button
@@ -665,19 +668,19 @@ export default function LeadsPage() {
             <SummaryCard
               title="Total Leads"
               value={totalLeads}
-              icon={<FiUserPlus className="w-5 h-5" />}
+              icon={<FiUser className="w-5 h-5" />}
             />
             <SummaryCard
               title="New"
               value={newLeads}
               variant="info"
-              icon={<FiUserPlus className="w-5 h-5" />}
+              icon={<FiUser className="w-5 h-5" />}
             />
             <SummaryCard
               title="Contacted"
               value={contactedLeads}
               variant="warning"
-              icon={<FiUserPlus className="w-5 h-5" />}
+              icon={<FiUser className="w-5 h-5" />}
             />
             <SummaryCard
               title="Qualified"

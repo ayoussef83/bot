@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { salesService, Lead } from '@/lib/services';
-import { FiPhone, FiMessageSquare, FiUser, FiClock } from 'react-icons/fi';
+import { FiPhone, FiMessageSquare, FiUser, FiClock, FiLayers } from 'react-icons/fi';
 
 type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
 
@@ -103,9 +103,12 @@ export default function PipelinePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pipeline</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage leads through the sales pipeline</p>
+        <div className="flex items-center gap-3">
+          <FiLayers className="w-8 h-8 text-indigo-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Pipeline</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage leads through the sales pipeline</p>
+          </div>
         </div>
         <button
           onClick={() => router.push('/dashboard/crm/leads')}

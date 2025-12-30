@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { salesService, Lead } from '@/lib/services';
 import SummaryCard from '@/components/SummaryCard';
-import { FiTrendingUp, FiUsers, FiCheckCircle, FiXCircle, FiClock } from 'react-icons/fi';
+import { FiTrendingUp, FiUsers, FiCheckCircle, FiXCircle, FiClock, FiBarChart2, FiBriefcase } from 'react-icons/fi';
 
 export default function CRMDashboard() {
   const router = useRouter();
@@ -76,9 +76,12 @@ export default function CRMDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">CRM Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Overview of your sales pipeline and conversion metrics</p>
+      <div className="flex items-center gap-3">
+        <FiBriefcase className="w-8 h-8 text-indigo-600" />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">CRM Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Overview of your sales pipeline and conversion metrics</p>
+        </div>
       </div>
 
       {error && (

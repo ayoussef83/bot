@@ -16,6 +16,10 @@ import {
   FiTrendingDown,
   FiSettings,
   FiChevronRight,
+  FiBriefcase,
+  FiBarChart2,
+  FiLayers,
+  FiUser,
 } from 'react-icons/fi';
 
 type NavigationSection = {
@@ -76,28 +80,28 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'crm',
     label: 'CRM',
-    icon: <FiUserPlus className="w-4 h-4" />,
+    icon: <FiBriefcase className="w-4 h-4" />,
     group: 'Main',
     roles: ['super_admin', 'sales', 'management'],
     children: [
       {
         id: 'crm-dashboard',
         label: 'Dashboard',
-        icon: <FiHome className="w-4 h-4" />,
+        icon: <FiBarChart2 className="w-4 h-4" />,
         path: '/dashboard/crm',
         roles: ['super_admin', 'sales', 'management'],
       },
       {
         id: 'crm-pipeline',
         label: 'Pipeline',
-        icon: <FiUserPlus className="w-4 h-4" />,
+        icon: <FiLayers className="w-4 h-4" />,
         path: '/dashboard/crm/pipeline',
         roles: ['super_admin', 'sales', 'management'],
       },
       {
         id: 'crm-leads',
         label: 'Leads',
-        icon: <FiUserPlus className="w-4 h-4" />,
+        icon: <FiUser className="w-4 h-4" />,
         path: '/dashboard/crm/leads',
         roles: ['super_admin', 'sales', 'management'],
       },
