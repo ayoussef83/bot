@@ -178,10 +178,10 @@ export default function ConversationsPage() {
     },
   ];
 
-  const actions: ActionButton<Conversation>[] = [
+  const actions: ActionButton[] = [
     {
       label: 'View',
-      onClick: (row) => {
+      onClick: (row: Conversation) => {
         router.push(`/dashboard/marketing/conversations/details?id=${row.id}`);
       },
       icon: <FiMessageCircle className="w-4 h-4" />,
