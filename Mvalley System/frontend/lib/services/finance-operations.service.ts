@@ -82,9 +82,24 @@ export interface Expense {
   paidDate?: string;
   status: string;
   categoryId: string;
-  category?: any;
+  category?: ExpenseCategory;
   cashAccountId?: string;
+  cashAccount?: CashAccount;
+  paymentMethod?: string;
+  instructorId?: string;
+  instructor?: {
+    id: string;
+    user?: {
+      firstName: string;
+      lastName: string;
+      email?: string;
+    };
+  };
   notes?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CashAccount {
