@@ -157,11 +157,11 @@ export default function ClassesPage() {
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/classes/${row.id}`}
+          href={`/dashboard/classes/details?id=${row.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
-            router.push(`/dashboard/classes/${row.id}`);
+            router.push(`/dashboard/classes/details?id=${row.id}`);
           }}
         >
           {row.name}
