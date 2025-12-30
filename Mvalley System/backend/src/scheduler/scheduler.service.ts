@@ -3,6 +3,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
+import { EmailService } from '../notifications/email.service';
+import { SmsService } from '../notifications/sms.service';
+import { WhatsAppService } from '../notifications/whatsapp.service';
 
 @Injectable()
 export class SchedulerService {
@@ -12,6 +15,9 @@ export class SchedulerService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private settingsService: SettingsService,
+    private emailService: EmailService,
+    private smsService: SmsService,
+    private whatsappService: WhatsAppService,
   ) {}
 
   /**
@@ -521,6 +527,7 @@ export class SchedulerService {
       const now = new Date();
       
       // Find notifications scheduled for now or in the past that are still pending
+      // Exclude ones that are already sent or failed
       const scheduledNotifications = await this.prisma.notification.findMany({
         where: {
           status: 'pending',
@@ -530,6 +537,9 @@ export class SchedulerService {
           },
         },
         take: 50, // Process up to 50 at a time
+        orderBy: {
+          scheduledAt: 'asc', // Process oldest first
+        },
       });
 
       this.logger.log(`Found ${scheduledNotifications.length} scheduled notifications to process`);
@@ -538,23 +548,65 @@ export class SchedulerService {
         try {
           this.logger.log(`Processing scheduled notification ${notification.id} (${notification.channel} to ${notification.recipient})`);
           
-          // Send the notification
-          await this.notificationsService.sendMessage({
-            channel: notification.channel as any,
-            recipient: notification.recipient,
-            message: notification.message,
-            subject: notification.subject || undefined,
-            template: notification.template || undefined,
-            payload: notification.payload ? JSON.parse(notification.payload) : undefined,
-            studentId: notification.studentId || undefined,
-            leadId: notification.leadId || undefined,
-            parentId: notification.parentId || undefined,
+          // Mark as sent first to prevent duplicate processing (we'll update to sent after sending)
+          // Use a temporary approach: update scheduledAt to null so it won't be picked up again
+          await this.prisma.notification.update({
+            where: { id: notification.id },
+            data: { scheduledAt: null }, // Clear scheduledAt so it won't be picked up again
+          });
+
+          // Send the notification directly (without creating a new notification record)
+          let result;
+          switch (notification.channel) {
+            case 'email':
+              result = await this.emailService.send(
+                notification.recipient,
+                notification.subject || '',
+                notification.message,
+                notification.template || undefined,
+                notification.payload ? JSON.parse(notification.payload) : undefined,
+              );
+              break;
+            case 'sms':
+              result = await this.smsService.send(
+                notification.recipient,
+                notification.message,
+                notification.template || undefined,
+                notification.payload ? JSON.parse(notification.payload) : undefined,
+              );
+              break;
+            case 'whatsapp':
+              result = await this.whatsappService.send(
+                notification.recipient,
+                notification.message,
+                notification.template || undefined,
+                notification.payload ? JSON.parse(notification.payload) : undefined,
+              );
+              break;
+            default:
+              throw new Error(`Unsupported channel: ${notification.channel}`);
+          }
+
+          // Update notification status to sent
+          await this.prisma.notification.update({
+            where: { id: notification.id },
+            data: {
+              status: 'sent',
+              sentAt: new Date(),
+            },
           });
 
           this.logger.log(`✅ Successfully sent scheduled notification ${notification.id}`);
         } catch (error: any) {
           this.logger.error(`❌ Failed to send scheduled notification ${notification.id}: ${error.message}`);
-          // The notification status will be updated to 'failed' by NotificationsService
+          // Update notification status to failed
+          await this.prisma.notification.update({
+            where: { id: notification.id },
+            data: {
+              status: 'failed',
+              errorMessage: error.message,
+            },
+          });
         }
       }
 
