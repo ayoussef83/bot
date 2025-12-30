@@ -127,14 +127,23 @@ export default function CommunicationsLogsPage() {
       key: 'body',
       label: 'Message',
       render: (value) => {
-        if (!value) return <span className="text-sm text-gray-400">-</span>;
-        const text = String(value);
-        return (
-          <span className="text-sm text-gray-600 line-clamp-2">
-            {text.substring(0, 100)}
-            {text.length > 100 ? '...' : ''}
-          </span>
-        );
+        try {
+          if (value === null || value === undefined) {
+            return <span className="text-sm text-gray-400">-</span>;
+          }
+          const text = String(value || '');
+          if (!text || text.length === 0) {
+            return <span className="text-sm text-gray-400">-</span>;
+          }
+          return (
+            <span className="text-sm text-gray-600 line-clamp-2">
+              {text.substring(0, 100)}
+              {text.length > 100 ? '...' : ''}
+            </span>
+          );
+        } catch (e) {
+          return <span className="text-sm text-gray-400">-</span>;
+        }
       },
     },
     {
