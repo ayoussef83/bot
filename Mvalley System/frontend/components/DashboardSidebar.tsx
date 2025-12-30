@@ -20,6 +20,7 @@ import {
   FiBarChart2,
   FiLayers,
   FiUser,
+  FiClock,
 } from 'react-icons/fi';
 
 type NavigationSection = {
@@ -122,6 +123,36 @@ const navigationSections: NavigationSection[] = [
         roles: ['super_admin', 'management', 'accounting'],
       },
       // Future: Expenses, Taxes can be added here
+    ],
+  },
+  {
+    id: 'hr',
+    label: 'HR',
+    icon: <FiUsers className="w-4 h-4" />,
+    group: 'Main',
+    roles: ['super_admin', 'operations', 'management', 'accounting'],
+    children: [
+      {
+        id: 'hr-dashboard',
+        label: 'Dashboard',
+        icon: <FiBarChart2 className="w-4 h-4" />,
+        path: '/dashboard/hr',
+        roles: ['super_admin', 'operations', 'management', 'accounting'],
+      },
+      {
+        id: 'hr-people',
+        label: 'People',
+        icon: <FiUsers className="w-4 h-4" />,
+        path: '/dashboard/hr/people',
+        roles: ['super_admin', 'operations', 'management', 'accounting'],
+      },
+      {
+        id: 'hr-availability',
+        label: 'Availability',
+        icon: <FiClock className="w-4 h-4" />,
+        path: '/dashboard/hr/availability',
+        roles: ['super_admin', 'operations', 'management'],
+      },
     ],
   },
   {
