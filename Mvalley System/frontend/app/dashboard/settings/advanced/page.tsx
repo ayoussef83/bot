@@ -226,7 +226,7 @@ export default function AdvancedSettingsPage() {
                 </p>
               </div>
             </div>
-            <StatusBadge status="info" label="Coming Soon" />
+            <StatusBadge status="active" label="Coming Soon" />
           </div>
 
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -239,7 +239,7 @@ export default function AdvancedSettingsPage() {
                 </p>
               </div>
             </div>
-            <StatusBadge status="info" label="Coming Soon" />
+            <StatusBadge status="active" label="Coming Soon" />
           </div>
 
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -252,7 +252,7 @@ export default function AdvancedSettingsPage() {
                 </p>
               </div>
             </div>
-            <StatusBadge status="info" label="Coming Soon" />
+            <StatusBadge status="active" label="Coming Soon" />
           </div>
 
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -265,7 +265,7 @@ export default function AdvancedSettingsPage() {
                 </p>
               </div>
             </div>
-            <StatusBadge status="info" label="Coming Soon" />
+            <StatusBadge status="active" label="Coming Soon" />
           </div>
         </div>
       </SettingsCard>
