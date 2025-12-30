@@ -178,4 +178,12 @@ export class FinanceService {
       where: { periodCode },
     });
   }
+
+  async getFinancialPeriods() {
+    return this.prisma.financialPeriod.findMany({
+      orderBy: {
+        periodCode: 'desc',
+      },
+    });
+  }
 }
