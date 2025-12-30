@@ -98,14 +98,20 @@ export class SchedulerService {
           const message = `Reminder: Payment of EGP ${payment.amount} is due in ${daysUntilDue} day(s). Please settle your payment to avoid service interruption.`;
           
           if (recipient) {
-            await this.notificationsService.sendMessage({
-              channel: 'sms',
-              recipient,
-              message,
-              template: 'payment_due_reminder',
-              payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
-              studentId: payment.studentId || undefined,
-            });
+            this.logger.log(`Sending SMS to ${recipient} for payment ${payment.id}`);
+            try {
+              await this.notificationsService.sendMessage({
+                channel: 'sms',
+                recipient,
+                message,
+                template: 'payment_due_reminder',
+                payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
+                studentId: payment.studentId || undefined,
+              });
+              this.logger.log(`✅ SMS sent successfully to ${recipient} for payment ${payment.id}`);
+            } catch (error: any) {
+              this.logger.error(`❌ Failed to send SMS to ${recipient} for payment ${payment.id}: ${error.message}`);
+            }
           }
 
           if (recipientEmail) {
@@ -145,14 +151,20 @@ export class SchedulerService {
           );
 
           if (recipient) {
-            await this.notificationsService.sendMessage({
-              channel: 'sms',
-              recipient,
-              message,
-              template: 'payment_due_reminder',
-              payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
-              studentId: payment.studentId || undefined,
-            });
+            this.logger.log(`Sending SMS to ${recipient} for payment ${payment.id}`);
+            try {
+              await this.notificationsService.sendMessage({
+                channel: 'sms',
+                recipient,
+                message,
+                template: 'payment_due_reminder',
+                payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
+                studentId: payment.studentId || undefined,
+              });
+              this.logger.log(`✅ SMS sent successfully to ${recipient} for payment ${payment.id}`);
+            } catch (error: any) {
+              this.logger.error(`❌ Failed to send SMS to ${recipient} for payment ${payment.id}: ${error.message}`);
+            }
           }
 
           if (recipientEmail) {
@@ -274,14 +286,20 @@ export class SchedulerService {
           : `URGENT: Payment of EGP ${payment.amount} is ${daysOverdue} day(s) overdue. Please settle immediately to avoid service suspension.`;
 
         if (recipient) {
-          await this.notificationsService.sendMessage({
-            channel: 'sms',
-            recipient,
-            message,
-            template: 'payment_overdue',
-            payload: { paymentId: payment.id, amount: payment.amount, daysOverdue },
-            studentId: payment.studentId || undefined,
-          });
+          this.logger.log(`Sending overdue payment SMS to ${recipient} for payment ${payment.id}`);
+          try {
+            await this.notificationsService.sendMessage({
+              channel: 'sms',
+              recipient,
+              message,
+              template: 'payment_overdue',
+              payload: { paymentId: payment.id, amount: payment.amount, daysOverdue },
+              studentId: payment.studentId || undefined,
+            });
+            this.logger.log(`✅ Overdue payment SMS sent successfully to ${recipient} for payment ${payment.id}`);
+          } catch (error: any) {
+            this.logger.error(`❌ Failed to send overdue payment SMS to ${recipient} for payment ${payment.id}: ${error.message}`);
+          }
         }
 
         if (recipientEmail) {
@@ -423,21 +441,27 @@ export class SchedulerService {
             : `Reminder: ${student.firstName} has class "${session.class.name}" tomorrow at ${sessionTime} (${session.class.location}).`;
 
           if (recipient) {
-            await this.notificationsService.sendMessage({
-              channel: 'sms',
-              recipient,
-              message,
-              template: 'session_reminder',
-              payload: {
-                sessionId: session.id,
+            this.logger.log(`Sending session reminder SMS to ${recipient} for student ${student.id}, session ${session.id}`);
+            try {
+              await this.notificationsService.sendMessage({
+                channel: 'sms',
+                recipient,
+                message,
+                template: 'session_reminder',
+                payload: {
+                  sessionId: session.id,
+                  studentId: student.id,
+                  className: session.class.name,
+                  location: session.class.location,
+                  time: sessionTime,
+                },
                 studentId: student.id,
-                className: session.class.name,
-                location: session.class.location,
-                time: sessionTime,
-              },
-              studentId: student.id,
-              parentId: student.parentId || undefined,
-            });
+                parentId: student.parentId || undefined,
+              });
+              this.logger.log(`✅ Session reminder SMS sent successfully to ${recipient} for session ${session.id}`);
+            } catch (error: any) {
+              this.logger.error(`❌ Failed to send session reminder SMS to ${recipient} for session ${session.id}: ${error.message}`);
+            }
           }
 
           if (recipientEmail) {
