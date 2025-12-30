@@ -193,6 +193,7 @@ model Student {
   // Relations
   user        User?               @relation(fields: [userId], references: [id])
   payments    Payment[]
+  invoices    Invoice[]
   attendances SessionAttendance[]
 
   // Audit
@@ -361,80 +362,312 @@ model Instructor {
 // FINANCE
 // ============================================
 
-enum PaymentType {
-  subscription
-  camp
-  b2b
-  other
+enum InvoiceStatus {
+  draft
+  issued
+  partially_paid
+  paid
+  overdue
+  cancelled
+}
+
+enum PaymentMethod {
+  cash
+  bank_transfer
+  vodafone_cash
+  instapay
+  pos
 }
 
 enum PaymentStatus {
   pending
-  completed
+  received
+  reversed
   failed
-  refunded
 }
 
-enum ExpenseCategory {
+enum ExpenseStatus {
+  draft
+  pending_approval
+  approved
+  paid
+  reversed
+}
+
+enum ExpenseCategoryType {
+  instructor_payouts
   rent
-  instructor
   marketing
+  utilities
   operations
   other
 }
 
-model Payment {
-  id        String   @id @default(uuid())
-  studentId String?
-  student   Student? @relation(fields: [studentId], references: [id])
+enum CashAccountType {
+  bank
+  cash
+  wallet
+}
 
-  amount Float
-  type   PaymentType
-  status PaymentStatus @default(pending)
+enum FinancialPeriodStatus {
+  open
+  closed
+  locked
+}
 
-  // Payment details
-  paymentDate DateTime?
-  dueDate     DateTime?
-  notes       String?
-  // Custom attributes (admin-defined)
-  customData  Json?
+enum ReconciliationType {
+  adjustment
+  correction
+  write_off
+  reversal
+}
 
-  // B2B fields
-  schoolName String?
+// Invoice (Logical, Internal) - Expected Revenue
+model Invoice {
+  id             String   @id @default(uuid())
+  invoiceNumber  String   @unique // Auto-generated: INV-YYYY-MM-####
+  studentId      String?
+  student        Student? @relation(fields: [studentId], references: [id])
+  classId        String? // Optional, for class-based invoices
+  subscriptionId String? // Optional, for recurring invoices
+
+  issueDate DateTime @default(now())
+  dueDate   DateTime
+
+  subtotal       Float @default(0)
+  discountAmount Float @default(0)
+  taxAmount      Float @default(0)
+  totalAmount    Float
+
+  status InvoiceStatus @default(issued)
+
+  installmentPlanId String? // Optional, for installment plans (future)
+
+  notes String?
+
+  // Relations
+  paymentAllocations PaymentAllocation[]
 
   // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  createdBy String? // User ID who created
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([studentId])
   @@index([status])
-  @@index([paymentDate])
+  @@index([dueDate])
+  @@index([invoiceNumber])
+  @@map("invoices")
+}
+
+// Payment (Actual Cash Received)
+model Payment {
+  id            String        @id @default(uuid())
+  paymentNumber String        @unique // Auto-generated: PAY-YYYY-MM-####
+  receivedDate  DateTime      @default(now())
+  amount        Float
+  method        PaymentMethod
+  cashAccountId String
+  cashAccount   CashAccount   @relation(fields: [cashAccountId], references: [id])
+
+  referenceNumber String? // Bank reference, transaction ID, receipt number
+  receivedBy      String? // User ID who recorded the payment
+  status          PaymentStatus @default(received)
+
+  reversedAt     DateTime?
+  reversalReason String?
+
+  notes String?
+
+  // Relations
+  allocations PaymentAllocation[]
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Student   Student? @relation(fields: [studentId], references: [id])
+  studentId String?
+
+  @@index([cashAccountId])
+  @@index([status])
+  @@index([receivedDate])
+  @@index([paymentNumber])
   @@map("payments")
 }
 
-model Expense {
-  id          String          @id @default(uuid())
-  category    ExpenseCategory
+// Payment Allocation (Links Payments to Invoices)
+model PaymentAllocation {
+  id        String  @id @default(uuid())
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
   amount      Float
-  description String
-
-  // Optional links
-  instructorId String?
-  instructor   Instructor? @relation(fields: [instructorId], references: [id])
-
-  expenseDate DateTime
+  allocatedAt DateTime @default(now())
+  allocatedBy String? // User ID who created allocation
+  notes       String?
 
   // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  createdBy String? // User ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([category])
+  @@index([paymentId])
+  @@index([invoiceId])
+  @@map("payment_allocations")
+}
+
+// Expense Category
+model ExpenseCategory {
+  id          String  @id @default(uuid())
+  name        String
+  code        String  @unique // e.g., "INSTR", "RENT", "MKTG"
+  description String?
+  isActive    Boolean @default(true)
+
+  // Relations
+  expenses Expense[]
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("expense_categories")
+}
+
+// Expense (Actual Cash Paid Out)
+model Expense {
+  id            String          @id @default(uuid())
+  expenseNumber String          @unique // Auto-generated: EXP-YYYY-MM-####
+  expenseDate   DateTime
+  paidDate      DateTime? // Null if unpaid
+  amount        Float
+  categoryId    String
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
+
+  description   String
+  vendor        String? // Vendor/payee name
+  paymentMethod PaymentMethod?
+
+  cashAccountId String? // Where money was paid from
+  cashAccount   CashAccount? @relation(fields: [cashAccountId], references: [id])
+
+  paidBy String? // User ID who recorded payment
+
+  status ExpenseStatus @default(draft)
+
+  approvedBy String? // User ID who approved
+  approvedAt DateTime?
+
+  instructorId String? // If instructor payout
+  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+  sessionId    String? // If session-based instructor payout
+
+  periodId String? // Financial Period
+  period   FinancialPeriod? @relation(fields: [periodId], references: [id])
+
+  notes      String?
+  receiptUrl String? // Receipt/document URL (future)
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([status])
   @@index([expenseDate])
+  @@index([periodId])
+  @@index([instructorId])
+  @@index([expenseNumber])
   @@map("expenses")
+}
+
+// Cash Account (Bank, Cash Register, Wallet)
+model CashAccount {
+  id            String          @id @default(uuid())
+  name          String
+  type          CashAccountType
+  accountNumber String? // Bank account number or identifier
+  bankName      String? // Bank name (if type is bank)
+  balance       Float           @default(0) // Calculated from payments and expenses
+  currency      String          @default("EGP")
+  isActive      Boolean         @default(true)
+
+  notes String?
+
+  // Relations
+  payments Payment[]
+  expenses Expense[]
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("cash_accounts")
+}
+
+// Financial Period (Monthly)
+model FinancialPeriod {
+  id         String                @id @default(uuid())
+  periodCode String                @unique // Format: "YYYY-MM"
+  startDate  DateTime
+  endDate    DateTime
+  status     FinancialPeriodStatus @default(open)
+
+  closedAt DateTime?
+  closedBy String? // User ID who closed the period
+
+  lockedAt DateTime?
+  lockedBy String? // User ID who locked the period
+
+  notes String?
+
+  // Relations
+  expenses        Expense[]
+  reconciliations ReconciliationRecord[]
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([periodCode])
+  @@index([status])
+  @@map("financial_periods")
+}
+
+// Reconciliation Record
+model ReconciliationRecord {
+  id                   String          @id @default(uuid())
+  reconciliationNumber String          @unique // Auto-generated: REC-YYYY-MM-####
+  periodId             String
+  period               FinancialPeriod @relation(fields: [periodId], references: [id])
+
+  reconciliationDate DateTime
+  type               ReconciliationType
+  amount             Float // Positive or negative
+  description        String
+
+  reconciledBy String? // User ID who performed reconciliation
+  approvedBy   String? // User ID who approved reconciliation
+  approvedAt   DateTime?
+
+  relatedInvoiceId String? // Optional link to Invoice
+  relatedPaymentId String? // Optional link to Payment
+  relatedExpenseId String? // Optional link to Expense
+
+  notes String?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([periodId])
+  @@index([type])
+  @@index([reconciliationDate])
+  @@index([reconciliationNumber])
+  @@map("reconciliation_records")
 }
 
 model MonthlySnapshot {

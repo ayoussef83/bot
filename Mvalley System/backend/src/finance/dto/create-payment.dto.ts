@@ -1,45 +1,30 @@
-import {
-  IsNumber,
-  IsEnum,
-  IsOptional,
-  IsDateString,
-  IsString,
-  Min,
-  IsUUID,
-} from 'class-validator';
-import { PaymentType, PaymentStatus } from '@prisma/client';
+import { IsString, IsNumber, IsEnum, IsOptional, IsDateString, Min } from 'class-validator';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
 export class CreatePaymentDto {
-  // Payments must be linked to a student (internal ops requirement).
-  @IsString()
-  @IsUUID()
-  studentId: string;
+  @IsDateString()
+  @IsOptional()
+  receivedDate?: string;
 
   @IsNumber()
   @Min(0)
   amount: number;
 
-  @IsEnum(PaymentType)
-  type: PaymentType;
+  @IsEnum(PaymentMethod)
+  method: PaymentMethod;
 
+  @IsString()
+  cashAccountId: string;
+
+  @IsString()
   @IsOptional()
+  referenceNumber?: string;
+
   @IsEnum(PaymentStatus)
+  @IsOptional()
   status?: PaymentStatus;
 
-  @IsOptional()
-  @IsDateString()
-  paymentDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  dueDate?: string;
-
-  @IsOptional()
   @IsString()
+  @IsOptional()
   notes?: string;
-
-  @IsOptional()
-  @IsString()
-  schoolName?: string;
 }
-
