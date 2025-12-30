@@ -30,6 +30,7 @@ import {
   FiSliders,
   FiShare2,
   FiMessageCircle,
+  FiTrendingUp,
 } from 'react-icons/fi';
 
 type NavigationSection = {
