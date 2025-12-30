@@ -1131,7 +1131,8 @@ function SchedulerStatus() {
         }
       } catch (e: any) {
         if (mounted) {
-          setError(e.response?.data?.message || e.message || 'Failed to load scheduler status');
+          const errorMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Failed to load scheduler status';
+          setError(typeof errorMsg === 'string' ? errorMsg : String(errorMsg));
         }
       } finally {
         if (mounted) {
@@ -1149,7 +1150,10 @@ function SchedulerStatus() {
   }, []);
 
   if (loading) return <div className="text-gray-500">Loading scheduler status...</div>;
-  if (error) return <div className="text-red-600">Error: {error}</div>;
+  if (error) {
+    const errorMessage = typeof error === 'string' ? error : error?.message || JSON.stringify(error);
+    return <div className="text-red-600">Error: {errorMessage}</div>;
+  }
   if (!status) return null;
 
   return (
@@ -1199,7 +1203,18 @@ function TestSchedulerTasks() {
       const resp = await testFn();
       setResults((prev) => ({ ...prev, [taskName]: resp?.data || resp }));
     } catch (e: any) {
-      const errorData = e?.response?.data || e?.message || 'Unknown error';
+      let errorData: string;
+      if (typeof e?.response?.data === 'string') {
+        errorData = e.response.data;
+      } else if (e?.response?.data?.message) {
+        errorData = e.response.data.message;
+      } else if (e?.response?.data?.error) {
+        errorData = e.response.data.error;
+      } else if (e?.message) {
+        errorData = e.message;
+      } else {
+        errorData = JSON.stringify(e?.response?.data || e || 'Unknown error');
+      }
       setErrors((prev) => ({ ...prev, [taskName]: errorData }));
     } finally {
       setTesting(null);
@@ -1248,10 +1263,14 @@ function TestSchedulerTasks() {
           {results[task.name] && (
             <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
               <div className="text-sm font-semibold text-green-700 mb-1">Success</div>
-              <div className="text-sm text-green-800">{results[task.name].message}</div>
-              <div className="text-xs text-green-600 mt-1">
-                Timestamp: {new Date(results[task.name].timestamp).toLocaleString()}
+              <div className="text-sm text-green-800">
+                {results[task.name]?.message || 'Task executed successfully'}
               </div>
+              {results[task.name]?.timestamp && (
+                <div className="text-xs text-green-600 mt-1">
+                  Timestamp: {new Date(results[task.name].timestamp).toLocaleString()}
+                </div>
+              )}
             </div>
           )}
 
@@ -1259,7 +1278,9 @@ function TestSchedulerTasks() {
             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
               <div className="text-sm font-semibold text-red-700 mb-1">Error</div>
               <pre className="text-xs text-red-800 whitespace-pre-wrap">
-                {JSON.stringify(errors[task.name], null, 2)}
+                {typeof errors[task.name] === 'string' 
+                  ? errors[task.name] 
+                  : JSON.stringify(errors[task.name], null, 2)}
               </pre>
             </div>
           )}
