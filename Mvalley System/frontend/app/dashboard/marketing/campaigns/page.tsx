@@ -57,10 +57,10 @@ export default function CampaignsPage() {
   const totalConversations = campaigns.reduce((sum, c) => sum + (c._count?.conversations || 0), 0);
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; status: 'active' | 'warning' | 'success' | 'error' }> = {
+    const statusMap: Record<string, { label: string; status: 'active' | 'warning' | 'inactive' | 'error' }> = {
       active: { label: 'Active', status: 'active' },
       paused: { label: 'Paused', status: 'warning' },
-      completed: { label: 'Completed', status: 'success' },
+      completed: { label: 'Completed', status: 'inactive' },
     };
     const config = statusMap[status] || { label: status, status: 'active' };
     return <StatusBadge status={config.status} label={config.label} />;

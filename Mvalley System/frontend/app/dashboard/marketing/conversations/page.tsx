@@ -60,11 +60,11 @@ export default function ConversationsPage() {
   const convertedCount = conversations.filter((c) => c.status === 'converted').length;
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; status: 'active' | 'warning' | 'success' | 'error' }> = {
+    const statusMap: Record<string, { label: string; status: 'active' | 'warning' | 'inactive' | 'error' }> = {
       new: { label: 'New', status: 'active' },
       in_progress: { label: 'In Progress', status: 'warning' },
       waiting_reply: { label: 'Waiting Reply', status: 'warning' },
-      converted: { label: 'Converted', status: 'success' },
+      converted: { label: 'Converted', status: 'inactive' },
       archived: { label: 'Archived', status: 'error' },
     };
     const config = statusMap[status] || { label: status, status: 'active' };
