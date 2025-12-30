@@ -329,8 +329,7 @@ export default function PaymentsPage() {
     {
       label: 'View',
       onClick: () => {
-        // TODO: Navigate to payment details
-        alert('Payment details coming soon');
+        router.push(`/dashboard/finance/cash/payments/details?id=${row.id}`);
       },
       icon: <FiEye className="w-4 h-4" />,
     },

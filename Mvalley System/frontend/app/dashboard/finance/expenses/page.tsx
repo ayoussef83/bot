@@ -311,8 +311,7 @@ export default function ExpensesPage() {
     {
       label: 'View',
       onClick: () => {
-        // TODO: Navigate to expense details
-        alert('Expense details coming soon');
+        router.push(`/dashboard/finance/expenses/details?id=${row.id}`);
       },
       icon: <FiEye className="w-4 h-4" />,
     },
