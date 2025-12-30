@@ -302,12 +302,24 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
   };
 
   const isExpanded = (sectionId: string) => {
-    // Auto-expand if any child is active
+    // Auto-expand if any child (or nested child) is active
     const section = navigationSections.find((s) => s.id === sectionId);
     if (section?.children) {
       const hasActiveChild = section.children.some((child) => {
-        if (!child.path) return false;
-        return isActive(child.path);
+        // Check if child path is active
+        if (child.path && isActive(child.path)) return true;
+        // Check if any grandchild is active (recursive)
+        if (child.children) {
+          return child.children.some((grandchild) => {
+            if (grandchild.path && isActive(grandchild.path)) return true;
+            // Check deeper nesting if needed
+            if (grandchild.children) {
+              return grandchild.children.some((ggchild) => ggchild.path && isActive(ggchild.path));
+            }
+            return false;
+          });
+        }
+        return false;
       });
       if (hasActiveChild) return true;
     }
