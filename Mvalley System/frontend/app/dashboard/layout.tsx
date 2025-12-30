@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import UserProfileMenu from '@/components/UserProfileMenu';
+import { FiMenu, FiX } from 'react-icons/fi';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -25,6 +27,11 @@ export default function DashboardLayout({
 
     setUser(JSON.parse(userStr));
   }, [router]);
+
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -54,16 +61,42 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-gray-100">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Left Sidebar */}
-      <DashboardSidebar userRole={user.role} />
+      <DashboardSidebar
+        userRole={user.role}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col ml-64">
+      <div className="flex-1 flex flex-col md:ml-64 w-full md:w-auto">
         {/* Top Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-6 py-3">
-            <div className="flex justify-end items-center">
-              <UserProfileMenu user={user} onLogout={handleLogout} />
+          <div className="px-4 sm:px-6 py-3">
+            <div className="flex items-center justify-between">
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                aria-label="Toggle menu"
+              >
+                {sidebarOpen ? (
+                  <FiX className="w-6 h-6" />
+                ) : (
+                  <FiMenu className="w-6 h-6" />
+                )}
+              </button>
+              <div className="flex-1 md:flex-none md:flex md:justify-end">
+                <UserProfileMenu user={user} onLogout={handleLogout} />
+              </div>
             </div>
           </div>
         </header>

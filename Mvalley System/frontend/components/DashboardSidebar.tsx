@@ -21,6 +21,7 @@ import {
   FiLayers,
   FiUser,
   FiClock,
+  FiX,
 } from 'react-icons/fi';
 
 type NavigationSection = {
@@ -167,9 +168,11 @@ const navigationSections: NavigationSection[] = [
 
 interface DashboardSidebarProps {
   userRole: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
+export default function DashboardSidebar({ userRole, isOpen = false, onClose }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
@@ -245,123 +248,261 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
   };
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 fixed left-0 top-0 bottom-0 overflow-y-auto">
-      <div className="p-6 border-b border-gray-200">
-        <Link href={getDashboardPath(userRole)} className="flex items-center justify-center">
-          <Image
-            src="/mindvalley-logo.png"
-            alt="MindValley"
-            height={80}
-            width={200}
-            className="h-20 w-auto object-contain"
-            unoptimized
-          />
-        </Link>
-      </div>
-      <nav className="p-2">
-        {Object.entries(groupedSections).map(([groupName, sections]) => (
-          <div key={groupName} className="mb-6">
-            {groupName !== 'Main' && (
-              <div className="px-3 py-2 mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {groupName}
-                </h3>
-              </div>
-            )}
-            <ul className="space-y-1">
-              {sections.map((section) => {
-                const hasChildren = section.children && section.children.length > 0;
-                const expanded = isExpanded(section.id);
-                const active = section.path ? isActive(section.path) : false;
+    <>
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out md:hidden ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <Link href={getDashboardPath(userRole)} className="flex items-center justify-center flex-1">
+              <Image
+                src="/mindvalley-logo.png"
+                alt="MindValley"
+                height={60}
+                width={150}
+                className="h-16 w-auto object-contain"
+                unoptimized
+              />
+            </Link>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              aria-label="Close menu"
+            >
+              <FiX className="w-5 h-5" />
+            </button>
+          </div>
+          <nav className="flex-1 overflow-y-auto p-2">
+            {Object.entries(groupedSections).map(([groupName, sections]) => (
+              <div key={groupName} className="mb-6">
+                {groupName !== 'Main' && (
+                  <div className="px-3 py-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {groupName}
+                    </h3>
+                  </div>
+                )}
+                <ul className="space-y-1">
+                  {sections.map((section) => {
+                    const hasChildren = section.children && section.children.length > 0;
+                    const expanded = isExpanded(section.id);
+                    const active = section.path ? isActive(section.path) : false;
 
-                // Special handling for Dashboard
-                if (section.id === 'dashboard') {
-                  const dashboardPath = getDashboardPath(userRole);
-                  const dashboardActive = pathname === dashboardPath || pathname?.startsWith('/dashboard/management') || pathname?.startsWith('/dashboard/ops') || pathname?.startsWith('/dashboard/accounting') || pathname?.startsWith('/dashboard/instructor');
-                  
+                    // Special handling for Dashboard
+                    if (section.id === 'dashboard') {
+                      const dashboardPath = getDashboardPath(userRole);
+                      const dashboardActive = pathname === dashboardPath || pathname?.startsWith('/dashboard/management') || pathname?.startsWith('/dashboard/ops') || pathname?.startsWith('/dashboard/accounting') || pathname?.startsWith('/dashboard/instructor');
+                      
+                      return (
+                        <li key={section.id}>
+                          <Link
+                            href={dashboardPath}
+                            onClick={onClose}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              dashboardActive
+                                ? 'bg-indigo-50 text-indigo-700'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {section.icon}
+                            <span>{section.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    }
+
+                    return (
+                      <li key={section.id}>
+                        {hasChildren ? (
+                          <>
+                            <button
+                              onClick={() => toggleSection(section.id)}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                                active
+                                  ? 'bg-indigo-50 text-indigo-700'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {section.icon}
+                                <span>{section.label}</span>
+                              </div>
+                              <FiChevronRight
+                                className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                              />
+                            </button>
+                            {expanded && (
+                              <ul className="ml-6 mt-1 space-y-1">
+                                {section.children!
+                                  .filter(isChildVisible)
+                                  .map((child) => {
+                                    const childActive = child.path ? isActive(child.path) : false;
+                                    return (
+                                      <li key={child.id}>
+                                        <Link
+                                          href={child.path || '#'}
+                                          onClick={onClose}
+                                          className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                            childActive
+                                              ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                              : 'text-gray-600 hover:bg-gray-50'
+                                          }`}
+                                        >
+                                          {child.icon}
+                                          <span>{child.label}</span>
+                                        </Link>
+                                      </li>
+                                    );
+                                  })}
+                              </ul>
+                            )}
+                          </>
+                        ) : (
+                          <Link
+                            href={section.path || '#'}
+                            onClick={onClose}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              active
+                                ? 'bg-indigo-50 text-indigo-700'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {section.icon}
+                            <span>{section.label}</span>
+                          </Link>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block w-64 bg-white border-r border-gray-200 min-h-screen flex-shrink-0 fixed left-0 top-0 bottom-0 overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
+          <Link href={getDashboardPath(userRole)} className="flex items-center justify-center">
+            <Image
+              src="/mindvalley-logo.png"
+              alt="MindValley"
+              height={80}
+              width={200}
+              className="h-20 w-auto object-contain"
+              unoptimized
+            />
+          </Link>
+        </div>
+        <nav className="p-2">
+          {Object.entries(groupedSections).map(([groupName, sections]) => (
+            <div key={groupName} className="mb-6">
+              {groupName !== 'Main' && (
+                <div className="px-3 py-2 mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    {groupName}
+                  </h3>
+                </div>
+              )}
+              <ul className="space-y-1">
+                {sections.map((section) => {
+                  const hasChildren = section.children && section.children.length > 0;
+                  const expanded = isExpanded(section.id);
+                  const active = section.path ? isActive(section.path) : false;
+
+                  // Special handling for Dashboard
+                  if (section.id === 'dashboard') {
+                    const dashboardPath = getDashboardPath(userRole);
+                    const dashboardActive = pathname === dashboardPath || pathname?.startsWith('/dashboard/management') || pathname?.startsWith('/dashboard/ops') || pathname?.startsWith('/dashboard/accounting') || pathname?.startsWith('/dashboard/instructor');
+                    
+                    return (
+                      <li key={section.id}>
+                        <Link
+                          href={dashboardPath}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            dashboardActive
+                              ? 'bg-indigo-50 text-indigo-700'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {section.icon}
+                          <span>{section.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  }
+
                   return (
                     <li key={section.id}>
-                      <Link
-                        href={dashboardPath}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                          dashboardActive
-                            ? 'bg-indigo-50 text-indigo-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {section.icon}
-                        <span>{section.label}</span>
-                      </Link>
-                    </li>
-                  );
-                }
-
-                return (
-                  <li key={section.id}>
-                    {hasChildren ? (
-                      <>
-                        <button
-                          onClick={() => toggleSection(section.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      {hasChildren ? (
+                        <>
+                          <button
+                            onClick={() => toggleSection(section.id)}
+                            className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              active
+                                ? 'bg-indigo-50 text-indigo-700'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {section.icon}
+                              <span>{section.label}</span>
+                            </div>
+                            <FiChevronRight
+                              className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                            />
+                          </button>
+                          {expanded && (
+                            <ul className="ml-6 mt-1 space-y-1">
+                              {section.children!
+                                .filter(isChildVisible)
+                                .map((child) => {
+                                  const childActive = child.path ? isActive(child.path) : false;
+                                  return (
+                                    <li key={child.id}>
+                                      <Link
+                                        href={child.path || '#'}
+                                        className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                          childActive
+                                            ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                            : 'text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        {child.icon}
+                                        <span>{child.label}</span>
+                                      </Link>
+                                    </li>
+                                  );
+                                })}
+                            </ul>
+                          )}
+                        </>
+                      ) : (
+                        <Link
+                          href={section.path || '#'}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                             active
                               ? 'bg-indigo-50 text-indigo-700'
                               : 'text-gray-700 hover:bg-gray-50'
                           }`}
                         >
-                          <div className="flex items-center gap-2">
-                            {section.icon}
-                            <span>{section.label}</span>
-                          </div>
-                          <FiChevronRight
-                            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                          />
-                        </button>
-                        {expanded && (
-                          <ul className="ml-6 mt-1 space-y-1">
-                            {section.children!
-                              .filter(isChildVisible)
-                              .map((child) => {
-                                const childActive = child.path ? isActive(child.path) : false;
-                                return (
-                                  <li key={child.id}>
-                                    <Link
-                                      href={child.path || '#'}
-                                      className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-                                        childActive
-                                          ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                          : 'text-gray-600 hover:bg-gray-50'
-                                      }`}
-                                    >
-                                      {child.icon}
-                                      <span>{child.label}</span>
-                                    </Link>
-                                  </li>
-                                );
-                              })}
-                          </ul>
-                        )}
-                      </>
-                    ) : (
-                      <Link
-                        href={section.path || '#'}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                          active
-                            ? 'bg-indigo-50 text-indigo-700'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {section.icon}
-                        <span>{section.label}</span>
-                      </Link>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-    </div>
+                          {section.icon}
+                          <span>{section.label}</span>
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </div>
+    </>
   );
 }
 
