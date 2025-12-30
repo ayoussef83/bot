@@ -528,6 +528,8 @@ export class SchedulerService {
       
       // Find notifications scheduled for now or in the past that are still pending
       // Exclude ones that are already sent or failed
+      // Also exclude ones that have been pending for more than 1 hour (likely stuck)
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       const scheduledNotifications = await this.prisma.notification.findMany({
         where: {
           status: 'pending',
@@ -535,12 +537,38 @@ export class SchedulerService {
             lte: now,
             not: null,
           },
+          // Only process notifications created in the last hour to avoid processing old stuck ones
+          createdAt: {
+            gte: oneHourAgo,
+          },
         },
         take: 50, // Process up to 50 at a time
         orderBy: {
           scheduledAt: 'asc', // Process oldest first
         },
       });
+
+      // Clean up old stuck notifications (pending for more than 1 hour)
+      const stuckCount = await this.prisma.notification.updateMany({
+        where: {
+          status: 'pending',
+          scheduledAt: {
+            not: null,
+            lte: now,
+          },
+          createdAt: {
+            lt: oneHourAgo,
+          },
+        },
+        data: {
+          status: 'failed',
+          errorMessage: 'Notification was stuck in pending status for more than 1 hour',
+          scheduledAt: null, // Clear scheduledAt
+        },
+      });
+      if (stuckCount.count > 0) {
+        this.logger.warn(`Cleaned up ${stuckCount.count} stuck scheduled notifications`);
+      }
 
       this.logger.log(`Found ${scheduledNotifications.length} scheduled notifications to process`);
 

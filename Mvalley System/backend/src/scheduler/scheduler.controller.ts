@@ -109,5 +109,36 @@ export class SchedulerController {
       scheduledAt: notification.scheduledAt,
     };
   }
+
+  @Post('cleanup-stuck-notifications')
+  @Roles(UserRole.super_admin)
+  async cleanupStuckNotifications() {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    const result = await this.schedulerService['prisma'].notification.updateMany({
+      where: {
+        status: 'pending',
+        scheduledAt: {
+          not: null,
+          lte: now,
+        },
+        createdAt: {
+          lt: oneHourAgo,
+        },
+      },
+      data: {
+        status: 'failed',
+        errorMessage: 'Notification was stuck in pending status - cleaned up',
+        scheduledAt: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Cleaned up ${result.count} stuck notifications`,
+      count: result.count,
+    };
+  }
 }
 
