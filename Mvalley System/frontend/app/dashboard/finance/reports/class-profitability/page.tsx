@@ -2,17 +2,63 @@
 
 import { useEffect, useState } from 'react';
 import { FiUsers, FiDownload, FiFileText, FiAlertCircle } from 'react-icons/fi';
+import { financeReportsService, type ClassProfitabilityReport, type FinancialPeriod } from '@/lib/services';
 
 export default function ClassProfitabilityReportPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedProgram, setSelectedProgram] = useState('');
   const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState<ClassProfitabilityReport | null>(null);
+  const [periods, setPeriods] = useState<FinancialPeriod[]>([]);
+  const [error, setError] = useState('');
 
-  // Mock periods for now
-  const periods = [
-    { code: '2025-01', label: 'January 2025' },
-    { code: '2024-12', label: 'December 2024' },
-    { code: '2024-11', label: 'November 2024' },
-  ];
+  useEffect(() => {
+    fetchPeriods();
+  }, []);
+
+  useEffect(() => {
+    if (selectedPeriod) {
+      fetchReport();
+    }
+  }, [selectedPeriod, selectedLocation, selectedProgram]);
+
+  const fetchPeriods = async () => {
+    try {
+      const data = await financeReportsService.getFinancialPeriods();
+      setPeriods(data);
+      if (data.length > 0 && !selectedPeriod) {
+        setSelectedPeriod(data[0].periodCode);
+      }
+    } catch (err: any) {
+      console.error('Error fetching periods:', err);
+      setPeriods([
+        { id: '1', periodCode: '2025-01', startDate: new Date('2025-01-01').toISOString(), endDate: new Date('2025-01-31').toISOString(), status: 'open' },
+      ]);
+      if (!selectedPeriod) {
+        setSelectedPeriod('2025-01');
+      }
+    }
+  };
+
+  const fetchReport = async () => {
+    if (!selectedPeriod) return;
+    setLoading(true);
+    setError('');
+    try {
+      const data = await financeReportsService.getClassProfitability(
+        selectedPeriod,
+        selectedLocation || undefined,
+        selectedProgram || undefined
+      );
+      setReport(data);
+    } catch (err: any) {
+      console.error('Error fetching report:', err);
+      setError(err.response?.data?.message || 'Failed to load report');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -37,26 +83,38 @@ export default function ClassProfitabilityReportPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
+
       {/* Period Selector */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Period</label>
             <select
-              value={selectedPeriod || periods[0].code}
+              value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              disabled={loading}
             >
               {periods.map((period) => (
-                <option key={period.code} value={period.code}>
-                  {period.label}
+                <option key={period.periodCode} value={period.periodCode}>
+                  {new Date(period.startDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Location (Optional)</label>
-            <select className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              disabled={loading}
+            >
               <option value="">All Locations</option>
               <option value="MOA">MOA</option>
               <option value="Espace">Espace</option>
@@ -66,7 +124,12 @@ export default function ClassProfitabilityReportPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Program (Optional)</label>
-            <select className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <select
+              value={selectedProgram}
+              onChange={(e) => setSelectedProgram(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              disabled={loading}
+            >
               <option value="">All Programs</option>
               <option value="AI">AI</option>
               <option value="robotics">Robotics</option>
@@ -77,42 +140,77 @@ export default function ClassProfitabilityReportPage() {
         </div>
       </div>
 
-      {/* Report Table */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="text-center py-12">
-          <FiUsers className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-sm font-medium text-gray-900 mb-2">Class Profitability Report</h3>
-          <p className="text-sm text-gray-500">
-            Revenue per class, instructor cost per class, net profit, and margin percentage
-          </p>
-          <p className="text-xs text-gray-400 mt-2">
-            Report data will be displayed here once backend endpoints are implemented
-          </p>
+      {loading ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="text-gray-500">Loading report...</div>
         </div>
-      </div>
+      ) : report ? (
+        <>
+          {/* Classes Table */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Class Profitability</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Instructor Cost</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Net Profit</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Margin</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {report.classes.map((cls) => (
+                    <tr key={cls.classId} className={cls.margin < 0 ? 'bg-red-50' : ''}>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{cls.className}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{cls.location}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                        {cls.revenue.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                        {cls.instructorCost.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${cls.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {cls.netProfit.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${cls.margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {cls.margin.toFixed(1)}%
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600">{cls.studentCount}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600">{cls.sessionCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      {/* Summary Section */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Summary</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-600">Total Classes</p>
-            <p className="text-2xl font-bold text-gray-900 mt-2">0</p>
+          {/* Summary Section */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Summary</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Classes</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{report.summary.totalClasses}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Profitable Classes</p>
+                <p className="text-2xl font-bold text-green-600 mt-2">{report.summary.profitableClasses}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Unprofitable Classes</p>
+                <p className="text-2xl font-bold text-red-600 mt-2">{report.summary.unprofitableClasses}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">Average Margin</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{report.summary.averageMargin.toFixed(1)}%</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-600">Profitable Classes</p>
-            <p className="text-2xl font-bold text-green-600 mt-2">0</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-600">Unprofitable Classes</p>
-            <p className="text-2xl font-bold text-red-600 mt-2">0</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-600">Average Margin</p>
-            <p className="text-2xl font-bold text-gray-900 mt-2">0.0%</p>
-          </div>
-        </div>
-      </div>
 
       {/* Alert for Negative Margin Classes */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">

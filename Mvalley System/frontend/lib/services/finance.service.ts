@@ -1,191 +1,166 @@
-import api from '@/lib/api';
+import api from '../api';
 
-export interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  studentId?: string;
-  student?: {
-    id: string;
-    firstName: string;
-    lastName: string;
+export interface ProfitAndLossReport {
+  period: {
+    code: string;
+    startDate: string;
+    endDate: string;
   };
-  classId?: string;
-  subscriptionId?: string;
-  issueDate: string;
-  dueDate: string;
-  subtotal: number;
-  discountAmount: number;
-  taxAmount: number;
-  totalAmount: number;
-  status: 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled';
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Payment {
-  id: string;
-  paymentNumber: string;
-  receivedDate: string;
-  amount: number;
-  method: 'cash' | 'bank_transfer' | 'vodafone_cash' | 'instapay' | 'pos';
-  cashAccountId: string;
-  cashAccount?: {
-    id: string;
-    name: string;
-    type: string;
-  };
-  referenceNumber?: string;
-  status: 'pending' | 'received' | 'reversed' | 'failed';
-  notes?: string;
-  allocations?: PaymentAllocation[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PaymentAllocation {
-  id: string;
-  paymentId: string;
-  invoiceId: string;
-  invoice?: Invoice;
-  amount: number;
-  allocatedAt: string;
-  notes?: string;
-}
-
-export interface Expense {
-  id: string;
-  expenseNumber: string;
-  expenseDate: string;
-  paidDate?: string;
-  amount: number;
-  categoryId: string;
-  category?: ExpenseCategory;
-  description: string;
-  vendor?: string;
-  paymentMethod?: string;
-  cashAccountId?: string;
-  cashAccount?: CashAccount;
-  status: 'draft' | 'pending_approval' | 'approved' | 'paid' | 'reversed';
-  instructorId?: string;
-  instructor?: {
-    id: string;
-    user?: {
-      firstName: string;
-      lastName: string;
-    };
-  };
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ExpenseCategory {
-  id: string;
-  name: string;
-  code: string;
-  description?: string;
-  isActive: boolean;
-}
-
-export interface CashAccount {
-  id: string;
-  name: string;
-  type: 'bank' | 'cash' | 'wallet';
-  accountNumber?: string;
-  bankName?: string;
-  balance: number;
-  currency: string;
-  isActive: boolean;
-  notes?: string;
-}
-
-export interface FinanceOverview {
-  cashPosition: {
+  revenue: {
     total: number;
-    breakdown: Array<{
-      name: string;
-      type: string;
-      balance: number;
-    }>;
-  };
-  expectedRevenue: number;
-  actualRevenue: {
-    _sum: {
-      amount: number;
+    breakdown: {
+      classFees: number;
+      subscriptions: number;
+      other: number;
     };
   };
-  variance: number;
-  overdueInvoices: {
-    count: number;
-    amount: number;
+  expenses: {
+    total: number;
+    breakdown: {
+      instructor: number;
+      rent: number;
+      marketing: number;
+      utilities: number;
+      operations: number;
+      other: number;
+    };
   };
-  netResult: {
-    revenue: number;
-    expenses: number;
-    profit: number;
-    margin: number;
+  netProfit: number;
+  grossMargin: number;
+}
+
+export interface CashFlowReport {
+  period: {
+    code: string;
+    startDate: string;
+    endDate: string;
   };
-  unpaidInstructorBalances: number;
-  recentPayments: Payment[];
-  recentExpenses: Expense[];
+  inflows: {
+    total: number;
+    breakdown: {
+      cash: number;
+      bankTransfer: number;
+      wallet: number;
+    };
+  };
+  outflows: {
+    total: number;
+    breakdown: {
+      instructorPayouts: number;
+      other: number;
+    };
+  };
+  openingBalance: number;
+  netCashFlow: number;
+  closingBalance: number;
+}
+
+export interface ClassProfitabilityItem {
+  classId: string;
+  className: string;
+  location: string;
+  revenue: number;
+  instructorCost: number;
+  netProfit: number;
+  margin: number;
+  studentCount: number;
+  sessionCount: number;
+}
+
+export interface ClassProfitabilityReport {
+  period: {
+    code: string;
+    startDate: string;
+    endDate: string;
+  };
+  classes: ClassProfitabilityItem[];
+  summary: {
+    totalClasses: number;
+    profitableClasses: number;
+    unprofitableClasses: number;
+    totalRevenue: number;
+    totalCost: number;
+    totalProfit: number;
+    averageMargin: number;
+  };
+}
+
+export interface InstructorCostItem {
+  instructorId: string;
+  instructorName: string;
+  costType: string;
+  sessions: number;
+  hours: number;
+  totalCost: number;
+  revenueGenerated: number;
+  costPerSession: number;
+  costPerHour: number;
+  netContribution: number;
+  efficiency: number;
+}
+
+export interface InstructorCostsReport {
+  period: {
+    code: string;
+    startDate: string;
+    endDate: string;
+  };
+  instructors: InstructorCostItem[];
+  summary: {
+    totalInstructors: number;
+    totalCost: number;
+    totalRevenue: number;
+    totalSessions: number;
+    totalHours: number;
+    costRatio: number;
+  };
+}
+
+export interface FinancialPeriod {
+  id: string;
+  periodCode: string;
+  startDate: string;
+  endDate: string;
+  status: string;
 }
 
 class FinanceService {
-  async getOverview(): Promise<{ data: FinanceOverview }> {
-    const response = await api.get('/finance/overview');
+  // Reports
+  async getProfitAndLoss(period: string, location?: string, program?: string): Promise<ProfitAndLossReport> {
+    const params = new URLSearchParams({ period });
+    if (location) params.append('location', location);
+    if (program) params.append('program', program);
+    const response = await api.get(`/finance/reports/profit-loss?${params.toString()}`);
     return response.data;
   }
 
-  async getInvoices(): Promise<{ data: Invoice[] }> {
-    const response = await api.get('/finance/invoices');
+  async getCashFlow(period: string, cashAccountId?: string): Promise<CashFlowReport> {
+    const params = new URLSearchParams({ period });
+    if (cashAccountId) params.append('cashAccountId', cashAccountId);
+    const response = await api.get(`/finance/reports/cash-flow?${params.toString()}`);
     return response.data;
   }
 
-  async getInvoiceById(id: string): Promise<{ data: Invoice }> {
-    const response = await api.get(`/finance/invoices/${id}`);
+  async getClassProfitability(period: string, location?: string, program?: string): Promise<ClassProfitabilityReport> {
+    const params = new URLSearchParams({ period });
+    if (location) params.append('location', location);
+    if (program) params.append('program', program);
+    const response = await api.get(`/finance/reports/class-profitability?${params.toString()}`);
     return response.data;
   }
 
-  async getPayments(): Promise<{ data: Payment[] }> {
-    const response = await api.get('/finance/payments');
+  async getInstructorCosts(period: string, instructorId?: string): Promise<InstructorCostsReport> {
+    const params = new URLSearchParams({ period });
+    if (instructorId) params.append('instructorId', instructorId);
+    const response = await api.get(`/finance/reports/instructor-costs?${params.toString()}`);
     return response.data;
   }
 
-  async getPaymentById(id: string): Promise<{ data: Payment }> {
-    const response = await api.get(`/finance/payments/${id}`);
-    return response.data;
-  }
-
-  async getExpenses(): Promise<{ data: Expense[] }> {
-    const response = await api.get('/finance/expenses');
-    return response.data;
-  }
-
-  async getExpenseById(id: string): Promise<{ data: Expense }> {
-    const response = await api.get(`/finance/expenses/${id}`);
-    return response.data;
-  }
-
-  async getCashAccounts(): Promise<{ data: CashAccount[] }> {
-    const response = await api.get('/finance/cash-accounts');
-    return response.data;
-  }
-
-  async getExpenseCategories(): Promise<{ data: ExpenseCategory[] }> {
-    const response = await api.get('/finance/expense-categories');
-    return response.data;
-  }
-
-  async getInvoices(): Promise<{ data: Invoice[] }> {
-    const response = await api.get('/finance/invoices');
-    return response.data;
-  }
-
-  async getInvoiceById(id: string): Promise<{ data: Invoice }> {
-    const response = await api.get(`/finance/invoices/${id}`);
+  // Financial Periods
+  async getFinancialPeriods(): Promise<FinancialPeriod[]> {
+    const response = await api.get('/finance/periods');
     return response.data;
   }
 }
 
-export const financeService = new FinanceService();
+export const financeReportsService = new FinanceService();

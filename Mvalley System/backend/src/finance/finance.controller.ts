@@ -14,4 +14,10 @@ export class FinanceController {
   async getOverview() {
     return this.financeService.getOverview();
   }
+
+  @Get('periods')
+  @Roles('super_admin', 'management', 'accounting', 'operations')
+  async getPeriods() {
+    return this.financeService.getFinancialPeriods();
+  }
 }
