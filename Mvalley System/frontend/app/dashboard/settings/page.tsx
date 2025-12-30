@@ -1093,19 +1093,12 @@ export default function SettingsPage() {
 
       {activeTab === 'scheduler' && canAccess && (
         <div className="space-y-6">
-          {/* Scheduler Status */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Scheduler Status</h2>
-            <SchedulerStatus />
-          </div>
-
-          {/* Test Tasks */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Test Scheduled Tasks</h2>
+            <h2 className="text-lg font-semibold mb-4">Schedule SMS</h2>
             <p className="text-sm text-gray-500 mb-4">
-              Manually trigger scheduler tasks to test SMS/Email sending. All tasks use Cairo timezone.
+              Schedule SMS messages to be sent at a specific time. All times use Cairo timezone.
             </p>
-            <TestSchedulerTasks />
+            <ScheduleSmsForm />
           </div>
         </div>
       )}
@@ -1113,128 +1106,11 @@ export default function SettingsPage() {
   );
 }
 
-// Scheduler Status Component
-function SchedulerStatus() {
-  const [status, setStatus] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    
-    const fetchStatus = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const resp = await settingsService.getSchedulerStatus();
-        
-        if (mounted) {
-          setStatus(resp.data);
-          setError(null);
-        }
-      } catch (e: any) {
-        if (mounted) {
-          let errorMsg: string;
-          
-          if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
-            errorMsg = 'Request timed out. The backend may not be available yet.';
-          } else if (e.response?.status === 404) {
-            errorMsg = 'Scheduler endpoint not found. Backend may need to be deployed.';
-          } else if (e.response?.status === 401 || e.response?.status === 403) {
-            errorMsg = 'Authentication failed. Please log in again.';
-          } else {
-            errorMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Failed to load scheduler status';
-          }
-          
-          setError(typeof errorMsg === 'string' ? errorMsg : String(errorMsg));
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    fetchStatus();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchStatus, 30000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        <div className="text-gray-500">Loading scheduler status...</div>
-        <div className="text-xs text-gray-400">This may take a few seconds. If it takes too long, the backend endpoint may not be available yet.</div>
-      </div>
-    );
-  }
-  
-  if (error) {
-    const errorMessage = typeof error === 'string' ? error : error?.message || JSON.stringify(error);
-    return (
-      <div className="space-y-2">
-        <div className="text-red-600 font-medium">Error loading scheduler status</div>
-        <div className="text-sm text-red-700">{errorMessage}</div>
-        <div className="text-xs text-gray-500 mt-2">
-          <strong>Possible causes:</strong>
-          <ul className="list-disc list-inside mt-1">
-            <li>Backend not deployed yet (check CodeBuild status)</li>
-            <li>Backend endpoint not available</li>
-            <li>Network connectivity issue</li>
-          </ul>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!status) return null;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-50 p-4 rounded">
-          <div className="text-sm font-medium text-gray-700 mb-1">Server Time</div>
-          <div className="text-lg font-mono">{new Date(status.serverTime).toLocaleString()}</div>
-        </div>
-        <div className="bg-indigo-50 p-4 rounded">
-          <div className="text-sm font-medium text-gray-700 mb-1">Cairo Time</div>
-          <div className="text-lg font-mono text-indigo-700">{status.cairoTimeFormatted}</div>
-        </div>
-      </div>
-
-      <div className="border-t pt-4">
-        <h3 className="text-md font-semibold mb-3">Scheduled Tasks</h3>
-        <div className="space-y-2">
-          {Object.entries(status.scheduledTasks || {}).map(([key, task]: [string, any]) => (
-            <div key={key} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-              <div>
-                <div className="font-medium text-gray-900 capitalize">
-                  {key.replace(/([A-Z])/g, ' $1').trim()}
-                </div>
-                <div className="text-sm text-gray-500">{task.schedule}</div>
-              </div>
-              <div className="text-xs font-mono text-gray-400">{task.cron}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Test Scheduler Tasks Component
-function TestSchedulerTasks() {
-  const [testing, setTesting] = useState<string | null>(null);
-  const [results, setResults] = useState<{ [key: string]: any }>({});
-  const [errors, setErrors] = useState<{ [key: string]: any }>({});
+// Schedule SMS Form Component
+function ScheduleSmsForm() {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [scheduledTime, setScheduledTime] = useState<string>('');
-  const [smsTest, setSmsTest] = useState({ mobile: '', message: 'Test SMS from MV-OS Scheduler' });
+  const [smsTest, setSmsTest] = useState({ mobile: '', message: '' });
   const [smsResult, setSmsResult] = useState<any>(null);
   const [smsError, setSmsError] = useState<any>(null);
   const [sendingSms, setSendingSms] = useState(false);
@@ -1270,72 +1146,6 @@ function TestSchedulerTasks() {
 
   const timeRemaining = getTimeRemaining();
 
-  const testTask = async (taskName: string, testFn: () => Promise<any>) => {
-    setTesting(taskName);
-    setResults((prev) => ({ ...prev, [taskName]: null }));
-    setErrors((prev) => ({ ...prev, [taskName]: null }));
-    try {
-      const resp = await testFn();
-      setResults((prev) => ({ ...prev, [taskName]: resp?.data || resp }));
-    } catch (e: any) {
-      let errorData: string;
-      if (typeof e?.response?.data === 'string') {
-        errorData = e.response.data;
-      } else if (e?.response?.data?.message) {
-        errorData = e.response.data.message;
-      } else if (e?.response?.data?.error) {
-        errorData = e.response.data.error;
-      } else if (e?.message) {
-        errorData = e.message;
-      } else {
-        errorData = JSON.stringify(e?.response?.data || e || 'Unknown error');
-      }
-      setErrors((prev) => ({ ...prev, [taskName]: errorData }));
-    } finally {
-      setTesting(null);
-    }
-  };
-
-  const sendTestSms = async () => {
-    if (!smsTest.mobile || !smsTest.message) {
-      setSmsError('Mobile number and message are required');
-      return;
-    }
-    setSendingSms(true);
-    setSmsResult(null);
-    setSmsError(null);
-    try {
-      const resp = await settingsService.sendTestSms(smsTest.mobile, smsTest.message);
-      setSmsResult(resp.data);
-    } catch (e: any) {
-      const errorData = e?.response?.data || e?.message || 'Unknown error';
-      setSmsError(typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2));
-    } finally {
-      setSendingSms(false);
-    }
-  };
-
-  const tasks = [
-    {
-      name: 'payment-due-reminders',
-      label: 'Payment Due Reminders',
-      description: 'Sends reminders for payments due in 3 days',
-      testFn: () => settingsService.testPaymentDueReminders(),
-    },
-    {
-      name: 'overdue-payment-reminders',
-      label: 'Overdue Payment Reminders',
-      description: 'Sends urgent reminders for overdue payments',
-      testFn: () => settingsService.testOverduePaymentReminders(),
-    },
-    {
-      name: 'session-reminders',
-      label: 'Session Reminders',
-      description: 'Sends reminders for sessions scheduled tomorrow',
-      testFn: () => settingsService.testSessionReminders(),
-    },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Current Time & Scheduled Time */}
@@ -1353,7 +1163,7 @@ function TestSchedulerTasks() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule Test Task</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Schedule SMS</label>
             <input
               type="datetime-local"
               value={scheduledTime}
@@ -1376,9 +1186,9 @@ function TestSchedulerTasks() {
         </div>
       </div>
 
-      {/* SMS Test Form */}
+      {/* SMS Form */}
       <div className="bg-white border rounded-lg p-4">
-        <h3 className="font-semibold text-gray-900 mb-3">Test SMS</h3>
+        <h3 className="font-semibold text-gray-900 mb-3">SMS Details</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
@@ -1397,18 +1207,11 @@ function TestSchedulerTasks() {
               value={smsTest.message}
               onChange={(e) => setSmsTest({ ...smsTest, message: e.target.value })}
               className="block w-full rounded-md border-gray-300 shadow-sm"
-              placeholder="Test SMS message"
+              placeholder="SMS message"
             />
           </div>
         </div>
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={sendTestSms}
-            disabled={sendingSms || !smsTest.mobile || !smsTest.message}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {sendingSms ? 'Sending...' : 'Send Test SMS'}
-          </button>
+        <div className="mt-3">
           <button
             onClick={async () => {
               if (!scheduledTime) {
@@ -1434,6 +1237,9 @@ function TestSchedulerTasks() {
                   scheduled.toISOString(),
                 );
                 setSmsResult(resp.data);
+                // Clear form after successful scheduling
+                setSmsTest({ mobile: '', message: '' });
+                setScheduledTime('');
               } catch (e: any) {
                 const errorData = e?.response?.data || e?.message || 'Unknown error';
                 setSmsError(typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2));
@@ -1442,90 +1248,33 @@ function TestSchedulerTasks() {
               }
             }}
             disabled={sendingSms || !smsTest.mobile || !smsTest.message || !scheduledTime}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {sendingSms ? 'Scheduling...' : 'Schedule SMS'}
           </button>
         </div>
 
         {/* SMS Results */}
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          {smsResult && (
-            <div className="bg-green-50 border border-green-200 rounded p-3">
-              <div className="text-xs font-semibold text-green-700 mb-2">SMS Response (Success)</div>
-              <pre className="whitespace-pre-wrap text-xs text-green-800">
-                {typeof smsResult === 'string' ? smsResult : JSON.stringify(smsResult, null, 2)}
-              </pre>
-            </div>
-          )}
-          {smsError && (
-            <div className="bg-red-50 border border-red-200 rounded p-3">
-              <div className="text-xs font-semibold text-red-700 mb-2">SMS Response (Error)</div>
-              <pre className="whitespace-pre-wrap text-xs text-red-800">
-                {typeof smsError === 'string' ? smsError : JSON.stringify(smsError, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Scheduled Tasks */}
-      <div className="border-t pt-4">
-        <h3 className="font-semibold text-gray-900 mb-3">Test Scheduled Tasks</h3>
-        <div className="space-y-4">
-          {tasks.map((task) => (
-            <div key={task.name} className="border rounded-lg p-4">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h3 className="font-medium text-gray-900">{task.label}</h3>
-              <p className="text-sm text-gray-500">{task.description}</p>
-            </div>
-            <button
-              onClick={() => testTask(task.name, task.testFn)}
-              disabled={testing === task.name}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {testing === task.name ? 'Running...' : 'Test Now'}
-            </button>
-          </div>
-
-          {results[task.name] && (
-            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-              <div className="text-sm font-semibold text-green-700 mb-1">Success</div>
-              <div className="text-sm text-green-800">
-                {results[task.name]?.message || 'Task executed successfully'}
+        {(smsResult || smsError) && (
+          <div className="mt-4">
+            {smsResult && (
+              <div className="bg-green-50 border border-green-200 rounded p-3">
+                <div className="text-xs font-semibold text-green-700 mb-2">Success</div>
+                <pre className="whitespace-pre-wrap text-xs text-green-800">
+                  {typeof smsResult === 'string' ? smsResult : JSON.stringify(smsResult, null, 2)}
+                </pre>
               </div>
-              {results[task.name]?.timestamp && (
-                <div className="text-xs text-green-600 mt-1">
-                  Timestamp: {new Date(results[task.name].timestamp).toLocaleString()}
-                </div>
-              )}
-            </div>
-          )}
-
-          {errors[task.name] && (
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-              <div className="text-sm font-semibold text-red-700 mb-1">Error</div>
-              <pre className="text-xs text-red-800 whitespace-pre-wrap">
-                {typeof errors[task.name] === 'string' 
-                  ? errors[task.name] 
-                  : JSON.stringify(errors[task.name], null, 2)}
-              </pre>
-            </div>
-          )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
-        <div className="text-sm font-semibold text-blue-700 mb-2">Note</div>
-        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-          <li>Tasks execute immediately when tested (not scheduled)</li>
-          <li>Check CloudWatch logs for detailed execution information</li>
-          <li>Verify notifications were sent in the database</li>
-          <li>Ensure SMSMisr and Zoho Email are configured before testing</li>
-        </ul>
+            )}
+            {smsError && (
+              <div className="bg-red-50 border border-red-200 rounded p-3">
+                <div className="text-xs font-semibold text-red-700 mb-2">Error</div>
+                <pre className="whitespace-pre-wrap text-xs text-red-800">
+                  {typeof smsError === 'string' ? smsError : JSON.stringify(smsError, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
