@@ -14,6 +14,7 @@ import { HealthController } from './health/health.controller';
 import { ExportsModule } from './exports/exports.module';
 import { SettingsModule } from './settings/settings.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { MarketingModule } from './marketing/marketing.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     ExportsModule,
     SettingsModule,
     SchedulerModule,
+    MarketingModule,
   ],
   controllers: [HealthController],
 })
