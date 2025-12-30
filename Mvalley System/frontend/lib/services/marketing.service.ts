@@ -219,12 +219,16 @@ class MarketingService {
     type?: 'text' | 'image' | 'video' | 'audio' | 'file';
     mediaUrl?: string;
   }): Promise<{ data: Message }> {
+    // Generate a temporary external message ID (backend will handle actual sending)
+    const externalMessageId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const response = await api.post('/marketing/messages', {
       conversationId: data.conversationId,
+      externalMessageId,
       direction: 'outbound',
       type: data.type || 'text',
       content: data.content,
       mediaUrl: data.mediaUrl,
+      sentAt: new Date().toISOString(),
     });
     return response;
   }
