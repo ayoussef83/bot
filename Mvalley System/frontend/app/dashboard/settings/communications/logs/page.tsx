@@ -32,15 +32,21 @@ export default function CommunicationsLogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     // Read URL params on mount (client-side only)
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const channel = params.get('channel');
-      const status = params.get('status');
-      if (channel) setChannelFilter(channel);
-      if (status) setStatusFilter(status);
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const channel = params.get('channel');
+        const status = params.get('status');
+        if (channel) setChannelFilter(channel);
+        if (status) setStatusFilter(status);
+      }
+    } catch (e) {
+      console.error('Error reading URL params:', e);
     }
   }, []);
 
@@ -216,6 +222,15 @@ export default function CommunicationsLogsPage() {
       onChange: setStatusFilter,
     },
   ];
+
+  // Don't render until mounted (prevents hydration errors)
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <StandardListView
