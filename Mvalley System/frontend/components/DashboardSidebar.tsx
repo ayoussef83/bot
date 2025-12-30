@@ -28,6 +28,8 @@ import {
   FiLink,
   FiShield,
   FiSliders,
+  FiShare2,
+  FiMessageCircle,
 } from 'react-icons/fi';
 
 type NavigationSection = {
@@ -159,6 +161,43 @@ const navigationSections: NavigationSection[] = [
         icon: <FiClock className="w-4 h-4" />,
         path: '/dashboard/hr/availability',
         roles: ['super_admin', 'operations', 'management'],
+      },
+    ],
+  },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    icon: <FiShare2 className="w-4 h-4" />,
+    group: 'Main',
+    roles: ['super_admin', 'management', 'operations', 'sales'],
+    children: [
+      {
+        id: 'marketing-overview',
+        label: 'Overview',
+        icon: <FiBarChart2 className="w-4 h-4" />,
+        path: '/dashboard/marketing',
+        roles: ['super_admin', 'management', 'operations', 'sales'],
+      },
+      {
+        id: 'marketing-conversations',
+        label: 'Conversations',
+        icon: <FiMessageCircle className="w-4 h-4" />,
+        path: '/dashboard/marketing/conversations',
+        roles: ['super_admin', 'management', 'operations', 'sales'],
+      },
+      {
+        id: 'marketing-campaigns',
+        label: 'Campaigns',
+        icon: <FiTrendingUp className="w-4 h-4" />,
+        path: '/dashboard/marketing/campaigns',
+        roles: ['super_admin', 'management', 'operations', 'sales'],
+      },
+      {
+        id: 'marketing-channels',
+        label: 'Channels',
+        icon: <FiLink className="w-4 h-4" />,
+        path: '/dashboard/marketing/channels',
+        roles: ['super_admin', 'management'],
       },
     ],
   },
