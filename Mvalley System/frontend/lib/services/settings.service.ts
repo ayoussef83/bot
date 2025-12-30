@@ -76,6 +76,12 @@ export const settingsService = {
     api.post('/settings/test-sms', { mobile, message }),
 
   getSmsMisrBalance: () => api.get('/settings/smsmisr/balance'),
+
+  // Scheduler
+  getSchedulerStatus: () => api.get('/scheduler/status'),
+  testPaymentDueReminders: () => api.post('/scheduler/test/payment-due-reminders'),
+  testOverduePaymentReminders: () => api.post('/scheduler/test/overdue-payment-reminders'),
+  testSessionReminders: () => api.post('/scheduler/test/session-reminders'),
 };
 
 

@@ -28,7 +28,7 @@ const typeOptions: { value: CustomFieldType; label: string }[] = [
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'custom_fields' | 'communications'>('custom_fields');
+  const [activeTab, setActiveTab] = useState<'custom_fields' | 'communications' | 'scheduler'>('custom_fields');
   const [entity, setEntity] = useState<CustomFieldEntity>('student');
   const [fields, setFields] = useState<CustomFieldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -413,6 +413,16 @@ export default function SettingsPage() {
             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
           >
             Communications
+          </button>
+          <button
+            onClick={() => setActiveTab('scheduler')}
+            className={`${
+              activeTab === 'scheduler'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Scheduler
           </button>
         </nav>
       </div>
@@ -1080,6 +1090,179 @@ export default function SettingsPage() {
           )}
         </div>
       )}
+
+      {activeTab === 'scheduler' && (
+        <div className="space-y-6">
+          {/* Scheduler Status */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Scheduler Status</h2>
+            <SchedulerStatus />
+          </div>
+
+          {/* Test Tasks */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Test Scheduled Tasks</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Manually trigger scheduler tasks to test SMS/Email sending. All tasks use Cairo timezone.
+            </p>
+            <TestSchedulerTasks />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Scheduler Status Component
+function SchedulerStatus() {
+  const [status, setStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        setLoading(true);
+        const resp = await settingsService.getSchedulerStatus();
+        setStatus(resp.data);
+      } catch (e: any) {
+        setError(e.response?.data?.message || 'Failed to load scheduler status');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStatus();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) return <div className="text-gray-500">Loading scheduler status...</div>;
+  if (error) return <div className="text-red-600">Error: {error}</div>;
+  if (!status) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gray-50 p-4 rounded">
+          <div className="text-sm font-medium text-gray-700 mb-1">Server Time</div>
+          <div className="text-lg font-mono">{new Date(status.serverTime).toLocaleString()}</div>
+        </div>
+        <div className="bg-indigo-50 p-4 rounded">
+          <div className="text-sm font-medium text-gray-700 mb-1">Cairo Time</div>
+          <div className="text-lg font-mono text-indigo-700">{status.cairoTimeFormatted}</div>
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <h3 className="text-md font-semibold mb-3">Scheduled Tasks</h3>
+        <div className="space-y-2">
+          {Object.entries(status.scheduledTasks || {}).map(([key, task]: [string, any]) => (
+            <div key={key} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+              <div>
+                <div className="font-medium text-gray-900 capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </div>
+                <div className="text-sm text-gray-500">{task.schedule}</div>
+              </div>
+              <div className="text-xs font-mono text-gray-400">{task.cron}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Test Scheduler Tasks Component
+function TestSchedulerTasks() {
+  const [testing, setTesting] = useState<string | null>(null);
+  const [results, setResults] = useState<{ [key: string]: any }>({});
+  const [errors, setErrors] = useState<{ [key: string]: any }>({});
+
+  const testTask = async (taskName: string, testFn: () => Promise<any>) => {
+    setTesting(taskName);
+    setResults((prev) => ({ ...prev, [taskName]: null }));
+    setErrors((prev) => ({ ...prev, [taskName]: null }));
+    try {
+      const resp = await testFn();
+      setResults((prev) => ({ ...prev, [taskName]: resp.data }));
+    } catch (e: any) {
+      setErrors((prev) => ({ ...prev, [taskName]: e.response?.data || e.message }));
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const tasks = [
+    {
+      name: 'payment-due-reminders',
+      label: 'Payment Due Reminders',
+      description: 'Sends reminders for payments due in 3 days',
+      testFn: () => settingsService.testPaymentDueReminders(),
+    },
+    {
+      name: 'overdue-payment-reminders',
+      label: 'Overdue Payment Reminders',
+      description: 'Sends urgent reminders for overdue payments',
+      testFn: () => settingsService.testOverduePaymentReminders(),
+    },
+    {
+      name: 'session-reminders',
+      label: 'Session Reminders',
+      description: 'Sends reminders for sessions scheduled tomorrow',
+      testFn: () => settingsService.testSessionReminders(),
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {tasks.map((task) => (
+        <div key={task.name} className="border rounded-lg p-4">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h3 className="font-medium text-gray-900">{task.label}</h3>
+              <p className="text-sm text-gray-500">{task.description}</p>
+            </div>
+            <button
+              onClick={() => testTask(task.name, task.testFn)}
+              disabled={testing === task.name}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {testing === task.name ? 'Running...' : 'Test Now'}
+            </button>
+          </div>
+
+          {results[task.name] && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+              <div className="text-sm font-semibold text-green-700 mb-1">Success</div>
+              <div className="text-sm text-green-800">{results[task.name].message}</div>
+              <div className="text-xs text-green-600 mt-1">
+                Timestamp: {new Date(results[task.name].timestamp).toLocaleString()}
+              </div>
+            </div>
+          )}
+
+          {errors[task.name] && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+              <div className="text-sm font-semibold text-red-700 mb-1">Error</div>
+              <pre className="text-xs text-red-800 whitespace-pre-wrap">
+                {JSON.stringify(errors[task.name], null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded">
+        <div className="text-sm font-semibold text-blue-700 mb-2">Note</div>
+        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+          <li>Tasks execute immediately when tested (not scheduled)</li>
+          <li>Check CloudWatch logs for detailed execution information</li>
+          <li>Verify notifications were sent in the database</li>
+          <li>Ensure SMSMisr and Zoho Email are configured before testing</li>
+        </ul>
+      </div>
     </div>
   );
 }
