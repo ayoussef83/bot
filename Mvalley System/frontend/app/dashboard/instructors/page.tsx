@@ -131,11 +131,11 @@ export default function InstructorsPage() {
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/instructors/${row.id}`}
+          href={`/dashboard/instructors/details?id=${row.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
-            router.push(`/dashboard/instructors/${row.id}`);
+            router.push(`/dashboard/instructors/details?id=${row.id}`);
           }}
         >
           {row.user?.firstName || ''} {row.user?.lastName || ''}
