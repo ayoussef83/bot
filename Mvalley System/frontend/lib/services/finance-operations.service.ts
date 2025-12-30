@@ -59,9 +59,17 @@ export interface Payment {
   receivedDate: string;
   status: string;
   cashAccountId: string;
+  cashAccount?: CashAccount;
   studentId?: string;
   student?: any;
+  referenceNumber?: string;
   notes?: string;
+  allocations?: Array<{
+    id: string;
+    amount: number;
+    invoiceId: string;
+    invoice?: Invoice;
+  }>;
 }
 
 export interface Expense {
