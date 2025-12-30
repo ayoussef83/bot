@@ -1,15 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { instructorsService, Instructor } from '@/lib/services';
 import api from '@/lib/api';
+import StandardListView, { FilterConfig } from '@/components/StandardListView';
+import { Column, ActionButton } from '@/components/DataTable';
+import SummaryCard from '@/components/SummaryCard';
+import EmptyState from '@/components/EmptyState';
+import { downloadExport } from '@/lib/export';
+import { FiPlus, FiEdit, FiTrash2, FiUserCheck, FiUsers } from 'react-icons/fi';
 
 export default function InstructorsPage() {
+  const router = useRouter();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [editingInstructor, setEditingInstructor] = useState<Instructor | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [costTypeFilter, setCostTypeFilter] = useState('');
   const [formData, setFormData] = useState({
     userId: '',
     costType: 'hourly',
@@ -18,13 +29,19 @@ export default function InstructorsPage() {
 
   useEffect(() => {
     fetchInstructors();
-    fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (instructors.length > 0) {
+      fetchUsers();
+    }
+  }, [instructors]);
 
   const fetchInstructors = async () => {
     try {
       const response = await instructorsService.getAll();
       setInstructors(response.data);
+      setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load instructors');
     } finally {
@@ -43,23 +60,41 @@ export default function InstructorsPage() {
       setUsers(availableUsers);
     } catch (err) {
       // Ignore errors, just won't show user dropdown
+      console.error('Failed to load users', err);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await instructorsService.create({
-        ...formData,
-        costAmount: parseFloat(formData.costAmount),
-      });
+      if (editingInstructor) {
+        await instructorsService.update(editingInstructor.id, {
+          ...formData,
+          costAmount: parseFloat(formData.costAmount),
+        });
+      } else {
+        await instructorsService.create({
+          ...formData,
+          costAmount: parseFloat(formData.costAmount),
+        });
+      }
       setShowForm(false);
+      setEditingInstructor(null);
       setFormData({ userId: '', costType: 'hourly', costAmount: '' });
       fetchInstructors();
-      fetchUsers();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create instructor');
+      setError(err.response?.data?.message || 'Failed to save instructor');
     }
+  };
+
+  const handleEdit = (instructor: Instructor) => {
+    setEditingInstructor(instructor);
+    setFormData({
+      userId: instructor.userId,
+      costType: instructor.costType,
+      costAmount: instructor.costAmount.toString(),
+    });
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -72,157 +107,293 @@ export default function InstructorsPage() {
     }
   };
 
-  if (loading) {
-    return <div className="p-6">Loading instructors...</div>;
-  }
+  // Filter instructors
+  const filteredInstructors = useMemo(() => {
+    return instructors.filter((instructor) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        `${instructor.user?.firstName || ''} ${instructor.user?.lastName || ''}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        instructor.user?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesCostType = costTypeFilter === '' || instructor.costType === costTypeFilter;
+
+      return matchesSearch && matchesCostType;
+    });
+  }, [instructors, searchTerm, costTypeFilter]);
+
+  // Column definitions
+  const columns: Column<Instructor>[] = [
+    {
+      key: 'name',
+      label: 'Name',
+      sortable: true,
+      render: (_, row) => (
+        <a
+          href={`/dashboard/instructors/${row.id}`}
+          className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
+          onClick={(e) => {
+            e.preventDefault();
+            router.push(`/dashboard/instructors/${row.id}`);
+          }}
+        >
+          {row.user?.firstName || ''} {row.user?.lastName || ''}
+        </a>
+      ),
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      sortable: true,
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">{row.user?.email || '-'}</span>
+      ),
+    },
+    {
+      key: 'costType',
+      label: 'Cost Type',
+      sortable: true,
+      render: (value) => (
+        <span className="text-sm text-gray-500 capitalize">{value}</span>
+      ),
+    },
+    {
+      key: 'costAmount',
+      label: 'Cost Amount',
+      sortable: true,
+      align: 'right',
+      render: (value, row) => (
+        <span className="text-sm font-semibold text-gray-900">
+          EGP {value.toLocaleString()}
+          <span className="text-xs text-gray-500 ml-1">
+            /{row.costType === 'hourly' ? 'hr' : 'mo'}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'classes',
+      label: 'Classes',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">{row.classes?.length || 0}</span>
+      ),
+    },
+  ];
+
+  // Action buttons
+  const actions = (row: Instructor): ActionButton[] => [
+    {
+      label: 'Edit',
+      onClick: () => handleEdit(row),
+      icon: <FiEdit className="w-4 h-4" />,
+    },
+    {
+      label: 'Delete',
+      onClick: () => handleDelete(row.id),
+      variant: 'danger',
+      icon: <FiTrash2 className="w-4 h-4" />,
+    },
+  ];
+
+  // Filters
+  const filters: FilterConfig[] = [
+    {
+      key: 'costType',
+      label: 'Cost Type',
+      type: 'select',
+      options: [
+        { value: 'hourly', label: 'Hourly' },
+        { value: 'monthly', label: 'Monthly' },
+      ],
+      value: costTypeFilter,
+      onChange: setCostTypeFilter,
+    },
+  ];
+
+  // Summary statistics
+  const totalInstructors = filteredInstructors.length;
+  const totalClasses = filteredInstructors.reduce(
+    (sum, i) => sum + (i.classes?.length || 0),
+    0,
+  );
+  const hourlyInstructors = filteredInstructors.filter((i) => i.costType === 'hourly').length;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Instructors</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Add Instructor
-        </button>
-      </div>
-
+    <div className="space-y-6">
+      {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
           {error}
         </div>
       )}
 
+      {/* Instructor Form Modal */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <h2 className="text-xl font-semibold mb-4">New Instructor</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">User</label>
-              <select
-                required
-                value={formData.userId}
-                onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-              >
-                <option value="">Select a user...</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.firstName} {user.lastName} ({user.email})
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-sm text-gray-500">
-                Note: Only users with instructor role are shown
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Cost Type</label>
-                <select
-                  value={formData.costType}
-                  onChange={(e) => setFormData({ ...formData, costType: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                >
-                  <option value="hourly">Hourly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => {
+                setShowForm(false);
+                setEditingInstructor(null);
+              }}
+            ></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h2 className="text-xl font-semibold mb-4">
+                  {editingInstructor ? 'Edit Instructor' : 'New Instructor'}
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">User</label>
+                    <select
+                      required
+                      disabled={!!editingInstructor}
+                      value={formData.userId}
+                      onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                    >
+                      <option value="">Select a user...</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.firstName} {user.lastName} ({user.email})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Note: Only users with instructor role are shown
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Cost Type</label>
+                      <select
+                        value={formData.costType}
+                        onChange={(e) => setFormData({ ...formData, costType: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="hourly">Hourly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Cost Amount (EGP)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        step="0.01"
+                        min="0"
+                        value={formData.costAmount}
+                        onChange={(e) => setFormData({ ...formData, costAmount: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="submit"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                    >
+                      {editingInstructor ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForm(false);
+                        setEditingInstructor(null);
+                      }}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Cost Amount (EGP)
-                </label>
-                <input
-                  type="number"
-                  required
-                  step="0.01"
-                  min="0"
-                  value={formData.costAmount}
-                  onChange={(e) => setFormData({ ...formData, costAmount: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                />
-              </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-              >
-                Create
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Cost Type
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Cost Amount
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Classes
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {instructors.map((instructor) => (
-              <tr key={instructor.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {instructor.user?.firstName} {instructor.user?.lastName}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {instructor.user?.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                  {instructor.costType}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                  EGP {instructor.costAmount.toLocaleString()}
-                  <span className="text-xs text-gray-500 ml-1">
-                    /{instructor.costType === 'hourly' ? 'hr' : 'mo'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {instructor.classes?.length || 0}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => handleDelete(instructor.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Standard List View */}
+      <StandardListView
+        title="Instructors"
+        subtitle="Manage instructor profiles and assignments"
+        primaryAction={{
+          label: 'Add Instructor',
+          onClick: () => {
+            setShowForm(true);
+            setEditingInstructor(null);
+            setFormData({ userId: '', costType: 'hourly', costAmount: '' });
+            fetchUsers();
+          },
+          icon: <FiPlus className="w-4 h-4" />,
+        }}
+        searchPlaceholder="Search by name or email..."
+        onSearch={setSearchTerm}
+        searchValue={searchTerm}
+        filters={filters}
+        columns={columns}
+        data={filteredInstructors}
+        loading={loading}
+        actions={actions}
+        emptyMessage="No instructors found"
+        emptyState={
+          <EmptyState
+            title="No instructors found"
+            message="Get started by adding your first instructor"
+            action={{
+              label: 'Add Instructor',
+              onClick: () => {
+                setShowForm(true);
+                setEditingInstructor(null);
+              },
+            }}
+          />
+        }
+        summaryCards={
+          <>
+            <SummaryCard
+              title="Total Instructors"
+              value={totalInstructors}
+              icon={<FiUserCheck className="w-8 h-8" />}
+            />
+            <SummaryCard
+              title="Total Classes"
+              value={totalClasses}
+              icon={<FiUsers className="w-8 h-8" />}
+            />
+            <SummaryCard
+              title="Hourly Instructors"
+              value={hourlyInstructors}
+              variant="info"
+              icon={<FiUserCheck className="w-8 h-8" />}
+            />
+          </>
+        }
+        getRowId={(row) => row.id}
+        onRowClick={(row) => {
+          router.push(`/dashboard/instructors/${row.id}`);
+        }}
+      />
+
+      {/* Export Buttons */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => downloadExport('instructors', 'xlsx')}
+          className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 text-sm font-medium"
+        >
+          Export Excel
+        </button>
+        <button
+          onClick={() => downloadExport('instructors', 'pdf')}
+          className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 text-sm font-medium"
+        >
+          Export PDF
+        </button>
       </div>
     </div>
   );
 }
-
-
