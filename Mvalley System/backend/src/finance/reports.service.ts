@@ -248,12 +248,12 @@ export class ReportsService {
     // Get all classes with revenue and costs
     const classes = await this.prisma.class.findMany({
       where: {
-        ...(location && { location }),
+        ...(location && { location: location as any }),
       },
       include: {
         students: {
           where: {
-            ...(program && { learningTrack: program }),
+            ...(program && { learningTrack: program as any }),
           },
         },
         sessions: {
