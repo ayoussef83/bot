@@ -82,6 +82,8 @@ export const settingsService = {
   testPaymentDueReminders: () => api.post('/scheduler/test/payment-due-reminders'),
   testOverduePaymentReminders: () => api.post('/scheduler/test/overdue-payment-reminders'),
   testSessionReminders: () => api.post('/scheduler/test/session-reminders'),
+  scheduleSms: (mobile: string, message: string, scheduledAt: string) =>
+    api.post('/scheduler/schedule-sms', { mobile, message, scheduledAt }),
 };
 
 

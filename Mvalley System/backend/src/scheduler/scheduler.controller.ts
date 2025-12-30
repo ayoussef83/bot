@@ -1,4 +1,4 @@
-import { Controller, Post, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, UseGuards, Body } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -74,7 +74,39 @@ export class SchedulerController {
           schedule: 'Every hour (Cairo time)',
           cron: '0 * * * *',
         },
+        scheduledNotifications: {
+          schedule: 'Every minute (Cairo time)',
+          cron: '* * * * *',
+        },
       },
+    };
+  }
+
+  @Post('schedule-sms')
+  @Roles(UserRole.super_admin)
+  async scheduleSms(@Body() body: { mobile: string; message: string; scheduledAt: string }) {
+    const scheduledAt = new Date(body.scheduledAt);
+    
+    if (isNaN(scheduledAt.getTime())) {
+      throw new Error('Invalid scheduledAt date');
+    }
+
+    if (scheduledAt <= new Date()) {
+      throw new Error('Scheduled time must be in the future');
+    }
+
+    const notification = await this.schedulerService.scheduleMessage(
+      'sms',
+      body.mobile,
+      body.message,
+      scheduledAt,
+    );
+
+    return {
+      success: true,
+      message: 'SMS scheduled successfully',
+      notificationId: notification.id,
+      scheduledAt: notification.scheduledAt,
     };
   }
 }

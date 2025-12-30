@@ -568,6 +568,7 @@ model Notification {
   status       NotificationStatus @default(pending)
   sentAt       DateTime?
   errorMessage String?
+  scheduledAt  DateTime? // For scheduled one-time messages
 
   // Links
   studentId String?
@@ -585,6 +586,7 @@ model Notification {
   @@index([channel])
   @@index([studentId])
   @@index([leadId])
+  @@index([scheduledAt])
   @@map("notifications")
 }
 

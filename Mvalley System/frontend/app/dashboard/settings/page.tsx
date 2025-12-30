@@ -1401,13 +1401,50 @@ function TestSchedulerTasks() {
             />
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 flex gap-2">
           <button
             onClick={sendTestSms}
             disabled={sendingSms || !smsTest.mobile || !smsTest.message}
             className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {sendingSms ? 'Sending...' : 'Send Test SMS'}
+          </button>
+          <button
+            onClick={async () => {
+              if (!scheduledTime) {
+                setSmsError('Please select a scheduled time first');
+                return;
+              }
+              if (!smsTest.mobile || !smsTest.message) {
+                setSmsError('Mobile number and message are required');
+                return;
+              }
+              const scheduled = new Date(scheduledTime);
+              if (scheduled <= new Date()) {
+                setSmsError('Scheduled time must be in the future');
+                return;
+              }
+              setSendingSms(true);
+              setSmsResult(null);
+              setSmsError(null);
+              try {
+                const resp = await settingsService.scheduleSms(
+                  smsTest.mobile,
+                  smsTest.message,
+                  scheduled.toISOString(),
+                );
+                setSmsResult(resp.data);
+              } catch (e: any) {
+                const errorData = e?.response?.data || e?.message || 'Unknown error';
+                setSmsError(typeof errorData === 'string' ? errorData : JSON.stringify(errorData, null, 2));
+              } finally {
+                setSendingSms(false);
+              }
+            }}
+            disabled={sendingSms || !smsTest.mobile || !smsTest.message || !scheduledTime}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {sendingSms ? 'Scheduling...' : 'Schedule SMS'}
           </button>
         </div>
 

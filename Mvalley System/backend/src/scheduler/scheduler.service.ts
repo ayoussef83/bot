@@ -505,5 +505,99 @@ export class SchedulerService {
       this.logger.error('Error processing session reminders:', error);
     }
   }
+
+  /**
+   * Process scheduled notifications (one-time scheduled SMS/Email)
+   * Runs every minute
+   */
+  @Cron('* * * * *', {
+    name: 'process-scheduled-notifications',
+    timeZone: 'Africa/Cairo',
+  })
+  async handleScheduledNotifications() {
+    this.logger.log('Checking for scheduled notifications...');
+
+    try {
+      const now = new Date();
+      
+      // Find notifications scheduled for now or in the past that are still pending
+      const scheduledNotifications = await this.prisma.notification.findMany({
+        where: {
+          status: 'pending',
+          scheduledAt: {
+            lte: now,
+            not: null,
+          },
+        },
+        take: 50, // Process up to 50 at a time
+      });
+
+      this.logger.log(`Found ${scheduledNotifications.length} scheduled notifications to process`);
+
+      for (const notification of scheduledNotifications) {
+        try {
+          this.logger.log(`Processing scheduled notification ${notification.id} (${notification.channel} to ${notification.recipient})`);
+          
+          // Send the notification
+          await this.notificationsService.sendMessage({
+            channel: notification.channel as any,
+            recipient: notification.recipient,
+            message: notification.message,
+            subject: notification.subject || undefined,
+            template: notification.template || undefined,
+            payload: notification.payload ? JSON.parse(notification.payload) : undefined,
+            studentId: notification.studentId || undefined,
+            leadId: notification.leadId || undefined,
+            parentId: notification.parentId || undefined,
+          });
+
+          this.logger.log(`✅ Successfully sent scheduled notification ${notification.id}`);
+        } catch (error: any) {
+          this.logger.error(`❌ Failed to send scheduled notification ${notification.id}: ${error.message}`);
+          // The notification status will be updated to 'failed' by NotificationsService
+        }
+      }
+
+      this.logger.log(`Scheduled notifications processed: ${scheduledNotifications.length}`);
+    } catch (error) {
+      this.logger.error('Error processing scheduled notifications:', error);
+    }
+  }
+
+  /**
+   * Schedule a one-time SMS or Email
+   */
+  async scheduleMessage(
+    channel: 'sms' | 'email',
+    recipient: string,
+    message: string,
+    scheduledAt: Date,
+    subject?: string,
+    template?: string,
+    payload?: any,
+  ) {
+    // Validate scheduled time is in the future
+    if (scheduledAt <= new Date()) {
+      throw new Error('Scheduled time must be in the future');
+    }
+
+    // Create notification with scheduledAt
+    const notification = await this.prisma.notification.create({
+      data: {
+        channel,
+        recipient,
+        message,
+        subject: subject || null,
+        template: template || null,
+        payload: payload ? JSON.stringify(payload) : null,
+        status: 'pending',
+        scheduledAt,
+      },
+    });
+
+    this.logger.log(`Scheduled ${channel} notification ${notification.id} for ${scheduledAt.toISOString()}`);
+    
+    return notification;
+  }
 }
 
