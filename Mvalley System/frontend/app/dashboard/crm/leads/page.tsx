@@ -9,7 +9,7 @@ import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { downloadExport } from '@/lib/export';
-import { FiPlus, FiEdit, FiTrash2, FiUserPlus, FiCheckCircle } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiUserPlus, FiCheckCircle, FiTrendingUp, FiGrid } from 'react-icons/fi';
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [timeRange, setTimeRange] = useState('all'); // 'today', '7d', '30d', 'all'
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -132,23 +133,78 @@ export default function LeadsPage() {
     }
   };
 
+  // Filter by time range
+  const getTimeRangeFilter = () => {
+    if (timeRange === 'all') return () => true;
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (timeRange) {
+      case 'today':
+        return (lead: Lead) => {
+          const createdAt = lead.createdAt ? new Date(lead.createdAt) : new Date(0);
+          return createdAt >= today;
+        };
+      case '7d':
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return (lead: Lead) => {
+          const createdAt = lead.createdAt ? new Date(lead.createdAt) : new Date(0);
+          return createdAt >= sevenDaysAgo;
+        };
+      case '30d':
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return (lead: Lead) => {
+          const createdAt = lead.createdAt ? new Date(lead.createdAt) : new Date(0);
+          return createdAt >= thirtyDaysAgo;
+        };
+      default:
+        return () => true;
+    }
+  };
+
   // Filter and search leads
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      const matchesSearch =
-        searchTerm === '' ||
-        `${lead.firstName} ${lead.lastName}`
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.phone?.includes(searchTerm);
+    return leads
+      .filter(getTimeRangeFilter())
+      .filter((lead) => {
+        const matchesSearch =
+          searchTerm === '' ||
+          `${lead.firstName} ${lead.lastName}`
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          lead.phone?.includes(searchTerm);
 
-      const matchesStatus = statusFilter === '' || lead.status === statusFilter;
-      const matchesSource = sourceFilter === '' || lead.source === sourceFilter;
+        const matchesStatus = statusFilter === '' || lead.status === statusFilter;
+        const matchesSource = sourceFilter === '' || lead.source === sourceFilter;
 
-      return matchesSearch && matchesStatus && matchesSource;
+        return matchesSearch && matchesStatus && matchesSource;
+      });
+  }, [leads, searchTerm, statusFilter, sourceFilter, timeRange]);
+
+  // Calculate counts for filters (from time-filtered data)
+  const timeFilteredLeads = useMemo(() => {
+    return leads.filter(getTimeRangeFilter());
+  }, [leads, timeRange]);
+
+  const statusCounts = useMemo(() => {
+    const counts: { [key: string]: number } = {};
+    timeFilteredLeads.forEach((lead) => {
+      counts[lead.status] = (counts[lead.status] || 0) + 1;
     });
-  }, [leads, searchTerm, statusFilter, sourceFilter]);
+    return counts;
+  }, [timeFilteredLeads]);
+
+  const sourceCounts = useMemo(() => {
+    const counts: { [key: string]: number } = {};
+    timeFilteredLeads.forEach((lead) => {
+      counts[lead.source] = (counts[lead.source] || 0) + 1;
+    });
+    return counts;
+  }, [timeFilteredLeads]);
 
   // Status badge mapping
   const getStatusBadge = (status: string) => {
@@ -259,18 +315,32 @@ export default function LeadsPage() {
     },
   ];
 
-  // Filters
+  // Filters with proper hierarchy: Time → Status → Source
   const filters: FilterConfig[] = [
+    {
+      key: 'timeRange',
+      label: 'Time Range',
+      type: 'select',
+      options: [
+        { value: 'today', label: 'Today' },
+        { value: '7d', label: 'Last 7 days' },
+        { value: '30d', label: 'Last 30 days' },
+        { value: 'all', label: 'All time' },
+      ],
+      value: timeRange,
+      onChange: setTimeRange,
+    },
     {
       key: 'status',
       label: 'Status',
       type: 'select',
       options: [
-        { value: 'new', label: 'New' },
-        { value: 'contacted', label: 'Contacted' },
-        { value: 'qualified', label: 'Qualified' },
-        { value: 'converted', label: 'Converted' },
-        { value: 'lost', label: 'Lost' },
+        { value: '', label: 'All Statuses' },
+        { value: 'new', label: `New (${statusCounts['new'] || 0})` },
+        { value: 'contacted', label: `Contacted (${statusCounts['contacted'] || 0})` },
+        { value: 'qualified', label: `Qualified (${statusCounts['qualified'] || 0})` },
+        { value: 'converted', label: `Converted (${statusCounts['converted'] || 0})` },
+        { value: 'lost', label: `Lost (${statusCounts['lost'] || 0})` },
       ],
       value: statusFilter,
       onChange: setStatusFilter,
@@ -280,21 +350,31 @@ export default function LeadsPage() {
       label: 'Source',
       type: 'select',
       options: [
-        { value: 'website', label: 'Website' },
-        { value: 'referral', label: 'Referral' },
-        { value: 'social', label: 'Social Media' },
-        { value: 'other', label: 'Other' },
+        { value: '', label: 'All Sources' },
+        { value: 'website', label: `Website (${sourceCounts['website'] || 0})` },
+        { value: 'referral', label: `Referral (${sourceCounts['referral'] || 0})` },
+        { value: 'social_media', label: `Social Media (${sourceCounts['social_media'] || 0})` },
+        { value: 'event', label: `Event (${sourceCounts['event'] || 0})` },
+        { value: 'walk_in', label: `Walk-in (${sourceCounts['walk_in'] || 0})` },
+        { value: 'other', label: `Other (${sourceCounts['other'] || 0})` },
       ],
       value: sourceFilter,
       onChange: setSourceFilter,
     },
   ];
 
-  // Summary statistics
-  const newLeads = filteredLeads.filter((l) => l.status === 'new').length;
-  const qualifiedLeads = filteredLeads.filter((l) => l.status === 'qualified').length;
-  const convertedLeads = filteredLeads.filter((l) => l.status === 'converted').length;
-  const totalLeads = filteredLeads.length;
+  // Summary statistics (from time-filtered data)
+  const newLeads = timeFilteredLeads.filter((l) => l.status === 'new').length;
+  const contactedLeads = timeFilteredLeads.filter((l) => l.status === 'contacted').length;
+  const qualifiedLeads = timeFilteredLeads.filter((l) => l.status === 'qualified').length;
+  const convertedLeads = timeFilteredLeads.filter((l) => l.status === 'converted').length;
+  const lostLeads = timeFilteredLeads.filter((l) => l.status === 'lost').length;
+  const totalLeads = timeFilteredLeads.length;
+  
+  // Conversion rate
+  const conversionRate = totalLeads > 0 
+    ? ((convertedLeads / totalLeads) * 100).toFixed(1) 
+    : '0';
 
   return (
     <div className="space-y-6">
@@ -517,28 +597,47 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {/* Page Header with Pipeline Link */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage sales leads and track conversion pipeline</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push('/dashboard/crm/pipeline')}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            <FiGrid className="w-4 h-4" />
+            Pipeline View
+          </button>
+          <button
+            onClick={() => {
+              setShowForm(true);
+              setSelectedLead(null);
+              setFormData({
+                firstName: '',
+                lastName: '',
+                email: '',
+                phone: '',
+                source: 'website',
+                status: 'new',
+                notes: '',
+                interestedIn: '',
+              });
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+          >
+            <FiPlus className="w-4 h-4" />
+            Add Lead
+          </button>
+        </div>
+      </div>
+
       {/* Standard List View */}
       <StandardListView
-        title="Leads"
-        subtitle="Manage sales leads and track conversion pipeline"
-        primaryAction={{
-          label: 'Add Lead',
-          onClick: () => {
-            setShowForm(true);
-            setSelectedLead(null);
-            setFormData({
-              firstName: '',
-              lastName: '',
-              email: '',
-              phone: '',
-              source: 'website',
-              status: 'new',
-              notes: '',
-              interestedIn: '',
-            });
-          },
-          icon: <FiPlus className="w-4 h-4" />,
-        }}
+        title=""
+        subtitle=""
         searchPlaceholder="Search by name, email, or phone..."
         onSearch={setSearchTerm}
         searchValue={searchTerm}
@@ -566,31 +665,43 @@ export default function LeadsPage() {
             <SummaryCard
               title="Total Leads"
               value={totalLeads}
-              icon={<FiUserPlus className="w-8 h-8" />}
+              icon={<FiUserPlus className="w-5 h-5" />}
             />
             <SummaryCard
-              title="New Leads"
+              title="New"
               value={newLeads}
               variant="info"
-              icon={<FiUserPlus className="w-8 h-8" />}
+              icon={<FiUserPlus className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Contacted"
+              value={contactedLeads}
+              variant="warning"
+              icon={<FiUserPlus className="w-5 h-5" />}
             />
             <SummaryCard
               title="Qualified"
               value={qualifiedLeads}
               variant="warning"
-              icon={<FiCheckCircle className="w-8 h-8" />}
+              icon={<FiCheckCircle className="w-5 h-5" />}
             />
             <SummaryCard
               title="Converted"
               value={convertedLeads}
               variant="success"
-              icon={<FiCheckCircle className="w-8 h-8" />}
+              icon={<FiCheckCircle className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Conversion Rate"
+              value={`${conversionRate}%`}
+              variant={parseFloat(conversionRate) >= 20 ? 'success' : 'default'}
+              icon={<FiTrendingUp className="w-5 h-5" />}
             />
           </>
         }
         getRowId={(row) => row.id}
         onRowClick={(row) => {
-          router.push(`/dashboard/crm/leads/${row.id}`);
+          router.push(`/dashboard/crm/leads/details?id=${row.id}`);
         }}
       />
 
