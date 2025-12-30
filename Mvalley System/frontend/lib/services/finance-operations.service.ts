@@ -141,6 +141,6 @@ export const financeService = {
   getExpenseCategories: () => api.get<ExpenseCategory[]>('/finance/expense-categories'),
   getExpenseCategoryById: (id: string) => api.get<ExpenseCategory>(`/finance/expense-categories/${id}`),
   createExpenseCategory: (data: any) => api.post<ExpenseCategory>('/finance/expense-categories', data),
-  updateExpenseCategory: (id: string, data: any) => api.patch<ExpenseCategory>(`/finance/expense-categories/${id}`, data),
+  updateExpenseCategory: (id: string, data: any) => api.put<ExpenseCategory>(`/finance/expense-categories/${id}`, data),
 };
 
