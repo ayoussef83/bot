@@ -425,7 +425,6 @@ export default function CommunicationsTemplatesPage() {
           onSearch={setSearchTerm}
           loading={loading}
           emptyMessage={`No ${channel} templates found. Click "Add Template" to create one.`}
-          actions={actions}
         />
       )}
 
