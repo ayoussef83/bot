@@ -205,7 +205,7 @@ export default function ConversationsPage() {
         <EmptyState
           icon={<FiMessageCircle className="w-12 h-12 text-gray-400" />}
           title="No conversations"
-          description="Connect your social media channels to start receiving conversations"
+          message="Connect your social media channels to start receiving conversations"
           action={{
             label: 'Connect Channels',
             onClick: () => router.push('/dashboard/marketing/channels'),

@@ -186,7 +186,7 @@ export default function CampaignsPage() {
         <EmptyState
           icon={<FiTrendingUp className="w-12 h-12 text-gray-400" />}
           title="No campaigns"
-          description="Create your first marketing campaign to start tracking performance"
+          message="Create your first marketing campaign to start tracking performance"
           action={{
             label: 'Create Campaign',
             onClick: () => {
