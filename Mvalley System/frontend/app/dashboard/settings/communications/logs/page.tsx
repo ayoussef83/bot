@@ -7,7 +7,7 @@ import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
 import StatusBadge from '@/components/settings/StatusBadge';
-import { FiMail, FiMessageSquare, FiCheckCircle, FiXCircle, FiClock, FiUser } from 'react-icons/fi';
+import { FiMail, FiMessageSquare, FiCheckCircle, FiXCircle, FiClock, FiUser, FiAlertCircle, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
 
 interface Notification {
   id: string;
@@ -32,6 +32,7 @@ export default function CommunicationsLogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [timeRange, setTimeRange] = useState('7d'); // 'today', '7d', '30d', 'custom'
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function CommunicationsLogsPage() {
 
   useEffect(() => {
     fetchNotifications();
-  }, [channelFilter, statusFilter]);
+  }, [channelFilter, statusFilter, timeRange]);
 
   const fetchNotifications = async () => {
     setError('');
@@ -70,14 +71,60 @@ export default function CommunicationsLogsPage() {
     }
   };
 
-  const filteredNotifications = notifications.filter((notification) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      notification.recipient.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (notification.subject || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  // Filter by time range
+  const getTimeRangeFilter = () => {
+    if (timeRange === 'all') return () => true;
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (timeRange) {
+      case 'today':
+        return (n: Notification) => new Date(n.createdAt) >= today;
+      case '7d':
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return (n: Notification) => new Date(n.createdAt) >= sevenDaysAgo;
+      case '30d':
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return (n: Notification) => new Date(n.createdAt) >= thirtyDaysAgo;
+      default:
+        return () => true;
+    }
+  };
+
+  const filteredNotifications = notifications
+    .filter(getTimeRangeFilter())
+    .filter((notification) => {
+      // Apply channel filter
+      if (channelFilter && notification.channel !== channelFilter) return false;
+      
+      // Apply status filter
+      if (statusFilter && notification.status !== statusFilter) return false;
+      
+      // Apply search filter
+      const matchesSearch =
+        searchTerm === '' ||
+        notification.recipient.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        notification.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (notification.subject || '').toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
+    })
+    .sort((a, b) => {
+      // Prioritize: failed → pending → sent/delivered
+      const statusPriority: { [key: string]: number } = {
+        failed: 0,
+        pending: 1,
+        sent: 2,
+        delivered: 2,
+      };
+      const aPriority = statusPriority[a.status] ?? 3;
+      const bPriority = statusPriority[b.status] ?? 3;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      // Then sort by time (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   // Table columns
   const columns: Column<Notification>[] = [
@@ -171,51 +218,47 @@ export default function CommunicationsLogsPage() {
     },
   ];
 
-  // Summary cards
-  const totalMessages = filteredNotifications.length;
-  const emailCount = filteredNotifications.filter((n) => n.channel === 'email').length;
-  const smsCount = filteredNotifications.filter((n) => n.channel === 'sms').length;
-  const sentCount = filteredNotifications.filter((n) => n.status === 'sent' || n.status === 'delivered').length;
-  const failedCount = filteredNotifications.filter((n) => n.status === 'failed').length;
-
-  const summaryCards = [
-    {
-      title: 'Total Messages',
-      value: totalMessages,
-      icon: <FiMessageSquare className="w-5 h-5" />,
-    },
-    {
-      title: 'Email',
-      value: emailCount,
-      icon: <FiMail className="w-5 h-5" />,
-    },
-    {
-      title: 'SMS',
-      value: smsCount,
-      icon: <FiMessageSquare className="w-5 h-5" />,
-    },
-    {
-      title: 'Sent',
-      value: sentCount,
-      icon: <FiCheckCircle className="w-5 h-5" />,
-    },
-    {
-      title: 'Failed',
-      value: failedCount,
-      icon: <FiXCircle className="w-5 h-5" />,
-    },
+  // Calculate health metrics from time-filtered data (before channel/status filters)
+  const timeFilteredNotifications = notifications.filter(getTimeRangeFilter());
+  const totalMessages = timeFilteredNotifications.length;
+  const emailCount = timeFilteredNotifications.filter((n) => n.channel === 'email').length;
+  const smsCount = timeFilteredNotifications.filter((n) => n.channel === 'sms').length;
+  const sentCount = timeFilteredNotifications.filter((n) => n.status === 'sent' || n.status === 'delivered').length;
+  const pendingCount = timeFilteredNotifications.filter((n) => n.status === 'pending').length;
+  const failedCount = timeFilteredNotifications.filter((n) => n.status === 'failed').length;
+  const successRate = totalMessages > 0 ? ((sentCount / totalMessages) * 100).toFixed(1) : '0';
+  const hasFailures = failedCount > 0;
+  const hasPending = pendingCount > 0;
+  
+  // Channel breakdown with failure counts
+  const channelBreakdown = [
+    { channel: 'email', count: emailCount, failures: timeFilteredNotifications.filter((n) => n.channel === 'email' && n.status === 'failed').length },
+    { channel: 'sms', count: smsCount, failures: timeFilteredNotifications.filter((n) => n.channel === 'sms' && n.status === 'failed').length },
   ];
 
-  // Filters
+  // Filters with proper hierarchy: Time → Channel → Status
   const filters: FilterConfig[] = [
+    {
+      key: 'timeRange',
+      label: 'Time Range',
+      type: 'select',
+      options: [
+        { value: 'today', label: 'Today' },
+        { value: '7d', label: 'Last 7 days' },
+        { value: '30d', label: 'Last 30 days' },
+        { value: 'all', label: 'All time' },
+      ],
+      value: timeRange,
+      onChange: setTimeRange,
+    },
     {
       key: 'channel',
       label: 'Channel',
       type: 'select',
       options: [
         { value: '', label: 'All Channels' },
-        { value: 'email', label: 'Email' },
-        { value: 'sms', label: 'SMS' },
+        { value: 'email', label: `Email (${emailCount})` },
+        { value: 'sms', label: `SMS (${smsCount})` },
       ],
       value: channelFilter,
       onChange: setChannelFilter,
@@ -226,10 +269,10 @@ export default function CommunicationsLogsPage() {
       type: 'select',
       options: [
         { value: '', label: 'All Statuses' },
-        { value: 'sent', label: 'Sent' },
+        { value: 'failed', label: `Failed (${failedCount})` },
+        { value: 'pending', label: `Pending (${pendingCount})` },
+        { value: 'sent', label: `Sent (${sentCount})` },
         { value: 'delivered', label: 'Delivered' },
-        { value: 'pending', label: 'Pending' },
-        { value: 'failed', label: 'Failed' },
       ],
       value: statusFilter,
       onChange: setStatusFilter,
@@ -246,24 +289,113 @@ export default function CommunicationsLogsPage() {
   }
 
   return (
-    <StandardListView
-      title="Message Logs"
-      subtitle="View all sent emails and SMS messages"
-      summaryCards={
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {summaryCards.map((card, idx) => (
-            <SummaryCard key={idx} {...card} />
-          ))}
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Message Logs</h1>
+        <p className="text-sm text-gray-500 mt-1">Monitor and investigate all sent messages</p>
+      </div>
+
+      {/* Health Dashboard Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">System Health</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Health Status Card */}
+          <div
+            className={`border rounded-lg p-6 ${
+              hasFailures
+                ? 'border-red-200 bg-red-50'
+                : hasPending
+                ? 'border-yellow-200 bg-yellow-50'
+                : 'border-green-200 bg-green-50'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">System Status</p>
+                <p className={`text-2xl font-bold mt-2 ${
+                  hasFailures ? 'text-red-600' : hasPending ? 'text-yellow-600' : 'text-green-600'
+                }`}>
+                  {hasFailures ? `${failedCount} Failure${failedCount > 1 ? 's' : ''} Need Attention` : 
+                   hasPending ? `${pendingCount} Pending` : 
+                   'Healthy'}
+                </p>
+                {hasFailures && (
+                  <button
+                    onClick={() => setStatusFilter('failed')}
+                    className="text-xs text-red-600 hover:text-red-700 mt-2 underline"
+                  >
+                    View failures →
+                  </button>
+                )}
+              </div>
+              {hasFailures ? (
+                <FiAlertCircle className="w-8 h-8 text-red-600" />
+              ) : (
+                <FiCheckCircle className="w-8 h-8 text-green-600" />
+              )}
+            </div>
+          </div>
+
+          {/* Success Rate Card */}
+          <div className="border border-gray-200 rounded-lg p-6 bg-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{successRate}%</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {sentCount} of {totalMessages} messages
+                </p>
+              </div>
+              {parseFloat(successRate) >= 95 ? (
+                <FiTrendingUp className="w-8 h-8 text-green-600" />
+              ) : (
+                <FiTrendingDown className="w-8 h-8 text-yellow-600" />
+              )}
+            </div>
+          </div>
+
+          {/* Channel Breakdown Card */}
+          <div className="border border-gray-200 rounded-lg p-6 bg-white">
+            <p className="text-sm font-medium text-gray-600 mb-3">Channel Breakdown</p>
+            <div className="space-y-2">
+              {channelBreakdown.map((ch) => (
+                <div key={ch.channel} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {ch.channel === 'email' ? (
+                      <FiMail className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <FiMessageSquare className="w-4 h-4 text-green-600" />
+                    )}
+                    <span className="text-sm font-medium text-gray-700 capitalize">{ch.channel}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-900">{ch.count}</span>
+                    {ch.failures > 0 && (
+                      <span className="text-xs text-red-600">({ch.failures} failed)</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      }
-      filters={filters}
-      columns={columns}
-      data={filteredNotifications}
-      searchValue={searchTerm}
-      onSearch={setSearchTerm}
-      loading={loading}
-      emptyMessage="No messages found"
-    />
+      </div>
+
+      {/* Investigation Tools Section */}
+      <StandardListView
+        title=""
+        subtitle=""
+        searchPlaceholder="Search recipient, message, or subject..."
+        filters={filters}
+        columns={columns}
+        data={filteredNotifications}
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
+        loading={loading}
+        emptyMessage="No messages found"
+      />
+    </div>
   );
 }
 
