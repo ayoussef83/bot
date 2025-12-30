@@ -1,22 +1,12 @@
 import { Module } from '@nestjs/common';
-import { FinanceService } from './finance.service';
+import { PrismaModule } from '../prisma/prisma.module';
 import { FinanceController } from './finance.controller';
-import { PaymentsService } from './payments.service';
-import { PaymentsController } from './payments.controller';
-import { ExpensesService } from './expenses.service';
-import { ExpensesController } from './expenses.controller';
-import { SnapshotsService } from './snapshots.service';
-import { SnapshotsController } from './snapshots.controller';
+import { FinanceService } from './finance.service';
 
 @Module({
-  providers: [FinanceService, PaymentsService, ExpensesService, SnapshotsService],
-  controllers: [
-    FinanceController,
-    PaymentsController,
-    ExpensesController,
-    SnapshotsController,
-  ],
-  exports: [PaymentsService, ExpensesService, SnapshotsService],
+  imports: [PrismaModule],
+  controllers: [FinanceController],
+  providers: [FinanceService],
+  exports: [FinanceService],
 })
 export class FinanceModule {}
-

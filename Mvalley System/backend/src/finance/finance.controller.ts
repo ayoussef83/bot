@@ -1,22 +1,17 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { FinanceService } from './finance.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('finance')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
-  @Get('summary')
-  @Roles(UserRole.super_admin, UserRole.management, UserRole.accounting)
-  getSummary(
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-  ) {
-    return this.financeService.getSummary(startDate, endDate);
+  @Get('overview')
+  @Roles('super_admin', 'management', 'accounting', 'operations')
+  async getOverview() {
+    return this.financeService.getOverview();
   }
 }
-
