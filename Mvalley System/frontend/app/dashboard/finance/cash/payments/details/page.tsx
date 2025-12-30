@@ -78,7 +78,7 @@ export default function PaymentDetailPage() {
     { label: 'Finance', href: '/dashboard/finance' },
     {
       label: `Payment - EGP ${payment.amount.toLocaleString()}`,
-      href: `/dashboard/finance/payments/details?id=${id}`,
+      href: `/dashboard/finance/cash/payments/details?id=${id}`,
     },
   ];
 
