@@ -212,19 +212,25 @@ export default function ClassProfitabilityReportPage() {
             </div>
           </div>
 
-      {/* Alert for Negative Margin Classes */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <FiAlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-          <div>
-            <h3 className="text-sm font-semibold text-yellow-900 mb-1">Negative Margin Classes</h3>
-            <p className="text-sm text-yellow-800">
-              Classes with negative margins (revenue &lt; instructor cost) are highlighted in the report.
-              Consider adjusting pricing or reducing instructor costs for these classes.
-            </p>
+          {/* Alert for Negative Margin Classes */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <FiAlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-yellow-900 mb-1">Negative Margin Classes</h3>
+                <p className="text-sm text-yellow-800">
+                  Classes with negative margins (revenue &lt; instructor cost) are highlighted in the report.
+                  Consider adjusting pricing or reducing instructor costs for these classes.
+                </p>
+              </div>
+            </div>
           </div>
+        </>
+      ) : (
+        <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="text-gray-500">Select a period to view the report</div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
