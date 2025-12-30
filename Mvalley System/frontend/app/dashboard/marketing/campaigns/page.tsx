@@ -151,10 +151,10 @@ export default function CampaignsPage() {
     },
   ];
 
-  const actions: ActionButton[] = [
+  const actions = (row: Campaign): ActionButton[] => [
     {
       label: 'View',
-      onClick: (row: Campaign) => {
+      onClick: () => {
         router.push(`/dashboard/marketing/campaigns/details?id=${row.id}`);
       },
       icon: <FiTrendingUp className="w-4 h-4" />,
