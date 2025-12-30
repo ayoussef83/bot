@@ -585,7 +585,7 @@ export default function LeadsPage() {
         }
         getRowId={(row) => row.id}
         onRowClick={(row) => {
-          router.push(`/dashboard/leads/${row.id}`);
+          router.push(`/dashboard/crm/leads/${row.id}`);
         }}
       />
 
