@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 import { SchedulerService } from './scheduler.service';
+import { SchedulerController } from './scheduler.controller';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { SchedulerService } from './scheduler.service';
     SettingsModule,
   ],
   providers: [SchedulerService],
+  controllers: [SchedulerController],
 })
 export class SchedulerModule {}
 
