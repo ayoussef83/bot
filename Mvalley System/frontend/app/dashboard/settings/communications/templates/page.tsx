@@ -176,12 +176,16 @@ export default function CommunicationsTemplatesPage() {
     {
       key: 'body',
       label: 'Body Preview',
-      render: (value) => (
-        <span className="text-sm text-gray-600 line-clamp-2">
-          {value.substring(0, 100)}
-          {value.length > 100 ? '...' : ''}
-        </span>
-      ),
+      render: (value) => {
+        if (!value) return <span className="text-sm text-gray-400">-</span>;
+        const text = String(value);
+        return (
+          <span className="text-sm text-gray-600 line-clamp-2">
+            {text.substring(0, 100)}
+            {text.length > 100 ? '...' : ''}
+          </span>
+        );
+      },
     },
     {
       key: 'isActive',
