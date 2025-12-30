@@ -22,11 +22,11 @@ frontend:
         - echo "Building Next.js application..."
         - npm run build
   artifacts:
-    baseDirectory: out
+    baseDirectory: frontend/out
     files:
       - '**/*'
   cache:
     paths:
-      - "Mvalley System/frontend/node_modules/**/*"
-      - "Mvalley System/frontend/.next/cache/**/*"
+      - frontend/node_modules/**/*
+      - frontend/.next/cache/**/*
 
