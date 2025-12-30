@@ -1121,17 +1121,39 @@ function SchedulerStatus() {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
     const fetchStatus = async () => {
       try {
         setLoading(true);
+        setError(null);
+        
+        // Add timeout for the request
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const resp = await settingsService.getSchedulerStatus();
+        
         if (mounted) {
+          clearTimeout(timeoutId);
           setStatus(resp.data);
           setError(null);
         }
       } catch (e: any) {
         if (mounted) {
-          const errorMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Failed to load scheduler status';
+          clearTimeout(timeoutId);
+          let errorMsg: string;
+          
+          if (e.name === 'AbortError' || e.code === 'ECONNABORTED') {
+            errorMsg = 'Request timed out. The backend may not be available yet.';
+          } else if (e.response?.status === 404) {
+            errorMsg = 'Scheduler endpoint not found. Backend may need to be deployed.';
+          } else if (e.response?.status === 401 || e.response?.status === 403) {
+            errorMsg = 'Authentication failed. Please log in again.';
+          } else {
+            errorMsg = e.response?.data?.message || e.response?.data?.error || e.message || 'Failed to load scheduler status';
+          }
+          
           setError(typeof errorMsg === 'string' ? errorMsg : String(errorMsg));
         }
       } finally {
@@ -1140,20 +1162,44 @@ function SchedulerStatus() {
         }
       }
     };
+    
     fetchStatus();
     // Refresh every 30 seconds
     const interval = setInterval(fetchStatus, 30000);
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       clearInterval(interval);
     };
   }, []);
 
-  if (loading) return <div className="text-gray-500">Loading scheduler status...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <div className="text-gray-500">Loading scheduler status...</div>
+        <div className="text-xs text-gray-400">This may take a few seconds. If it takes too long, the backend endpoint may not be available yet.</div>
+      </div>
+    );
+  }
+  
   if (error) {
     const errorMessage = typeof error === 'string' ? error : error?.message || JSON.stringify(error);
-    return <div className="text-red-600">Error: {errorMessage}</div>;
+    return (
+      <div className="space-y-2">
+        <div className="text-red-600 font-medium">Error loading scheduler status</div>
+        <div className="text-sm text-red-700">{errorMessage}</div>
+        <div className="text-xs text-gray-500 mt-2">
+          <strong>Possible causes:</strong>
+          <ul className="list-disc list-inside mt-1">
+            <li>Backend not deployed yet (check CodeBuild status)</li>
+            <li>Backend endpoint not available</li>
+            <li>Network connectivity issue</li>
+          </ul>
+        </div>
+      </div>
+    );
   }
+  
   if (!status) return null;
 
   return (
