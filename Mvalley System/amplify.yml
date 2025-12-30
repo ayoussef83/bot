@@ -7,24 +7,22 @@ frontend:
         - |
           if [ -d "Mvalley System/frontend" ]; then
             cd "Mvalley System/frontend"
+            FRONTEND_DIR="Mvalley System/frontend"
           elif [ -d "frontend" ]; then
             cd "frontend"
+            FRONTEND_DIR="frontend"
+          else
+            echo "ERROR: Frontend directory not found"
+            exit 1
           fi
           pwd
         - npm install --legacy-peer-deps
     build:
       commands:
         - echo "Building Next.js application..."
-        - |
-          if [ -d "Mvalley System/frontend" ]; then
-            cd "Mvalley System/frontend"
-          elif [ -d "frontend" ]; then
-            cd "frontend"
-          fi
-          pwd
         - npm run build
   artifacts:
-    baseDirectory: "Mvalley System/frontend/out"
+    baseDirectory: out
     files:
       - '**/*'
   cache:
