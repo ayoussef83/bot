@@ -8,6 +8,8 @@ import { ExpensesController } from './expenses.controller';
 import { ExpensesService } from './expenses.service';
 import { CashAccountsController } from './cash-accounts.controller';
 import { CashAccountsService } from './cash-accounts.service';
+import { ExpenseCategoriesController } from './expense-categories.controller';
+import { ExpenseCategoriesService } from './expense-categories.service';
 
 @Module({
   imports: [PrismaModule],
@@ -16,18 +18,21 @@ import { CashAccountsService } from './cash-accounts.service';
     PaymentsController,
     ExpensesController,
     CashAccountsController,
+    ExpenseCategoriesController,
   ],
   providers: [
     FinanceService,
     PaymentsService,
     ExpensesService,
     CashAccountsService,
+    ExpenseCategoriesService,
   ],
   exports: [
     FinanceService,
     PaymentsService,
     ExpensesService,
     CashAccountsService,
+    ExpenseCategoriesService,
   ],
 })
 export class FinanceModule {}
