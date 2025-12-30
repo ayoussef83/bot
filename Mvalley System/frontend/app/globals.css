@@ -12,8 +12,8 @@
 }
 
 body {
-  color: #f9fafb; /* gray-50 */
-  background: #111827; /* gray-900 */
+  color: #111827; /* gray-900 */
+  background: #f9fafb; /* gray-50 */
 }
 
 /* Safe default: make form control text readable even if a page forgot `text-gray-900`. */

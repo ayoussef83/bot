@@ -54,20 +54,15 @@ export default function DashboardLayout({
     }
   };
 
-  // Generate user initials for avatar
-  const getUserInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-
   return (
-    <div className="flex min-h-screen bg-gray-900">
+    <div className="flex min-h-screen bg-gray-100">
       {/* Left Sidebar */}
       <DashboardSidebar userRole={user.role} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
-        <header className="bg-gray-800 border-b border-gray-700">
+        <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-3">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
@@ -83,28 +78,17 @@ export default function DashboardLayout({
                       onError={() => setLogoError(true)}
                     />
                   ) : (
-                    <h1 className="text-lg font-bold text-white">MV-OS</h1>
+                    <h1 className="text-lg font-bold">MV-OS</h1>
                   )}
                 </Link>
               </div>
               <div className="flex items-center gap-4">
-                {/* User Profile Section */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-medium">
-                    {getUserInitials(user.firstName, user.lastName)}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-white">
-                      {user.firstName} {user.lastName}
-                    </span>
-                    <span className="text-xs text-gray-400 capitalize">
-                      {user.role.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
+                <span className="text-sm text-gray-700 whitespace-nowrap">
+                  {user.firstName} {user.lastName} ({user.role})
+                </span>
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-gray-400 hover:text-white transition-colors whitespace-nowrap"
+                  className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
                 >
                   Logout
                 </button>
@@ -114,7 +98,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-gray-900">
+        <main className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             {children}
           </div>
