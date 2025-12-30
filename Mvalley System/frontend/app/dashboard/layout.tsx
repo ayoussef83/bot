@@ -94,7 +94,8 @@ export default function DashboardLayout({
                   <FiMenu className="w-6 h-6" />
                 )}
               </button>
-              <div className="flex-1 md:flex-none md:flex md:justify-end">
+              {/* User Profile Menu - Always on the right */}
+              <div className="ml-auto">
                 <UserProfileMenu user={user} onLogout={handleLogout} />
               </div>
             </div>
