@@ -98,9 +98,16 @@ export default function SessionsPage() {
       label: 'Date',
       sortable: true,
       render: (_, row) => (
-        <span className="text-sm text-gray-900">
+        <a
+          href={`/dashboard/sessions/details?id=${row.id}`}
+          className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
+          onClick={(e) => {
+            e.preventDefault();
+            router.push(`/dashboard/sessions/details?id=${row.id}`);
+          }}
+        >
           {new Date(row.scheduledDate).toLocaleDateString()}
-        </span>
+        </a>
       ),
     },
     {
