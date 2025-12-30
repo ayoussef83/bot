@@ -150,27 +150,27 @@ export default function CommunicationsLogsPage() {
 
   const summaryCards = [
     {
-      label: 'Total Messages',
+      title: 'Total Messages',
       value: totalMessages,
       icon: <FiMessageSquare className="w-5 h-5" />,
     },
     {
-      label: 'Email',
+      title: 'Email',
       value: emailCount,
       icon: <FiMail className="w-5 h-5" />,
     },
     {
-      label: 'SMS',
+      title: 'SMS',
       value: smsCount,
       icon: <FiMessageSquare className="w-5 h-5" />,
     },
     {
-      label: 'Sent',
+      title: 'Sent',
       value: sentCount,
       icon: <FiCheckCircle className="w-5 h-5" />,
     },
     {
-      label: 'Failed',
+      title: 'Failed',
       value: failedCount,
       icon: <FiXCircle className="w-5 h-5" />,
     },
@@ -210,7 +210,13 @@ export default function CommunicationsLogsPage() {
     <StandardListView
       title="Message Logs"
       subtitle="View all sent emails and SMS messages"
-      summaryCards={summaryCards}
+      summaryCards={
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {summaryCards.map((card, idx) => (
+            <SummaryCard key={idx} {...card} />
+          ))}
+        </div>
+      }
       filters={filters}
       searchTerm={searchTerm}
       onSearchChange={setSearchTerm}
