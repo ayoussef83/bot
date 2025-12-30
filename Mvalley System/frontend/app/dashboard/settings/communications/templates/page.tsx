@@ -29,6 +29,7 @@ export default function CommunicationsTemplatesPage() {
     isOpen: false,
     template: null,
   });
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchTemplates();
