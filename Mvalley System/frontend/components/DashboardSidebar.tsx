@@ -421,8 +421,9 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
                         {hasChildren ? (
                           <>
                             <button
+                              type="button"
                               onClick={() => toggleSection(section.id)}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                                 active
                                   ? 'bg-indigo-50 text-indigo-700'
                                   : 'text-gray-700 hover:bg-gray-50'
@@ -450,8 +451,9 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
                                         {childHasChildren ? (
                                           <>
                                             <button
+                                              type="button"
                                               onClick={() => toggleSection(child.id)}
-                                              className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+                                              className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors cursor-pointer ${
                                                 childActive
                                                   ? 'bg-indigo-50 text-indigo-700 font-medium'
                                                   : 'text-gray-600 hover:bg-gray-50'
@@ -592,8 +594,9 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
                       {hasChildren ? (
                         <>
                           <button
+                            type="button"
                             onClick={() => toggleSection(section.id)}
-                            className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                               active
                                 ? 'bg-indigo-50 text-indigo-700'
                                 : 'text-gray-700 hover:bg-gray-50'
@@ -621,8 +624,9 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
                                       {childHasChildren ? (
                                         <>
                                           <button
+                                            type="button"
                                             onClick={() => toggleSection(child.id)}
-                                            className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+                                            className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors cursor-pointer ${
                                               childActive
                                                 ? 'bg-indigo-50 text-indigo-700 font-medium'
                                                 : 'text-gray-600 hover:bg-gray-50'
