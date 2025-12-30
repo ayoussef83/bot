@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { settingsService, MessageTemplate, MessageChannel } from '@/lib/services';
-import SettingsCard from '@/components/settings/SettingsCard';
+import StandardListView from '@/components/StandardListView';
+import DataTable, { Column } from '@/components/DataTable';
 import StatusBadge from '@/components/settings/StatusBadge';
 import ConfirmModal from '@/components/settings/ConfirmModal';
-import { FiPlus, FiEdit2, FiTrash2, FiX, FiCheck, FiMail, FiMessageSquare } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiMail, FiMessageSquare, FiEye } from 'react-icons/fi';
 
 export default function CommunicationsTemplatesPage() {
   const [channel, setChannel] = useState<MessageChannel>('email');
@@ -14,6 +15,7 @@ export default function CommunicationsTemplatesPage() {
   const [error, setError] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<MessageTemplate | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
   const [form, setForm] = useState({
     channel: 'email' as MessageChannel,
     key: '',
@@ -134,93 +136,181 @@ export default function CommunicationsTemplatesPage() {
     }
   };
 
-  const activeTemplates = templates.filter((t) => t.isActive);
-  const inactiveTemplates = templates.filter((t) => !t.isActive);
+  // Table columns
+  const columns: Column<MessageTemplate>[] = [
+    {
+      key: 'name',
+      label: 'Template Name',
+      render: (value, row) => (
+        <div>
+          <div className="font-medium text-gray-900">{value}</div>
+          <div className="text-xs text-gray-500 mt-0.5">Key: {row.key}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'channel',
+      label: 'Channel',
+      render: (value) => (
+        <div className="flex items-center gap-2">
+          {value === 'email' ? (
+            <FiMail className="w-4 h-4 text-blue-600" />
+          ) : (
+            <FiMessageSquare className="w-4 h-4 text-green-600" />
+          )}
+          <span className="text-sm text-gray-700 capitalize">{value}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'subject',
+      label: 'Subject',
+      render: (value, row) => (
+        <span className="text-sm text-gray-600">
+          {row.channel === 'email' ? (value || '-') : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'body',
+      label: 'Body Preview',
+      render: (value) => (
+        <span className="text-sm text-gray-600 line-clamp-2">
+          {value.substring(0, 100)}
+          {value.length > 100 ? '...' : ''}
+        </span>
+      ),
+    },
+    {
+      key: 'isActive',
+      label: 'Status',
+      render: (value) => (
+        <StatusBadge status={value ? 'active' : 'inactive'} label={value ? 'Active' : 'Inactive'} />
+      ),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      align: 'right',
+      render: (_, row) => (
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={() => setPreviewTemplate(row)}
+            className="p-1.5 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+            title="Preview"
+          >
+            <FiEye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => openEdit(row)}
+            className="p-1.5 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+            title="Edit"
+          >
+            <FiEdit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setDeleteModal({ isOpen: true, template: row })}
+            className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+            title="Delete"
+          >
+            <FiTrash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  // Summary cards
+  const summaryCards = [
+    {
+      label: 'Total Templates',
+      value: templates.length,
+      icon: <FiMail className="w-5 h-5" />,
+    },
+    {
+      label: 'Active',
+      value: templates.filter((t) => t.isActive).length,
+      icon: <FiMessageSquare className="w-5 h-5" />,
+    },
+    {
+      label: 'Inactive',
+      value: templates.filter((t) => !t.isActive).length,
+      icon: <FiMessageSquare className="w-5 h-5" />,
+    },
+  ];
+
+  // Primary action
+  const primaryAction = showForm
+    ? undefined
+    : {
+        label: 'Add Template',
+        onClick: openCreate,
+        icon: <FiPlus className="w-4 h-4" />,
+      };
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Message Templates</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Create and manage email and SMS templates for system notifications
-        </p>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-800">{error}</p>
-        </div>
-      )}
-
       {/* Channel Selector */}
-      <SettingsCard
-        title="Select Channel"
-        description="Choose which channel to manage templates for"
-      >
-        <div className="flex gap-2">
-          <button
-            onClick={() => setChannel('email')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              channel === 'email'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <FiMail className="w-4 h-4" />
-            Email
-          </button>
-          <button
-            onClick={() => setChannel('sms')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              channel === 'sms'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <FiMessageSquare className="w-4 h-4" />
-            SMS
-          </button>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-1">Select Channel</h3>
+            <p className="text-xs text-gray-500">Choose which channel to manage templates for</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setChannel('email');
+                resetForm();
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                channel === 'email'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <FiMail className="w-4 h-4" />
+              Email
+            </button>
+            <button
+              onClick={() => {
+                setChannel('sms');
+                resetForm();
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                channel === 'sms'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <FiMessageSquare className="w-4 h-4" />
+              SMS
+            </button>
+          </div>
         </div>
-      </SettingsCard>
-
-      {/* Add Template Button */}
-      {!showForm && (
-        <div className="flex justify-end">
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-          >
-            <FiPlus className="w-4 h-4" />
-            Add Template
-          </button>
-        </div>
-      )}
+      </div>
 
       {/* Add/Edit Form */}
       {showForm && (
-        <SettingsCard
-          title={editing ? 'Edit Template' : 'Add Template'}
-          footer={
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={resetForm}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                <FiX className="w-4 h-4" />
-                Cancel
-              </button>
-              <button
-                onClick={saveTemplate}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-              >
-                <FiCheck className="w-4 h-4" />
-                {editing ? 'Update' : 'Create'}
-              </button>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {editing ? 'Edit Template' : 'Add Template'}
+            </h2>
+            <button
+              onClick={resetForm}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <FiTrash2 className="w-5 h-5" />
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-800">{error}</p>
             </div>
-          }
-        >
+          )}
+
           <form onSubmit={saveTemplate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -231,7 +321,7 @@ export default function CommunicationsTemplatesPage() {
                   type="text"
                   value={form.key}
                   onChange={(e) => setForm({ ...form, key: e.target.value })}
-                  className="w-full rounded-md border-gray-300 shadow-sm"
+                  className="w-full rounded-md border-gray-300 shadow-sm text-gray-900"
                   required
                   disabled={!!editing}
                   placeholder="e.g. payment_due_reminder"
@@ -246,7 +336,7 @@ export default function CommunicationsTemplatesPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border-gray-300 shadow-sm"
+                  className="w-full rounded-md border-gray-300 shadow-sm text-gray-900"
                   required
                   placeholder="e.g. Payment Due Reminder"
                 />
@@ -261,7 +351,7 @@ export default function CommunicationsTemplatesPage() {
                   type="text"
                   value={form.subject}
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  className="w-full rounded-md border-gray-300 shadow-sm"
+                  className="w-full rounded-md border-gray-300 shadow-sm text-gray-900"
                   required
                   placeholder="Email subject line"
                 />
@@ -274,7 +364,7 @@ export default function CommunicationsTemplatesPage() {
               <textarea
                 value={form.body}
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
-                className="w-full rounded-md border-gray-300 shadow-sm"
+                className="w-full rounded-md border-gray-300 shadow-sm text-gray-900"
                 rows={8}
                 required
                 placeholder="Template body. Use {{variable}} for dynamic content."
@@ -295,111 +385,100 @@ export default function CommunicationsTemplatesPage() {
                 Active
               </label>
             </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+              >
+                {editing ? 'Update' : 'Create'}
+              </button>
+            </div>
           </form>
-        </SettingsCard>
+        </div>
       )}
 
-      {/* Active Templates */}
-      {loading ? (
-        <div className="text-center py-8 text-gray-500">Loading...</div>
-      ) : (
-        <>
-          {activeTemplates.length > 0 && (
-            <SettingsCard title={`Active Templates (${activeTemplates.length})`}>
-              <div className="space-y-3">
-                {activeTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="flex items-start justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-gray-900">{template.name}</span>
-                        <span className="text-xs text-gray-500">({template.key})</span>
-                        <StatusBadge status="active" label="Active" />
-                        {template.channel === 'email' && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                            Email
-                          </span>
-                        )}
-                        {template.channel === 'sms' && (
-                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
-                            SMS
-                          </span>
-                        )}
+      {/* Templates List */}
+      {!showForm && (
+        <StandardListView
+          title="Message Templates"
+          subtitle={`Manage ${channel} templates for system notifications`}
+          primaryAction={primaryAction}
+          summaryCards={summaryCards}
+          loading={loading}
+          error={error}
+          emptyMessage={`No ${channel} templates found. Click "Add Template" to create one.`}
+        >
+          <DataTable
+            columns={columns}
+            data={templates}
+            emptyMessage={`No ${channel} templates found`}
+            loading={loading}
+          />
+        </StandardListView>
+      )}
+
+      {/* Preview Modal */}
+      {previewTemplate && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                      {previewTemplate.name}
+                    </h3>
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Channel</p>
+                        <p className="text-sm text-gray-900 capitalize">{previewTemplate.channel}</p>
                       </div>
-                      {template.channel === 'email' && template.subject && (
-                        <p className="text-sm text-gray-600 mb-1">
-                          <strong>Subject:</strong> {template.subject}
-                        </p>
+                      {previewTemplate.channel === 'email' && previewTemplate.subject && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Subject</p>
+                          <p className="text-sm text-gray-900">{previewTemplate.subject}</p>
+                        </div>
                       )}
-                      <p className="text-sm text-gray-600 line-clamp-2">{template.body}</p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <button
-                        onClick={() => openEdit(template)}
-                        className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded"
-                      >
-                        <FiEdit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteModal({ isOpen: true, template })}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <FiTrash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SettingsCard>
-          )}
-
-          {/* Inactive Templates */}
-          {inactiveTemplates.length > 0 && (
-            <SettingsCard title={`Inactive Templates (${inactiveTemplates.length})`}>
-              <div className="space-y-3">
-                {inactiveTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    className="flex items-start justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 opacity-60"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-gray-900">{template.name}</span>
-                        <span className="text-xs text-gray-500">({template.key})</span>
-                        <StatusBadge status="inactive" label="Inactive" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Body</p>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                          <p className="text-sm text-gray-900 whitespace-pre-wrap">{previewTemplate.body}</p>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">{template.body}</p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <button
-                        onClick={() => openEdit(template)}
-                        className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded"
-                      >
-                        <FiEdit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteModal({ isOpen: true, template })}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <FiTrash2 className="w-4 h-4" />
-                      </button>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Status</p>
+                        <div className="mt-1">
+                          <StatusBadge
+                            status={previewTemplate.isActive ? 'active' : 'inactive'}
+                            label={previewTemplate.isActive ? 'Active' : 'Inactive'}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-            </SettingsCard>
-          )}
-
-          {templates.length === 0 && !showForm && (
-            <SettingsCard title="No Templates">
-              <p className="text-sm text-gray-500">
-                No {channel} templates defined. Click "Add Template" to create one.
-              </p>
-            </SettingsCard>
-          )}
-        </>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setPreviewTemplate(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
@@ -409,11 +488,10 @@ export default function CommunicationsTemplatesPage() {
         onConfirm={handleDelete}
         title="Delete Template"
         message={`Are you sure you want to delete "${deleteModal.template?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        variant="danger"
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDestructive={true}
       />
     </div>
   );
 }
-
