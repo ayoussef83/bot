@@ -147,8 +147,8 @@ export default function LeadsPage() {
 
   // Status badge mapping
   const getStatusBadge = (status: string) => {
-    const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' | 'info' } = {
-      new: 'info',
+    const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' | 'error' } = {
+      new: 'active',
       contacted: 'warning',
       qualified: 'active',
       converted: 'active',

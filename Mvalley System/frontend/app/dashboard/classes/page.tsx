@@ -321,7 +321,7 @@ export default function ClassesPage() {
                         <option value="">Select Instructor</option>
                         {instructors.map((instructor) => (
                           <option key={instructor.id} value={instructor.id}>
-                            {instructor.firstName} {instructor.lastName}
+                            {instructor.user?.firstName || ''} {instructor.user?.lastName || ''}
                           </option>
                         ))}
                       </select>

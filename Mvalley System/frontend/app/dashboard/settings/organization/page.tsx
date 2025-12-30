@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import SettingsCard from '@/components/settings/SettingsCard';
 import StatusBadge from '@/components/settings/StatusBadge';
 import ConfirmModal from '@/components/settings/ConfirmModal';
-import { FiEdit2, FiSave, FiX, FiBuilding, FiMapPin, FiPhone, FiMail, FiGlobe, FiDollarSign } from 'react-icons/fi';
+import { FiEdit2, FiSave, FiX, FiHome, FiMapPin, FiPhone, FiMail, FiGlobe, FiDollarSign } from 'react-icons/fi';
 
 interface OrganizationData {
   name: string;
@@ -123,7 +123,7 @@ export default function OrganizationSettingsPage() {
         title={
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FiBuilding className="w-5 h-5 text-gray-500" />
+              <FiHome className="w-5 h-5 text-gray-500" />
               <span>Organization Information</span>
             </div>
             {!isEditing ? (

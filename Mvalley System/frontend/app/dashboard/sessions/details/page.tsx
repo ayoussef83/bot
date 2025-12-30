@@ -136,13 +136,12 @@ export default function SessionDetailPage() {
     {
       label: session.instructorConfirmed ? 'Confirmed' : 'Confirm',
       onClick: handleConfirmSession,
-      variant: session.instructorConfirmed ? 'default' : 'success',
+      variant: session.instructorConfirmed ? 'secondary' : 'primary',
       icon: session.instructorConfirmed ? (
         <FiCheckCircle className="w-4 h-4" />
       ) : (
         <FiCheckCircle className="w-4 h-4" />
       ),
-      disabled: session.instructorConfirmed,
     },
     {
       label: 'Edit',

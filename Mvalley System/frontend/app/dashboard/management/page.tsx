@@ -87,46 +87,46 @@ export default function ManagementDashboard() {
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard
-          label="Monthly Revenue"
+          title="Monthly Revenue"
           value={`EGP ${(data.monthlyRevenue || 0).toLocaleString()}`}
           icon={<FiDollarSign className="w-5 h-5" />}
           trend={data.monthlyRevenueTrend}
         />
         <SummaryCard
-          label="Active Students"
+          title="Active Students"
           value={(data.activeStudents || 0).toString()}
           icon={<FiUsers className="w-5 h-5" />}
           trend={data.activeStudentsTrend}
         />
         <SummaryCard
-          label="Avg Students/Session"
+          title="Avg Students/Session"
           value={(data.avgStudentsPerSession || 0).toFixed(1)}
           icon={<FiTrendingUp className="w-5 h-5" />}
         />
         <SummaryCard
-          label="Instructor Utilization"
+          title="Instructor Utilization"
           value={`${(data.instructorUtilization || 0).toFixed(1)}%`}
           icon={<FiUserCheck className="w-5 h-5" />}
         />
         <SummaryCard
-          label="Class Fill Rate"
+          title="Class Fill Rate"
           value={`${(data.classFillRate || 0).toFixed(1)}%`}
           icon={<FiBookOpen className="w-5 h-5" />}
         />
         <SummaryCard
-          label="Cash In"
+          title="Cash In"
           value={`EGP ${(data.cashIn || 0).toLocaleString()}`}
           icon={<FiArrowUp className="w-5 h-5" />}
           variant="success"
         />
         <SummaryCard
-          label="Cash Out"
+          title="Cash Out"
           value={`EGP ${(data.cashOut || 0).toLocaleString()}`}
           icon={<FiArrowDown className="w-5 h-5" />}
           variant="danger"
         />
         <SummaryCard
-          label="Net"
+          title="Net"
           value={`EGP ${(data.net || 0).toLocaleString()}`}
           icon={<FiDollarSign className="w-5 h-5" />}
           variant={(data.net || 0) >= 0 ? 'success' : 'danger'}

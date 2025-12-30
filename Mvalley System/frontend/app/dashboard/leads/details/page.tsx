@@ -148,7 +148,7 @@ export default function LeadDetailPage() {
     {
       label: 'Convert to Student',
       onClick: handleConvertToStudent,
-      variant: 'success',
+      variant: 'primary',
       icon: <FiUserPlus className="w-4 h-4" />,
     },
     {
@@ -426,7 +426,7 @@ export default function LeadDetailPage() {
                 lead.status === 'converted'
                   ? 'active'
                   : lead.status === 'qualified'
-                  ? 'info'
+                  ? 'active'
                   : lead.status === 'lost'
                   ? 'inactive'
                   : 'warning'

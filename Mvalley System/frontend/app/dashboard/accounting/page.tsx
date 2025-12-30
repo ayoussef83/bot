@@ -94,19 +94,19 @@ export default function AccountingDashboard() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <SummaryCard
-          label="Total Received"
+          title="Total Received"
           value={`EGP ${(data?.totalReceived || 0).toLocaleString()}`}
           icon={<FiDollarSign className="w-5 h-5" />}
           variant="success"
         />
         <SummaryCard
-          label="Total Outstanding"
+          title="Total Outstanding"
           value={`EGP ${(data?.totalOutstanding || 0).toLocaleString()}`}
           icon={<FiAlertCircle className="w-5 h-5" />}
           variant="danger"
         />
         <SummaryCard
-          label="Total Expenses"
+          title="Total Expenses"
           value={`EGP ${(data?.totalExpenses || 0).toLocaleString()}`}
           icon={<FiTrendingDown className="w-5 h-5" />}
           variant="danger"
