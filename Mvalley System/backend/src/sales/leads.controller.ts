@@ -16,6 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import { CreateLeadDto, UpdateLeadDto } from './dto';
+import { GetLeadsQueryDto } from './dto/get-leads-query.dto';
 
 @Controller('leads')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,11 +31,8 @@ export class LeadsController {
 
   @Get()
   @Roles(UserRole.super_admin, UserRole.management, UserRole.sales)
-  findAll(
-    @Query('status') status?: string,
-    @Query('source') source?: string,
-  ) {
-    return this.leadsService.findAll(status, source);
+  findAll(@Query() query: GetLeadsQueryDto) {
+    return this.leadsService.findAll(query.status, query.source);
   }
 
   @Get(':id')
