@@ -195,17 +195,17 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
   };
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">MV-OS</h2>
-        <p className="text-xs text-gray-500 mt-1">Navigation</p>
+    <div className="w-64 bg-gray-800 border-r border-gray-700 min-h-screen">
+      <div className="p-4 border-b border-gray-700">
+        <h2 className="text-lg font-semibold text-white">MV-OS</h2>
+        <p className="text-xs text-gray-400 mt-1">Navigation</p>
       </div>
       <nav className="p-2">
         {Object.entries(groupedSections).map(([groupName, sections]) => (
           <div key={groupName} className="mb-6">
             {groupName !== 'Main' && (
               <div className="px-3 py-2 mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   {groupName}
                 </h3>
               </div>
@@ -225,10 +225,10 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
                     <li key={section.id}>
                       <Link
                         href={dashboardPath}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                           dashboardActive
-                            ? 'bg-indigo-50 text-indigo-700'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                         }`}
                       >
                         {section.icon}
@@ -244,13 +244,13 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
                       <>
                         <button
                           onClick={() => toggleSection(section.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                             active
-                              ? 'bg-indigo-50 text-indigo-700'
-                              : 'text-gray-700 hover:bg-gray-50'
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                           }`}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
                             {section.icon}
                             <span>{section.label}</span>
                           </div>
@@ -268,10 +268,10 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
                                   <li key={child.id}>
                                     <Link
                                       href={child.path || '#'}
-                                      className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                                         childActive
-                                          ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                          : 'text-gray-600 hover:bg-gray-50'
+                                          ? 'bg-indigo-600 text-white font-medium'
+                                          : 'text-gray-400 hover:bg-gray-700 hover:text-white'
                                       }`}
                                     >
                                       {child.icon}
@@ -286,10 +286,10 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
                     ) : (
                       <Link
                         href={section.path || '#'}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                           active
-                            ? 'bg-indigo-50 text-indigo-700'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                         }`}
                       >
                         {section.icon}
@@ -303,6 +303,20 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
           </div>
         ))}
       </nav>
+      
+      {/* Footer with User Info */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700 bg-gray-800">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-medium">
+            {userRole.split('_').map(w => w.charAt(0)).join('').toUpperCase().slice(0, 2)}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-white">
+              {userRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
