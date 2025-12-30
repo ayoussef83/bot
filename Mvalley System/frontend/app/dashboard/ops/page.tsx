@@ -2,9 +2,28 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import DataTable, { Column } from '@/components/DataTable';
+import StatusBadge from '@/components/settings/StatusBadge';
+import { FiCalendar, FiBookOpen } from 'react-icons/fi';
+
+interface Session {
+  id: string;
+  class?: { name: string };
+  startTime: string;
+  instructor?: { user?: { firstName: string; lastName: string } };
+  status: string;
+}
+
+interface ClassItem {
+  id: string;
+  name: string;
+  capacity: number;
+  students?: any[];
+  utilizationPercentage?: number;
+}
 
 export default function OpsDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<{ dailySessions?: Session[]; underfilledClasses?: ClassItem[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -16,6 +35,7 @@ export default function OpsDashboard() {
     try {
       const response = await api.get('/dashboard/ops');
       setData(response.data);
+      setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load dashboard');
     } finally {
@@ -24,106 +44,142 @@ export default function OpsDashboard() {
   };
 
   if (loading) {
-    return <div className="p-6">Loading dashboard...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500">Loading dashboard...</div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-6 text-red-600">Error: {error}</div>;
-  }
-
-  return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Operations Dashboard</h1>
-
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Today's Sessions</h2>
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Class
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Instructor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data?.dailySessions?.map((session: any) => (
-                <tr key={session.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {session.class?.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(session.startTime).toLocaleTimeString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {session.instructor?.user?.firstName} {session.instructor?.user?.lastName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      session.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {session.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
         </div>
       </div>
+    );
+  }
 
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Underfilled Classes</h2>
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Class Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Capacity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Students
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Utilization
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data?.underfilledClasses?.map((classItem: any) => (
-                <tr key={classItem.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {classItem.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {classItem.capacity}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {classItem.students?.length || 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {classItem.utilizationPercentage?.toFixed(1) || 0}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  // Today's Sessions columns
+  const sessionColumns: Column<Session>[] = [
+    {
+      key: 'class',
+      label: 'Class',
+      render: (_, row) => (
+        <span className="text-sm font-medium text-gray-900">{row.class?.name || '-'}</span>
+      ),
+    },
+    {
+      key: 'time',
+      label: 'Time',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">
+          {new Date(row.startTime).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
+      ),
+    },
+    {
+      key: 'instructor',
+      label: 'Instructor',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">
+          {row.instructor?.user
+            ? `${row.instructor.user.firstName} ${row.instructor.user.lastName}`
+            : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (value) => {
+        const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' } = {
+          completed: 'active',
+          scheduled: 'warning',
+          cancelled: 'inactive',
+        };
+        return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
+      },
+    },
+  ];
+
+  // Underfilled Classes columns
+  const classColumns: Column<ClassItem>[] = [
+    {
+      key: 'name',
+      label: 'Class Name',
+      render: (value) => <span className="text-sm font-medium text-gray-900">{value}</span>,
+    },
+    {
+      key: 'capacity',
+      label: 'Capacity',
+      render: (value) => <span className="text-sm text-gray-500">{value}</span>,
+    },
+    {
+      key: 'students',
+      label: 'Students',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">{row.students?.length || 0}</span>
+      ),
+    },
+    {
+      key: 'utilization',
+      label: 'Utilization',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">
+          {(row.utilizationPercentage || 0).toFixed(1)}%
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Operations Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Daily operations overview and class management</p>
+      </div>
+
+      {/* Today's Sessions */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FiCalendar className="w-5 h-5 text-gray-500" />
+          <h2 className="text-lg font-semibold text-gray-900">Today's Sessions</h2>
         </div>
+        {data?.dailySessions && data.dailySessions.length > 0 ? (
+          <DataTable
+            columns={sessionColumns}
+            data={data.dailySessions}
+            emptyMessage="No sessions scheduled for today"
+            loading={loading}
+          />
+        ) : (
+          <div className="text-center py-8 text-gray-500">No sessions scheduled for today</div>
+        )}
+      </div>
+
+      {/* Underfilled Classes */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FiBookOpen className="w-5 h-5 text-gray-500" />
+          <h2 className="text-lg font-semibold text-gray-900">Underfilled Classes</h2>
+        </div>
+        {data?.underfilledClasses && data.underfilledClasses.length > 0 ? (
+          <DataTable
+            columns={classColumns}
+            data={data.underfilledClasses}
+            emptyMessage="All classes are at capacity"
+            loading={loading}
+          />
+        ) : (
+          <div className="text-center py-8 text-gray-500">All classes are at capacity</div>
+        )}
       </div>
     </div>
   );
 }
-
-
