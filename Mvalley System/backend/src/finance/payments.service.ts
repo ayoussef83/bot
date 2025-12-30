@@ -1,230 +1,237 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePaymentDto, UpdatePaymentDto } from './dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreatePaymentAllocationDto } from './dto/create-payment-allocation.dto';
 
 @Injectable()
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
-  private normalizeDateInput(value?: string) {
-    if (!value) return undefined;
-    // Accept both full ISO datetime and HTML date input (YYYY-MM-DD).
-    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-    const date = isDateOnly ? new Date(`${value}T00:00:00.000Z`) : new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException(`Invalid date: ${value}`);
-    }
-    return date;
-  }
-
-  async create(data: CreatePaymentDto, createdBy: string) {
-    const studentId = data.studentId?.trim();
-    if (!studentId) {
-      throw new BadRequestException('studentId is required');
-    }
-
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!student) {
-      throw new BadRequestException('Student not found');
-    }
-
-    const paymentDate = this.normalizeDateInput(data.paymentDate);
-    const dueDate = this.normalizeDateInput(data.dueDate);
-
-    const payment = await this.prisma.payment.create({
-      data: {
-        ...data,
-        studentId,
-        paymentDate,
-        dueDate,
-        createdBy,
-      },
-      include: {
-        student: {
-          include: {
-            parent: true,
-            class: true,
-          },
-        },
-      },
-    });
-
-    // Log audit
-    await this.prisma.auditLog.create({
-      data: {
-        userId: createdBy,
-        action: 'create',
-        entityType: 'Payment',
-        entityId: payment.id,
-      },
-    });
-
-    return payment;
-  }
-
-  async findAll(studentId?: string, status?: string) {
-    return this.prisma.payment.findMany({
+  async create(createPaymentDto: CreatePaymentDto, userId?: string) {
+    // Generate payment number
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const count = await this.prisma.payment.count({
       where: {
-        ...(studentId && { studentId }),
-        ...(status && { status: status as any }),
-        deletedAt: null,
+        receivedDate: {
+          gte: new Date(year, now.getMonth(), 1),
+          lt: new Date(year, now.getMonth() + 1, 1),
+        },
+      },
+    });
+    const paymentNumber = `PAY-${year}-${month}-${String(count + 1).padStart(4, '0')}`;
+
+    // Update cash account balance if payment is received
+    if (createPaymentDto.status === 'received') {
+      await this.prisma.cashAccount.update({
+        where: { id: createPaymentDto.cashAccountId },
+        data: {
+          balance: {
+            increment: createPaymentDto.amount,
+          },
+        },
+      });
+    }
+
+    return this.prisma.payment.create({
+      data: {
+        ...createPaymentDto,
+        paymentNumber,
+        receivedDate: createPaymentDto.receivedDate ? new Date(createPaymentDto.receivedDate) : new Date(),
+        receivedBy: userId,
       },
       include: {
-        student: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+        cashAccount: true,
+        allocations: {
+          include: {
+            invoice: {
+              include: {
+                student: true,
+              },
+            },
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
+    });
+  }
+
+  async findAll() {
+    return this.prisma.payment.findMany({
+      orderBy: { receivedDate: 'desc' },
+      include: {
+        cashAccount: true,
+        allocations: {
+          include: {
+            invoice: {
+              include: {
+                student: true,
+              },
+            },
+          },
+        },
       },
     });
   }
 
   async findOne(id: string) {
-    const payment = await this.prisma.payment.findFirst({
-      where: { id, deletedAt: null },
+    return this.prisma.payment.findUnique({
+      where: { id },
       include: {
-        student: {
+        cashAccount: true,
+        allocations: {
           include: {
-            parent: true,
-            class: true,
+            invoice: {
+              include: {
+                student: true,
+              },
+            },
           },
         },
+      },
+    });
+  }
+
+  async createAllocation(createAllocationDto: CreatePaymentAllocationDto, userId?: string) {
+    // Verify payment exists and has enough unallocated amount
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: createAllocationDto.paymentId },
+      include: {
+        allocations: true,
       },
     });
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new Error('Payment not found');
     }
 
-    return payment;
-  }
+    const totalAllocated = payment.allocations.reduce((sum, alloc) => sum + alloc.amount, 0);
+    const unallocated = payment.amount - totalAllocated;
 
-  async update(id: string, data: UpdatePaymentDto, updatedBy: string) {
-    const studentId = data.studentId?.trim();
-    if (studentId) {
-      const student = await this.prisma.student.findFirst({
-        where: { id: studentId, deletedAt: null },
-        select: { id: true },
-      });
-      if (!student) {
-        throw new BadRequestException('Student not found');
-      }
+    if (createAllocationDto.amount > unallocated) {
+      throw new Error(`Insufficient unallocated amount. Available: ${unallocated}`);
     }
 
-    const paymentDate = this.normalizeDateInput(data.paymentDate);
-    const dueDate = this.normalizeDateInput(data.dueDate);
-
-    const payment = await this.prisma.payment.update({
-      where: { id },
+    // Create allocation
+    const allocation = await this.prisma.paymentAllocation.create({
       data: {
-        ...data,
-        ...(studentId ? { studentId } : {}),
-        ...(data.paymentDate !== undefined ? { paymentDate } : {}),
-        ...(data.dueDate !== undefined ? { dueDate } : {}),
+        ...createAllocationDto,
+        allocatedBy: userId,
       },
       include: {
-        student: true,
-      },
-    });
-
-    // Log audit
-    await this.prisma.auditLog.create({
-      data: {
-        userId: updatedBy,
-        action: 'update',
-        entityType: 'Payment',
-        entityId: id,
-        changes: JSON.stringify(data),
-      },
-    });
-
-    return payment;
-  }
-
-  async remove(id: string, deletedBy: string) {
-    const payment = await this.prisma.payment.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
-
-    // Log audit
-    await this.prisma.auditLog.create({
-      data: {
-        userId: deletedBy,
-        action: 'delete',
-        entityType: 'Payment',
-        entityId: id,
-      },
-    });
-
-    return payment;
-  }
-
-  async getOutstandingBalances() {
-    const students = await this.prisma.student.findMany({
-      where: { deletedAt: null },
-      include: {
-        payments: {
-          where: {
-            status: 'pending',
-            deletedAt: null,
+        payment: true,
+        invoice: {
+          include: {
+            student: true,
           },
         },
       },
     });
 
-    return students
-      .map((student) => ({
-        studentId: student.id,
-        studentName: `${student.firstName} ${student.lastName}`,
-        outstandingAmount: student.payments.reduce(
-          (sum, p) => sum + p.amount,
-          0,
-        ),
-        pendingPayments: student.payments.length,
-      }))
-      .filter((s) => s.outstandingAmount > 0);
+    // Update invoice status
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: createAllocationDto.invoiceId },
+      include: {
+        paymentAllocations: true,
+      },
+    });
+
+    if (invoice) {
+      const totalPaid = invoice.paymentAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
+      let newStatus = invoice.status;
+
+      if (totalPaid >= invoice.totalAmount) {
+        newStatus = 'paid';
+      } else if (totalPaid > 0) {
+        newStatus = 'partially_paid';
+      }
+
+      // Check if overdue
+      if (newStatus !== 'paid' && invoice.dueDate < new Date()) {
+        newStatus = 'overdue';
+      }
+
+      await this.prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { status: newStatus },
+      });
+    }
+
+    return allocation;
   }
 
-  async getStudentSummary(studentId: string) {
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, deletedAt: null },
-      select: { id: true, firstName: true, lastName: true },
-    });
-    if (!student) throw new NotFoundException('Student not found');
-
-    const payments = await this.prisma.payment.findMany({
-      where: { studentId, deletedAt: null },
-      orderBy: { createdAt: 'desc' },
+  async reverse(id: string, reason: string, userId?: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        allocations: true,
+        cashAccount: true,
+      },
     });
 
-    const totalCompleted = payments
-      .filter((p) => p.status === 'completed')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const totalPending = payments
-      .filter((p) => p.status === 'pending')
-      .reduce((sum, p) => sum + p.amount, 0);
+    if (!payment) {
+      throw new Error('Payment not found');
+    }
 
-    const duePayments = payments
-      .filter((p) => p.status === 'pending' && p.dueDate)
-      .sort((a, b) => (a.dueDate!.getTime() ?? 0) - (b.dueDate!.getTime() ?? 0));
+    if (payment.status === 'reversed') {
+      throw new Error('Payment already reversed');
+    }
 
-    return {
-      studentId: student.id,
-      studentName: `${student.firstName} ${student.lastName}`,
-      totalCompleted,
-      totalPending,
-      duePayments,
-      payments,
-    };
+    // Reverse cash account balance if payment was received
+    if (payment.status === 'received' && payment.cashAccount) {
+      await this.prisma.cashAccount.update({
+        where: { id: payment.cashAccountId },
+        data: {
+          balance: {
+            decrement: payment.amount,
+          },
+        },
+      });
+    }
+
+    // Reverse invoice statuses
+    for (const allocation of payment.allocations) {
+      const invoice = await this.prisma.invoice.findUnique({
+        where: { id: allocation.invoiceId },
+        include: {
+          paymentAllocations: true,
+        },
+      });
+
+      if (invoice) {
+        const remainingAllocations = invoice.paymentAllocations.filter(
+          (alloc) => alloc.paymentId !== payment.id,
+        );
+        const totalPaid = remainingAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
+
+        let newStatus = 'issued';
+        if (totalPaid > 0) {
+          newStatus = 'partially_paid';
+        }
+        if (invoice.dueDate < new Date() && newStatus !== 'paid') {
+          newStatus = 'overdue';
+        }
+
+        await this.prisma.invoice.update({
+          where: { id: invoice.id },
+          data: { status: newStatus },
+        });
+      }
+    }
+
+    // Delete allocations
+    await this.prisma.paymentAllocation.deleteMany({
+      where: { paymentId: id },
+    });
+
+    // Update payment status
+    return this.prisma.payment.update({
+      where: { id },
+      data: {
+        status: 'reversed',
+        reversedAt: new Date(),
+        reversalReason: reason,
+      },
+    });
   }
 }
-

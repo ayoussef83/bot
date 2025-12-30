@@ -1,78 +1,43 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
-import { CreatePaymentDto, UpdatePaymentDto } from './dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreatePaymentAllocationDto } from './dto/create-payment-allocation.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
-@Controller('payments')
+@Controller('finance/payments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post()
-  @Roles(UserRole.super_admin, UserRole.accounting)
-  create(@Body() createPaymentDto: CreatePaymentDto, @CurrentUser() user: any) {
-    return this.paymentsService.create(createPaymentDto, user.id);
+  @Roles('super_admin', 'accounting')
+  async create(@Body() createPaymentDto: CreatePaymentDto, @Request() req) {
+    return this.paymentsService.create(createPaymentDto, req.user?.userId);
   }
 
   @Get()
-  @Roles(
-    UserRole.super_admin,
-    UserRole.management,
-    UserRole.accounting,
-  )
-  findAll(
-    @Query('studentId') studentId?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.paymentsService.findAll(studentId, status);
-  }
-
-  @Get('outstanding')
-  @Roles(UserRole.super_admin, UserRole.management, UserRole.accounting)
-  getOutstandingBalances() {
-    return this.paymentsService.getOutstandingBalances();
-  }
-
-  @Get('student/:studentId/summary')
-  @Roles(UserRole.super_admin, UserRole.management, UserRole.accounting)
-  getStudentSummary(@Param('studentId') studentId: string) {
-    return this.paymentsService.getStudentSummary(studentId);
+  @Roles('super_admin', 'management', 'accounting', 'operations')
+  async findAll() {
+    return this.paymentsService.findAll();
   }
 
   @Get(':id')
-  @Roles(UserRole.super_admin, UserRole.management, UserRole.accounting)
-  findOne(@Param('id') id: string) {
+  @Roles('super_admin', 'management', 'accounting', 'operations')
+  async findOne(@Param('id') id: string) {
     return this.paymentsService.findOne(id);
   }
 
-  @Patch(':id')
-  @Roles(UserRole.super_admin, UserRole.accounting)
-  update(
-    @Param('id') id: string,
-    @Body() updatePaymentDto: UpdatePaymentDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.paymentsService.update(id, updatePaymentDto, user.id);
+  @Post('allocations')
+  @Roles('super_admin', 'accounting')
+  async createAllocation(@Body() createAllocationDto: CreatePaymentAllocationDto, @Request() req) {
+    return this.paymentsService.createAllocation(createAllocationDto, req.user?.userId);
   }
 
-  @Delete(':id')
-  @Roles(UserRole.super_admin)
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.paymentsService.remove(id, user.id);
+  @Post(':id/reverse')
+  @Roles('super_admin', 'accounting')
+  async reverse(@Param('id') id: string, @Body() body: { reason: string }, @Request() req) {
+    return this.paymentsService.reverse(id, body.reason, req.user?.userId);
   }
 }
-
