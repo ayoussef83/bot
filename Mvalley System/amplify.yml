@@ -24,11 +24,11 @@ frontend:
           pwd
         - npm run build
   artifacts:
-    baseDirectory: .next
+    baseDirectory: "Mvalley System/frontend/out"
     files:
       - '**/*'
   cache:
     paths:
-      - node_modules/**/*
-      - .next/cache/**/*
+      - "Mvalley System/frontend/node_modules/**/*"
+      - "Mvalley System/frontend/.next/cache/**/*"
 
