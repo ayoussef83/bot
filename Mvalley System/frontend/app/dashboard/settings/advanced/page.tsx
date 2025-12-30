@@ -309,10 +309,9 @@ export default function AdvancedSettingsPage() {
         onConfirm={handleAction}
         title={getActionTitle(actionType)}
         message={getActionMessage(actionType)}
-        confirmText="Confirm"
-        cancelText="Cancel"
-        isDestructive={actionType === 'reset-settings' || actionType === 'cleanup-db'}
-        loading={loading}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        variant={actionType === 'reset-settings' || actionType === 'cleanup-db' ? 'danger' : 'default'}
       />
     </div>
   );
