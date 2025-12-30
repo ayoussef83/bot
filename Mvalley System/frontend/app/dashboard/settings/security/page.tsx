@@ -498,9 +498,9 @@ export default function SecuritySettingsPage() {
         onConfirm={handleSave}
         title="Save Security Settings"
         message="Are you sure you want to save these security settings? Changes to security policies will affect all users."
-        confirmText="Save"
-        cancelText="Cancel"
-        isDestructive={false}
+        confirmLabel="Save"
+        cancelLabel="Cancel"
+        variant="default"
         loading={loading}
       />
     </div>

@@ -492,9 +492,9 @@ export default function CommunicationsTemplatesPage() {
         onConfirm={handleDelete}
         title="Delete Template"
         message={`Are you sure you want to delete "${deleteModal.template?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        isDestructive={true}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
       />
     </div>
   );
