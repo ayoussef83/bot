@@ -18,6 +18,7 @@ import {
   FiShield,
   FiSliders,
   FiChevronRight,
+  FiX,
 } from 'react-icons/fi';
 
 type SettingsSection = {
@@ -159,9 +160,11 @@ const settingsSections: SettingsSection[] = [
 
 interface SettingsSidebarProps {
   userRole: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function SettingsSidebar({ userRole }: SettingsSidebarProps) {
+export default function SettingsSidebar({ userRole, isOpen = false, onClose }: SettingsSidebarProps) {
   const pathname = usePathname();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
@@ -209,89 +212,124 @@ export default function SettingsSidebar({ userRole }: SettingsSidebarProps) {
     return expandedSections.has(sectionId);
   };
 
-  return (
-    <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
-        <p className="text-xs text-gray-500 mt-1">System configuration</p>
-      </div>
-      <nav className="p-2">
-        {Object.entries(groupedSections).map(([groupName, sections]) => (
-          <div key={groupName} className="mb-6">
-            <div className="px-3 py-2 mb-2">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                {groupName}
-              </h3>
-            </div>
-            <ul className="space-y-1">
-              {sections.map((section) => {
-                const hasChildren = section.children && section.children.length > 0;
-                const expanded = isExpanded(section.id);
-                const active = isActive(section.path);
+  const renderNavContent = (onLinkClick?: () => void) => (
+    <nav className="p-2">
+      {Object.entries(groupedSections).map(([groupName, sections]) => (
+        <div key={groupName} className="mb-6">
+          <div className="px-3 py-2 mb-2">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              {groupName}
+            </h3>
+          </div>
+          <ul className="space-y-1">
+            {sections.map((section) => {
+              const hasChildren = section.children && section.children.length > 0;
+              const expanded = isExpanded(section.id);
+              const active = isActive(section.path);
 
-                return (
-                  <li key={section.id}>
-                    {hasChildren ? (
-                      <>
-                        <button
-                          onClick={() => toggleSection(section.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                            active
-                              ? 'bg-indigo-50 text-indigo-700'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {section.icon}
-                            <span>{section.label}</span>
-                          </div>
-                          <FiChevronRight
-                            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                          />
-                        </button>
-                        {expanded && (
-                          <ul className="ml-6 mt-1 space-y-1">
-                            {section.children!.map((child) => {
-                              const childActive = isActive(child.path);
-                              return (
-                                <li key={child.id}>
-                                  <Link
-                                    href={child.path}
-                                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-                                      childActive
-                                        ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                        : 'text-gray-600 hover:bg-gray-50'
-                                    }`}
-                                  >
-                                    {child.icon}
-                                    <span>{child.label}</span>
-                                  </Link>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </>
-                    ) : (
-                      <Link
-                        href={section.path}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              return (
+                <li key={section.id}>
+                  {hasChildren ? (
+                    <>
+                      <button
+                        onClick={() => toggleSection(section.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                           active
                             ? 'bg-indigo-50 text-indigo-700'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        {section.icon}
-                        <span>{section.label}</span>
-                      </Link>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+                        <div className="flex items-center gap-2">
+                          {section.icon}
+                          <span>{section.label}</span>
+                        </div>
+                        <FiChevronRight
+                          className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                        />
+                      </button>
+                      {expanded && (
+                        <ul className="ml-6 mt-1 space-y-1">
+                          {section.children!.map((child) => {
+                            const childActive = isActive(child.path);
+                            return (
+                              <li key={child.id}>
+                                <Link
+                                  href={child.path}
+                                  onClick={onLinkClick}
+                                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                    childActive
+                                      ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                      : 'text-gray-600 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {child.icon}
+                                  <span>{child.label}</span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <Link
+                      href={section.path}
+                      onClick={onLinkClick}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        active
+                          ? 'bg-indigo-50 text-indigo-700'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {section.icon}
+                      <span>{section.label}</span>
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+
+  return (
+    <>
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out md:hidden ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+              <p className="text-xs text-gray-500 mt-1">System configuration</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              aria-label="Close menu"
+            >
+              <FiX className="w-5 h-5" />
+            </button>
           </div>
-        ))}
-      </nav>
-    </div>
+          <div className="flex-1 overflow-y-auto">
+            {renderNavContent(onClose)}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block w-64 bg-white border-r border-gray-200 min-h-screen fixed left-0 top-0 bottom-0 overflow-y-auto">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+          <p className="text-xs text-gray-500 mt-1">System configuration</p>
+        </div>
+        {renderNavContent()}
+      </div>
+    </>
   );
 }
