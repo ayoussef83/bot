@@ -63,7 +63,7 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-6 py-4">
+          <div className="px-6 py-3">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <Link href={getDashboardPath(user.role)} className="flex items-center">
@@ -71,15 +71,14 @@ export default function DashboardLayout({
                     <Image
                       src="/mindvalley-logo.png"
                       alt="MindValley"
-                      height={60}
-                      width={180}
-                      className="h-15 w-auto object-contain"
-                      style={{ width: 'auto' }}
+                      height={32}
+                      width={120}
+                      className="h-8 w-auto object-contain"
                       unoptimized
                       onError={() => setLogoError(true)}
                     />
                   ) : (
-                    <h1 className="text-xl font-bold">MV-OS</h1>
+                    <h1 className="text-lg font-bold">MV-OS</h1>
                   )}
                 </Link>
               </div>
