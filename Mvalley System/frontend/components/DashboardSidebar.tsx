@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   FiHome,
   FiUsers,
@@ -196,9 +197,17 @@ export default function DashboardSidebar({ userRole }: DashboardSidebarProps) {
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">MV-OS</h2>
-        <p className="text-xs text-gray-500 mt-1">Navigation</p>
+      <div className="p-6 border-b border-gray-200">
+        <Link href={getDashboardPath(userRole)} className="flex items-center justify-center">
+          <Image
+            src="/mindvalley-logo.png"
+            alt="MindValley"
+            height={80}
+            width={200}
+            className="h-20 w-auto object-contain"
+            unoptimized
+          />
+        </Link>
       </div>
       <nav className="p-2">
         {Object.entries(groupedSections).map(([groupName, sections]) => (

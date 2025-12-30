@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import UserProfileMenu from '@/components/UserProfileMenu';
 
 export default function DashboardLayout({
   children,
@@ -14,7 +13,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
-  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -64,35 +62,8 @@ export default function DashboardLayout({
         {/* Top Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-3">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <Link href={getDashboardPath(user.role)} className="flex items-center">
-                  {!logoError ? (
-                    <Image
-                      src="/mindvalley-logo.png"
-                      alt="MindValley"
-                      height={32}
-                      width={120}
-                      className="h-8 w-auto object-contain"
-                      unoptimized
-                      onError={() => setLogoError(true)}
-                    />
-                  ) : (
-                    <h1 className="text-lg font-bold">MV-OS</h1>
-                  )}
-                </Link>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-700 whitespace-nowrap">
-                  {user.firstName} {user.lastName} ({user.role})
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
-                >
-                  Logout
-                </button>
-              </div>
+            <div className="flex justify-end items-center">
+              <UserProfileMenu user={user} onLogout={handleLogout} />
             </div>
           </div>
         </header>
