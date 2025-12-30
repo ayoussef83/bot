@@ -51,6 +51,21 @@ export default function PersonDetailPage() {
     }
   };
 
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [formData, setFormData] = useState({
+    costType: 'hourly',
+    costAmount: '',
+  });
+
+  useEffect(() => {
+    if (instructor) {
+      setFormData({
+        costType: instructor.costType,
+        costAmount: instructor.costAmount.toString(),
+      });
+    }
+  }, [instructor]);
+
   const handleDelete = async () => {
     if (!instructor || !confirm('Are you sure you want to delete this person?')) return;
     try {
@@ -58,6 +73,22 @@ export default function PersonDetailPage() {
       router.push('/dashboard/hr/people');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete person');
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!instructor) return;
+    try {
+      await instructorsService.update(instructor.id, {
+        costType: formData.costType,
+        costAmount: parseFloat(formData.costAmount),
+      });
+      setShowEditForm(false);
+      fetchInstructor(instructor.id);
+      setError('');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update person');
     }
   };
 
@@ -107,10 +138,7 @@ export default function PersonDetailPage() {
   const actions: ActionButton[] = [
     {
       label: 'Edit',
-      onClick: () => {
-        // Edit functionality can be added later
-        alert('Edit functionality coming soon');
-      },
+      onClick: () => setShowEditForm(true),
       icon: <FiEdit className="w-4 h-4" />,
     },
     {
@@ -366,14 +394,83 @@ export default function PersonDetailPage() {
   );
 
   return (
-    <StandardDetailView
-      title={userName}
-      subtitle={userEmail}
-      actions={actions}
-      tabs={tabs}
-      breadcrumbs={breadcrumbs}
-      sidebar={sidebar}
-    />
+    <>
+      {/* Edit Form Modal */}
+      {showEditForm && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => setShowEditForm(false)}
+            ></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h2 className="text-xl font-semibold mb-4">Edit Person</h2>
+                <form onSubmit={handleEditSubmit} className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> User information (name, email) is managed in User Settings. 
+                      You can only update cost information here.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Cost Type</label>
+                      <select
+                        value={formData.costType}
+                        onChange={(e) => setFormData({ ...formData, costType: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="hourly">Hourly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Cost Amount (EGP)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        step="0.01"
+                        min="0"
+                        value={formData.costAmount}
+                        onChange={(e) => setFormData({ ...formData, costAmount: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="submit"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                    >
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditForm(false)}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <StandardDetailView
+        title={userName}
+        subtitle={userEmail}
+        actions={actions}
+        tabs={tabs}
+        breadcrumbs={breadcrumbs}
+        sidebar={sidebar}
+      />
+    </>
   );
 }
 
