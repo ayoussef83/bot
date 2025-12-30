@@ -135,7 +135,7 @@ export const financeService = {
   getCashAccounts: () => api.get<CashAccount[]>('/finance/cash-accounts'),
   getCashAccountById: (id: string) => api.get<CashAccount>(`/finance/cash-accounts/${id}`),
   createCashAccount: (data: any) => api.post<CashAccount>('/finance/cash-accounts', data),
-  updateCashAccount: (id: string, data: any) => api.patch<CashAccount>(`/finance/cash-accounts/${id}`, data),
+  updateCashAccount: (id: string, data: any) => api.put<CashAccount>(`/finance/cash-accounts/${id}`, data),
 
   // Expense Categories
   getExpenseCategories: () => api.get<ExpenseCategory[]>('/finance/expense-categories'),
