@@ -1091,7 +1091,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {activeTab === 'scheduler' && (
+      {activeTab === 'scheduler' && canAccess && (
         <div className="space-y-6">
           {/* Scheduler Status */}
           <div className="bg-white rounded-lg shadow p-6">
@@ -1120,21 +1120,32 @@ function SchedulerStatus() {
   const [error, setError] = useState<any>(null);
 
   useEffect(() => {
+    let mounted = true;
     const fetchStatus = async () => {
       try {
         setLoading(true);
         const resp = await settingsService.getSchedulerStatus();
-        setStatus(resp.data);
+        if (mounted) {
+          setStatus(resp.data);
+          setError(null);
+        }
       } catch (e: any) {
-        setError(e.response?.data?.message || 'Failed to load scheduler status');
+        if (mounted) {
+          setError(e.response?.data?.message || e.message || 'Failed to load scheduler status');
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
     fetchStatus();
     // Refresh every 30 seconds
     const interval = setInterval(fetchStatus, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   if (loading) return <div className="text-gray-500">Loading scheduler status...</div>;
@@ -1186,9 +1197,10 @@ function TestSchedulerTasks() {
     setErrors((prev) => ({ ...prev, [taskName]: null }));
     try {
       const resp = await testFn();
-      setResults((prev) => ({ ...prev, [taskName]: resp.data }));
+      setResults((prev) => ({ ...prev, [taskName]: resp?.data || resp }));
     } catch (e: any) {
-      setErrors((prev) => ({ ...prev, [taskName]: e.response?.data || e.message }));
+      const errorData = e?.response?.data || e?.message || 'Unknown error';
+      setErrors((prev) => ({ ...prev, [taskName]: errorData }));
     } finally {
       setTesting(null);
     }
