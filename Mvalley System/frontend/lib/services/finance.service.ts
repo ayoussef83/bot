@@ -176,6 +176,16 @@ class FinanceService {
     const response = await api.get('/finance/expense-categories');
     return response.data;
   }
+
+  async getInvoices(): Promise<{ data: Invoice[] }> {
+    const response = await api.get('/finance/invoices');
+    return response.data;
+  }
+
+  async getInvoiceById(id: string): Promise<{ data: Invoice }> {
+    const response = await api.get(`/finance/invoices/${id}`);
+    return response.data;
+  }
 }
 
 export const financeService = new FinanceService();
