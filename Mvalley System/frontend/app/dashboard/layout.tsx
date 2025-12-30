@@ -74,7 +74,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center min-h-[72px] py-2">
+          <div className="flex justify-between items-center min-h-[80px] py-3">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center pr-4 overflow-visible">
                 <Link href={`/dashboard/${getDashboardPath(user.role)}`} className="flex items-center">
@@ -82,9 +82,9 @@ export default function DashboardLayout({
                     <Image
                       src="/mindvalley-logo.png"
                       alt="MindValley"
-                      height={48}
-                      width={144}
-                      className="h-12 w-auto object-contain"
+                      height={64}
+                      width={192}
+                      className="h-16 w-auto object-contain"
                       style={{ width: 'auto' }}
                       unoptimized
                       onError={() => setLogoError(true)}
