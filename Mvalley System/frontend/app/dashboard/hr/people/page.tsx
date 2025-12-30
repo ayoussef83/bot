@@ -150,7 +150,7 @@ export default function PeoplePage() {
     },
     {
       key: 'costType',
-      label: 'Cost Model',
+      label: 'Fee Model',
       sortable: true,
       render: (value) => (
         <span className="text-sm text-gray-700 capitalize">{value}</span>
@@ -158,7 +158,7 @@ export default function PeoplePage() {
     },
     {
       key: 'costAmount',
-      label: 'Cost',
+      label: 'Fees',
       sortable: true,
       render: (value, row) => (
         <span className="text-sm text-gray-900">
@@ -212,7 +212,7 @@ export default function PeoplePage() {
   const filters: FilterConfig[] = [
     {
       key: 'costType',
-      label: 'Cost Model',
+      label: 'Fee Model',
       type: 'select',
       options: [
         { value: '', label: 'All Models' },
@@ -283,7 +283,7 @@ export default function PeoplePage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Cost Type</label>
+                      <label className="block text-sm font-medium text-gray-700">Fee Type</label>
                       <select
                         value={formData.costType}
                         onChange={(e) => setFormData({ ...formData, costType: e.target.value })}
@@ -295,7 +295,7 @@ export default function PeoplePage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
-                        Cost Amount (EGP)
+                        Fee Amount (EGP)
                       </label>
                       <input
                         type="number"

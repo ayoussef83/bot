@@ -46,11 +46,11 @@ export default function HRDashboard() {
   // Calculate average utilization (simplified - would need session data)
   const avgUtilization = totalPeople > 0 ? (totalClasses / totalPeople).toFixed(1) : '0';
 
-  // Calculate total cost (read-only from Finance)
-  const totalHourlyCost = instructors
+  // Calculate total fees (read-only from Finance)
+  const totalHourlyFees = instructors
     .filter((i) => i.costType === 'hourly')
     .reduce((sum, i) => sum + (i.costAmount || 0), 0);
-  const totalMonthlyCost = instructors
+  const totalMonthlyFees = instructors
     .filter((i) => i.costType === 'monthly')
     .reduce((sum, i) => sum + (i.costAmount || 0), 0);
 
@@ -122,7 +122,7 @@ export default function HRDashboard() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Cost Overview</p>
+              <p className="text-sm font-medium text-gray-600">Fees Overview</p>
               <p className="text-2xl font-bold text-gray-900 mt-2">
                 {hourlyInstructors > 0 ? `${hourlyInstructors} hourly` : 'N/A'}
               </p>
@@ -136,7 +136,7 @@ export default function HRDashboard() {
 
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div>
-            <p className="text-sm font-medium text-gray-600 mb-3">Cost Model Distribution</p>
+            <p className="text-sm font-medium text-gray-600 mb-3">Fee Model Distribution</p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-700">Hourly Rate</span>

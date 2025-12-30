@@ -230,13 +230,13 @@ export default function PersonDetailPage() {
               </div>
             )}
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Cost Model</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Fee Model</h3>
               <p className="text-lg text-gray-900 capitalize">{instructor.costType}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Cost Amount
+                Fee Amount
               </h3>
               <p className="text-lg text-gray-900">
                 {instructor.costAmount} {instructor.costType === 'hourly' ? '/hour' : '/month'}
@@ -337,13 +337,13 @@ export default function PersonDetailPage() {
     },
     {
       id: 'cost',
-      label: 'Cost',
+      label: 'Fees',
       icon: <FiDollarSign className="w-4 h-4" />,
       content: (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Cost Model</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Fee Model</h3>
               <p className="text-lg font-bold text-gray-900 capitalize">{instructor.costType}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -355,7 +355,7 @@ export default function PersonDetailPage() {
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> Cost information is used by Finance for expense calculations. 
+              <strong>Note:</strong> Fee information is used by Finance for expense calculations. 
               Payroll processing is handled by Finance.
             </p>
           </div>
@@ -371,7 +371,7 @@ export default function PersonDetailPage() {
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Summary</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-500">Cost Model:</span>
+            <span className="text-gray-500">Fee Model:</span>
             <span className="font-medium text-gray-900 capitalize">{instructor.costType}</span>
           </div>
           <div className="flex justify-between">
@@ -410,12 +410,12 @@ export default function PersonDetailPage() {
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-blue-800">
                       <strong>Note:</strong> User information (name, email) is managed in User Settings. 
-                      You can only update cost information here.
+                      You can only update fee information here.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Cost Type</label>
+                      <label className="block text-sm font-medium text-gray-700">Fee Type</label>
                       <select
                         value={formData.costType}
                         onChange={(e) => setFormData({ ...formData, costType: e.target.value })}
@@ -427,7 +427,7 @@ export default function PersonDetailPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
-                        Cost Amount (EGP)
+                        Fee Amount (EGP)
                       </label>
                       <input
                         type="number"
