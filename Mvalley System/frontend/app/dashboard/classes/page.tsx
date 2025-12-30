@@ -1,16 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { classesService, Class } from '@/lib/services';
-import Link from 'next/link';
+import { instructorsService, Instructor } from '@/lib/services';
+import StandardListView, { FilterConfig } from '@/components/StandardListView';
+import { Column, ActionButton } from '@/components/DataTable';
+import SummaryCard from '@/components/SummaryCard';
+import EmptyState from '@/components/EmptyState';
 import { downloadExport } from '@/lib/export';
+import { FiPlus, FiEdit, FiTrash2, FiBookOpen, FiUsers } from 'react-icons/fi';
 
 export default function ClassesPage() {
+  const router = useRouter();
   const [classes, setClasses] = useState<Class[]>([]);
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     location: 'MOA',
@@ -25,17 +35,43 @@ export default function ClassesPage() {
 
   useEffect(() => {
     fetchClasses();
+    fetchInstructors();
   }, []);
 
   const fetchClasses = async () => {
     try {
       const response = await classesService.getAll();
       setClasses(response.data);
+      setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load classes');
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchInstructors = async () => {
+    try {
+      const response = await instructorsService.getAll();
+      setInstructors(response.data);
+    } catch (err: any) {
+      // Don't block the page if instructors fail
+      console.error('Failed to load instructors', err);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      location: 'MOA',
+      capacity: '',
+      instructorId: '',
+      dayOfWeek: '0',
+      startTime: '',
+      endTime: '',
+      startDate: '',
+      endDate: '',
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,20 +97,6 @@ export default function ClassesPage() {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save class');
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      location: 'MOA',
-      capacity: '',
-      instructorId: '',
-      dayOfWeek: '0',
-      startTime: '',
-      endTime: '',
-      startDate: '',
-      endDate: '',
-    });
   };
 
   const handleEdit = (classItem: Class) => {
@@ -103,6 +125,18 @@ export default function ClassesPage() {
     }
   };
 
+  // Filter classes
+  const filteredClasses = classes.filter((classItem) => {
+    const matchesSearch =
+      searchTerm === '' ||
+      classItem.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      classItem.location.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesLocation = locationFilter === '' || classItem.location === locationFilter;
+
+    return matchesSearch && matchesLocation;
+  });
+
   const daysOfWeek = [
     { value: '0', label: 'Sunday' },
     { value: '1', label: 'Monday' },
@@ -115,252 +149,349 @@ export default function ClassesPage() {
 
   const locations = ['MOA', 'Espace', 'SODIC', 'PalmHills'];
 
-  if (loading) {
-    return <div className="p-6">Loading classes...</div>;
-  }
+  // Column definitions
+  const columns: Column<Class>[] = [
+    {
+      key: 'name',
+      label: 'Name',
+      sortable: true,
+      render: (_, row) => (
+        <a
+          href={`/dashboard/classes/${row.id}`}
+          className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
+          onClick={(e) => {
+            e.preventDefault();
+            router.push(`/dashboard/classes/${row.id}`);
+          }}
+        >
+          {row.name}
+        </a>
+      ),
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      sortable: true,
+      render: (value) => <span className="text-sm text-gray-500">{value}</span>,
+    },
+    {
+      key: 'capacity',
+      label: 'Capacity',
+      sortable: true,
+      render: (value) => <span className="text-sm text-gray-500">{value}</span>,
+    },
+    {
+      key: 'students',
+      label: 'Students',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">{row.students?.length || 0}</span>
+      ),
+    },
+    {
+      key: 'schedule',
+      label: 'Schedule',
+      render: (_, row) => {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        return (
+          <span className="text-sm text-gray-500">
+            {dayNames[row.dayOfWeek]} {row.startTime} - {row.endTime}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'utilization',
+      label: 'Utilization',
+      render: (_, row) => (
+        <div className="text-sm text-gray-500">
+          {row.utilizationPercentage?.toFixed(1) || 0}%
+          {row.isUnderfilled && (
+            <span className="ml-2 text-xs text-red-600">⚠️ Underfilled</span>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // Action buttons
+  const actions = (row: Class): ActionButton[] => [
+    {
+      label: 'Edit',
+      onClick: () => handleEdit(row),
+      icon: <FiEdit className="w-4 h-4" />,
+    },
+    {
+      label: 'Delete',
+      onClick: () => handleDelete(row.id),
+      variant: 'danger',
+      icon: <FiTrash2 className="w-4 h-4" />,
+    },
+  ];
+
+  // Filters
+  const filters: FilterConfig[] = [
+    {
+      key: 'location',
+      label: 'Location',
+      type: 'select',
+      options: locations.map((loc) => ({ value: loc, label: loc })),
+      value: locationFilter,
+      onChange: setLocationFilter,
+    },
+  ];
+
+  // Summary statistics
+  const totalClasses = filteredClasses.length;
+  const totalStudents = filteredClasses.reduce((sum, c) => sum + (c.students?.length || 0), 0);
+  const avgUtilization =
+    filteredClasses.length > 0
+      ? filteredClasses.reduce((sum, c) => sum + (c.utilizationPercentage || 0), 0) /
+        filteredClasses.length
+      : 0;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Classes</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => downloadExport('classes', 'xlsx')}
-            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
-          >
-            Export Excel
-          </button>
-          <button
-            onClick={() => downloadExport('classes', 'pdf')}
-            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
-          >
-            Export PDF
-          </button>
-          <button
-            onClick={() => {
-              setShowForm(true);
-              setEditingClass(null);
-              resetForm();
-            }}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-          >
-            Add Class
-          </button>
-        </div>
-      </div>
-
+    <div className="space-y-6">
+      {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
           {error}
         </div>
       )}
 
+      {/* Class Form Modal */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <h2 className="text-xl font-semibold mb-4">
-            {editingClass ? 'Edit Class' : 'Add New Class'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Class Name</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Location</label>
-                <select
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                  {locations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => setShowForm(false)}
+            ></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h2 className="text-xl font-semibold mb-4">
+                  {editingClass ? 'Edit Class' : 'Add New Class'}
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Class Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Location</label>
+                      <select
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        {locations.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Capacity</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={formData.capacity}
-                  onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Day of Week</label>
-                <select
-                  value={formData.dayOfWeek}
-                  onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                >
-                  {daysOfWeek.map((day) => (
-                    <option key={day.value} value={day.value}>
-                      {day.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Capacity</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={formData.capacity}
+                        onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Instructor</label>
+                      <select
+                        value={formData.instructorId}
+                        onChange={(e) => setFormData({ ...formData, instructorId: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="">Select Instructor</option>
+                        {instructors.map((instructor) => (
+                          <option key={instructor.id} value={instructor.id}>
+                            {instructor.firstName} {instructor.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Start Time</label>
-                <input
-                  type="time"
-                  required
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">End Time</label>
-                <input
-                  type="time"
-                  required
-                  value={formData.endTime}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Day of Week</label>
+                      <select
+                        value={formData.dayOfWeek}
+                        onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        {daysOfWeek.map((day) => (
+                          <option key={day.value} value={day.value}>
+                            {day.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                <input
-                  type="date"
-                  required
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">End Date (Optional)</label>
-                <input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">End Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
 
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-              >
-                {editingClass ? 'Update' : 'Create'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingClass(null);
-                  resetForm();
-                }}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      End Date (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="submit"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+                    >
+                      {editingClass ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForm(false);
+                        setEditingClass(null);
+                        resetForm();
+                      }}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </form>
+          </div>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Location
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Capacity
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Students
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Schedule
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Utilization
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {classes.map((classItem) => (
-              <tr key={classItem.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Link
-                    href={`/dashboard/classes/${classItem.id}`}
-                    className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
-                  >
-                    {classItem.name}
-                  </Link>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {classItem.location}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {classItem.capacity}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {classItem.students?.length || 0}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][classItem.dayOfWeek]}{' '}
-                  {classItem.startTime} - {classItem.endTime}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {classItem.utilizationPercentage?.toFixed(1) || 0}%
-                  {classItem.isUnderfilled && (
-                    <span className="ml-2 text-xs text-red-600">⚠️ Underfilled</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => handleEdit(classItem)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-4"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(classItem.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Standard List View */}
+      <StandardListView
+        title="Classes"
+        subtitle="Manage class schedules and enrollment"
+        primaryAction={{
+          label: 'Add Class',
+          onClick: () => {
+            setShowForm(true);
+            setEditingClass(null);
+            resetForm();
+          },
+          icon: <FiPlus className="w-4 h-4" />,
+        }}
+        searchPlaceholder="Search by name or location..."
+        onSearch={setSearchTerm}
+        searchValue={searchTerm}
+        filters={filters}
+        columns={columns}
+        data={filteredClasses}
+        loading={loading}
+        actions={actions}
+        emptyMessage="No classes found"
+        emptyState={
+          <EmptyState
+            title="No classes found"
+            message="Get started by creating your first class"
+            action={{
+              label: 'Add Class',
+              onClick: () => {
+                setShowForm(true);
+                setEditingClass(null);
+              },
+            }}
+          />
+        }
+        summaryCards={
+          <>
+            <SummaryCard
+              title="Total Classes"
+              value={totalClasses}
+              icon={<FiBookOpen className="w-8 h-8" />}
+            />
+            <SummaryCard
+              title="Total Students"
+              value={totalStudents}
+              icon={<FiUsers className="w-8 h-8" />}
+            />
+            <SummaryCard
+              title="Avg Utilization"
+              value={`${avgUtilization.toFixed(1)}%`}
+              variant="info"
+              icon={<FiUsers className="w-8 h-8" />}
+            />
+          </>
+        }
+        getRowId={(row) => row.id}
+        onRowClick={(row) => {
+          router.push(`/dashboard/classes/${row.id}`);
+        }}
+      />
+
+      {/* Export Buttons */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => downloadExport('classes', 'xlsx')}
+          className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 text-sm font-medium"
+        >
+          Export Excel
+        </button>
+        <button
+          onClick={() => downloadExport('classes', 'pdf')}
+          className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 text-sm font-medium"
+        >
+          Export PDF
+        </button>
       </div>
     </div>
   );
 }
-
