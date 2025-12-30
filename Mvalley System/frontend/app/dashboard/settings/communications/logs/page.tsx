@@ -7,7 +7,8 @@ import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
 import StatusBadge from '@/components/settings/StatusBadge';
-import { FiMail, FiMessageSquare, FiCheckCircle, FiXCircle, FiClock, FiUser, FiAlertCircle, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
+import SearchBar from '@/components/SearchBar';
+import { FiMail, FiMessageSquare, FiCheckCircle, FiXCircle, FiClock, FiUser, FiAlertCircle, FiTrendingUp, FiTrendingDown, FiEye, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 interface Notification {
   id: string;
@@ -33,6 +34,10 @@ export default function CommunicationsLogsPage() {
   const [channelFilter, setChannelFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [timeRange, setTimeRange] = useState('7d'); // 'today', '7d', '30d', 'custom'
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [selectedMessage, setSelectedMessage] = useState<Notification | null>(null);
+  const [groupByDate, setGroupByDate] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -126,6 +131,27 @@ export default function CommunicationsLogsPage() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
+  // Group notifications by date
+  const groupedByDate = filteredNotifications.reduce((acc, notification) => {
+    const dateKey = new Date(notification.createdAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(notification);
+    return acc;
+  }, {} as Record<string, Notification[]>);
+
+  const dateGroups = Object.entries(groupedByDate).sort((a, b) => {
+    // Sort by actual date, not string
+    const dateA = new Date(a[1][0]?.createdAt || 0);
+    const dateB = new Date(b[1][0]?.createdAt || 0);
+    return dateB.getTime() - dateA.getTime();
+  });
+
   // Table columns
   const columns: Column<Notification>[] = [
     {
@@ -173,7 +199,7 @@ export default function CommunicationsLogsPage() {
     {
       key: 'body',
       label: 'Message',
-      render: (value) => {
+      render: (value, row) => {
         try {
           if (value === null || value === undefined) {
             return <span className="text-sm text-gray-400">-</span>;
@@ -182,11 +208,48 @@ export default function CommunicationsLogsPage() {
           if (!text || text.length === 0) {
             return <span className="text-sm text-gray-400">-</span>;
           }
+          const isExpanded = expandedMessages.has(row.id);
+          const preview = text.substring(0, 100);
+          const hasMore = text.length > 100;
+          
           return (
-            <span className="text-sm text-gray-600 line-clamp-2">
-              {text.substring(0, 100)}
-              {text.length > 100 ? '...' : ''}
-            </span>
+            <div className="text-sm text-gray-600">
+              {isExpanded ? (
+                <div>
+                  <div className="whitespace-pre-wrap">{text}</div>
+                  {hasMore && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedMessages((prev) => {
+                          const next = new Set(prev);
+                          next.delete(row.id);
+                          return next;
+                        });
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 mt-1"
+                    >
+                      Show less
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <span className="line-clamp-2">{preview}{hasMore ? '...' : ''}</span>
+                  {hasMore && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedMessages((prev) => new Set(prev).add(row.id));
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 mt-1"
+                    >
+                      Show more
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           );
         } catch (e) {
           return <span className="text-sm text-gray-400">-</span>;
@@ -196,14 +259,23 @@ export default function CommunicationsLogsPage() {
     {
       key: 'status',
       label: 'Status',
-      render: (value) => {
+      render: (value, row) => {
         const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' | 'error' } = {
           sent: 'active',
           delivered: 'active',
           pending: 'warning',
-          failed: 'inactive',
+          failed: 'error',
         };
-        return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
+        return (
+          <div>
+            <StatusBadge status={statusMap[value] || 'inactive'} label={value} />
+            {row.errorMessage && (
+              <div className="mt-1 text-xs text-red-600 max-w-xs truncate" title={row.errorMessage}>
+                {row.errorMessage}
+              </div>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -383,18 +455,261 @@ export default function CommunicationsLogsPage() {
       </div>
 
       {/* Investigation Tools Section */}
-      <StandardListView
-        title=""
-        subtitle=""
-        searchPlaceholder="Search recipient, message, or subject..."
-        filters={filters}
-        columns={columns}
-        data={filteredNotifications}
-        searchValue={searchTerm}
-        onSearch={setSearchTerm}
-        loading={loading}
-        emptyMessage="No messages found"
-      />
+      <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="max-w-md flex-1">
+            <SearchBar
+              placeholder="Search recipient, message, or subject..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={groupByDate}
+                onChange={(e) => setGroupByDate(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Group by date
+            </label>
+          </div>
+        </div>
+        {filters && filters.length > 0 && (
+          <div className="flex gap-4">
+            {filters.map((filter) => (
+              <div key={filter.key} className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {filter.label}
+                </label>
+                {filter.type === 'select' && filter.options ? (
+                  <select
+                    value={filter.value}
+                    onChange={(e) => filter.onChange(e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  >
+                    <option value="">All</option>
+                    {filter.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Grouped Table View */}
+      {loading ? (
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-12 text-center">
+          <div className="text-gray-500">Loading messages...</div>
+        </div>
+      ) : groupByDate && dateGroups.length > 0 ? (
+        <div className="space-y-4">
+          {dateGroups.map(([date, messages]) => {
+            const isExpanded = expandedDates.has(date);
+            const statusCounts = {
+              failed: messages.filter((m) => m.status === 'failed').length,
+              pending: messages.filter((m) => m.status === 'pending').length,
+              sent: messages.filter((m) => m.status === 'sent' || m.status === 'delivered').length,
+            };
+            
+            return (
+              <div key={date} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setExpandedDates((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(date)) {
+                        next.delete(date);
+                      } else {
+                        next.add(date);
+                      }
+                      return next;
+                    });
+                  }}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    {isExpanded ? (
+                      <FiChevronUp className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <FiChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-gray-900">{date}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {messages.length} message{messages.length !== 1 ? 's' : ''}
+                        {statusCounts.failed > 0 && (
+                          <span className="ml-2 text-red-600">
+                            • {statusCounts.failed} failed
+                          </span>
+                        )}
+                        {statusCounts.pending > 0 && (
+                          <span className="ml-2 text-yellow-600">
+                            • {statusCounts.pending} pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-gray-200">
+                    <DataTable
+                      columns={columns}
+                      data={messages}
+                      actions={(row) => [
+                        {
+                          label: 'View Details',
+                          onClick: () => setSelectedMessage(row),
+                          variant: 'primary' as const,
+                          icon: <FiEye className="w-4 h-4" />,
+                        },
+                      ]}
+                      emptyMessage="No messages"
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : filteredNotifications.length > 0 ? (
+        <DataTable
+          columns={columns}
+          data={filteredNotifications}
+          actions={(row) => [
+            {
+              label: 'View Details',
+              onClick: () => setSelectedMessage(row),
+              variant: 'primary' as const,
+              icon: <FiEye className="w-4 h-4" />,
+            },
+          ]}
+          emptyMessage="No messages found"
+        />
+      ) : (
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-12 text-center">
+          <p className="text-gray-500">No messages found</p>
+        </div>
+      )}
+
+      {/* Message Details Modal */}
+      {selectedMessage && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => setSelectedMessage(null)}
+            ></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Message Details</h3>
+                  <button
+                    onClick={() => setSelectedMessage(null)}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <FiXCircle className="w-6 h-6" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Channel</label>
+                      <div className="mt-1 flex items-center gap-2">
+                        {selectedMessage.channel === 'email' ? (
+                          <FiMail className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <FiMessageSquare className="w-4 h-4 text-green-600" />
+                        )}
+                        <span className="text-sm text-gray-900 capitalize">{selectedMessage.channel}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Status</label>
+                      <div className="mt-1">
+                        <StatusBadge
+                          status={
+                            selectedMessage.status === 'failed'
+                              ? 'error'
+                              : selectedMessage.status === 'pending'
+                              ? 'warning'
+                              : 'active'
+                          }
+                          label={selectedMessage.status}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Recipient</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedMessage.recipient}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Sent At</label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {new Date(selectedMessage.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    {selectedMessage.subject && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-500">Subject</label>
+                        <p className="mt-1 text-sm text-gray-900">{selectedMessage.subject}</p>
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-500">Message</label>
+                      <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                        <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                          {selectedMessage.body || '-'}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedMessage.errorMessage && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-red-600">Error Message</label>
+                        <div className="mt-1 p-3 bg-red-50 rounded-md border border-red-200">
+                          <p className="text-sm text-red-800">{selectedMessage.errorMessage}</p>
+                        </div>
+                      </div>
+                    )}
+                    {(selectedMessage.student || selectedMessage.lead) && (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-500">Associated</label>
+                        <div className="mt-1">
+                          {selectedMessage.student && (
+                            <p className="text-sm text-gray-900">
+                              Student: {selectedMessage.student.firstName} {selectedMessage.student.lastName}
+                            </p>
+                          )}
+                          {selectedMessage.lead && (
+                            <p className="text-sm text-gray-900">
+                              Lead: {selectedMessage.lead.firstName} {selectedMessage.lead.lastName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setSelectedMessage(null)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
