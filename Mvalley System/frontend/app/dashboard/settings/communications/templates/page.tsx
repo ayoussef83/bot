@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { settingsService, MessageTemplate, MessageChannel } from '@/lib/services';
 import StandardListView from '@/components/StandardListView';
 import DataTable, { Column } from '@/components/DataTable';
+import SummaryCard from '@/components/SummaryCard';
 import StatusBadge from '@/components/settings/StatusBadge';
 import ConfirmModal from '@/components/settings/ConfirmModal';
 import { FiPlus, FiEdit2, FiTrash2, FiMail, FiMessageSquare, FiEye } from 'react-icons/fi';
@@ -223,17 +224,17 @@ export default function CommunicationsTemplatesPage() {
   // Summary cards
   const summaryCards = [
     {
-      label: 'Total Templates',
+      title: 'Total Templates',
       value: templates.length,
       icon: <FiMail className="w-5 h-5" />,
     },
     {
-      label: 'Active',
+      title: 'Active',
       value: templates.filter((t) => t.isActive).length,
       icon: <FiMessageSquare className="w-5 h-5" />,
     },
     {
-      label: 'Inactive',
+      title: 'Inactive',
       value: templates.filter((t) => !t.isActive).length,
       icon: <FiMessageSquare className="w-5 h-5" />,
     },
@@ -410,13 +411,21 @@ export default function CommunicationsTemplatesPage() {
           title="Message Templates"
           subtitle={`Manage ${channel} templates for system notifications`}
           primaryAction={primaryAction}
-          summaryCards={summaryCards}
+          summaryCards={
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {summaryCards.map((card, idx) => (
+                <SummaryCard key={idx} {...card} />
+              ))}
+            </div>
+          }
+          columns={columns}
+          data={filteredTemplates}
+          searchValue={searchTerm}
+          onSearch={setSearchTerm}
           loading={loading}
-          error={error}
           emptyMessage={`No ${channel} templates found. Click "Add Template" to create one.`}
-        >
-          <DataTable
-            columns={columns}
+          actions={actions}
+        />
             data={templates}
             emptyMessage={`No ${channel} templates found`}
             loading={loading}
