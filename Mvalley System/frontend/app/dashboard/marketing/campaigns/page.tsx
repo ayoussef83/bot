@@ -7,7 +7,7 @@ import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
-import { FiTrendingUp, FiPlus, FiEdit, FiTrash2, FiCheckCircle, FiPause, FiXCircle } from 'react-icons/fi';
+import { FiTrendingUp, FiPlus, FiEdit, FiTrash2, FiCheckCircle, FiPause, FiXCircle, FiMessageCircle } from 'react-icons/fi';
 import StatusBadge from '@/components/settings/StatusBadge';
 
 export default function CampaignsPage() {
