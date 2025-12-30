@@ -4,6 +4,16 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import {
+  FiHome,
+  FiUsers,
+  FiBookOpen,
+  FiCalendar,
+  FiUserCheck,
+  FiUserPlus,
+  FiDollarSign,
+  FiSettings,
+} from 'react-icons/fi';
 
 export default function DashboardLayout({
   children,
@@ -37,37 +47,56 @@ export default function DashboardLayout({
     return <div>Loading...</div>;
   }
 
-  const navigation = [
-    { name: 'Dashboard', href: `/dashboard/${getDashboardPath(user.role)}` },
+  // Icon mapping
+  const iconMap: { [key: string]: React.ReactNode } = {
+    'Dashboard': <FiHome className="w-4 h-4" />,
+    'Students': <FiUsers className="w-4 h-4" />,
+    'Classes': <FiBookOpen className="w-4 h-4" />,
+    'My Classes': <FiBookOpen className="w-4 h-4" />,
+    'Sessions': <FiCalendar className="w-4 h-4" />,
+    'Instructors': <FiUserCheck className="w-4 h-4" />,
+    'Leads': <FiUserPlus className="w-4 h-4" />,
+    'Finance': <FiDollarSign className="w-4 h-4" />,
+    'Settings': <FiSettings className="w-4 h-4" />,
+  };
+
+  type NavigationItem = {
+    name: string;
+    href: string;
+    icon: React.ReactNode;
+  };
+
+  const navigation: NavigationItem[] = [
+    { name: 'Dashboard', href: `/dashboard/${getDashboardPath(user.role)}`, icon: iconMap['Dashboard'] },
   ];
 
   // Add navigation based on role
   if (['super_admin', 'operations', 'management'].includes(user.role)) {
     navigation.push(
-      { name: 'Students', href: '/dashboard/students' },
-      { name: 'Classes', href: '/dashboard/classes' },
-      { name: 'Sessions', href: '/dashboard/sessions' },
-      { name: 'Instructors', href: '/dashboard/instructors' }
+      { name: 'Students', href: '/dashboard/students', icon: iconMap['Students'] },
+      { name: 'Classes', href: '/dashboard/classes', icon: iconMap['Classes'] },
+      { name: 'Sessions', href: '/dashboard/sessions', icon: iconMap['Sessions'] },
+      { name: 'Instructors', href: '/dashboard/instructors', icon: iconMap['Instructors'] }
     );
   }
 
   if (user.role === 'sales' || user.role === 'super_admin') {
-    navigation.push({ name: 'Leads', href: '/dashboard/leads' });
+    navigation.push({ name: 'Leads', href: '/dashboard/leads', icon: iconMap['Leads'] });
   }
 
   if (user.role === 'instructor') {
     navigation.push(
-      { name: 'My Classes', href: '/dashboard/classes' },
-      { name: 'Sessions', href: '/dashboard/sessions' }
+      { name: 'My Classes', href: '/dashboard/classes', icon: iconMap['My Classes'] },
+      { name: 'Sessions', href: '/dashboard/sessions', icon: iconMap['Sessions'] }
     );
   }
 
   if (['accounting', 'management', 'super_admin'].includes(user.role)) {
-    navigation.push({ name: 'Finance', href: '/dashboard/finance' });
+    navigation.push({ name: 'Finance', href: '/dashboard/finance', icon: iconMap['Finance'] });
   }
 
   if (user.role === 'super_admin') {
-    navigation.push({ name: 'Settings', href: '/dashboard/settings' });
+    navigation.push({ name: 'Settings', href: '/dashboard/settings', icon: iconMap['Settings'] });
   }
 
   return (
@@ -103,8 +132,9 @@ export default function DashboardLayout({
                       pathname === item.href
                         ? 'border-indigo-500 text-gray-900'
                         : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                    } inline-flex items-center gap-2 px-1 pt-1 border-b-2 text-sm font-medium`}
                   >
+                    {item.icon}
                     {item.name}
                   </Link>
                 ))}
