@@ -470,6 +470,264 @@ model MonthlySnapshot {
 }
 
 // ============================================
+// MARKETING
+// ============================================
+
+enum MarketingPlatform {
+  facebook_page
+  instagram_business
+  whatsapp_business
+}
+
+enum ChannelAccountStatus {
+  connected
+  disconnected
+  error
+}
+
+model ChannelAccount {
+  id           String               @id @default(uuid())
+  platform     MarketingPlatform
+  externalId   String // Meta Page ID, WhatsApp Business Number
+  name         String
+  accessToken  String               @db.Text // Encrypted
+  refreshToken String?              @db.Text // Encrypted
+  status       ChannelAccountStatus @default(connected)
+
+  // Settings
+  settings Json? // Auto-reply, business hours, etc.
+
+  // Relations
+  conversations Conversation[]
+  campaigns     Campaign[]
+
+  // Audit
+  connectedAt DateTime  @default(now())
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([platform, externalId])
+  @@index([platform, status])
+  @@map("channel_accounts")
+}
+
+enum CampaignType {
+  organic_post
+  paid_ad
+  story
+  reel
+  whatsapp_broadcast
+}
+
+enum CampaignStatus {
+  active
+  paused
+  completed
+}
+
+model Campaign {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  type        CampaignType
+  status      CampaignStatus @default(active)
+
+  // Dates
+  startDate DateTime
+  endDate   DateTime?
+
+  // Budget (if paid)
+  budget Float?
+  spend  Float? @default(0)
+
+  // Attribution
+  channelAccountId String
+  channelAccount   ChannelAccount @relation(fields: [channelAccountId], references: [id])
+
+  // UTM Parameters
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+
+  // Relations
+  conversations Conversation[]
+  attributions  Attribution[]
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, startDate])
+  @@index([channelAccountId])
+  @@map("campaigns")
+}
+
+enum ParticipantType {
+  unknown
+  lead
+  parent
+  school
+}
+
+model Participant {
+  id                String          @id @default(uuid())
+  type              ParticipantType @default(unknown)
+  platformUserId    String? // Meta user ID, WhatsApp number
+  name              String?
+  profilePictureUrl String?
+  phone             String?
+  email             String?
+
+  // Relations
+  conversations Conversation[]
+  leadId        String? // After conversion
+  lead          Lead?          @relation("LeadMarketingParticipant")
+
+  // Audit
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, leadId])
+  @@index([platformUserId])
+  @@index([phone])
+  @@index([email])
+  @@map("participants")
+}
+
+enum ConversationStatus {
+  new
+  in_progress
+  waiting_reply
+  converted
+  archived
+}
+
+model Conversation {
+  id               String            @id @default(uuid())
+  channelAccountId String
+  channelAccount   ChannelAccount    @relation(fields: [channelAccountId], references: [id])
+  platform         MarketingPlatform
+  externalThreadId String // Meta thread ID, WhatsApp conversation ID
+  participantId    String
+  participant      Participant       @relation(fields: [participantId], references: [id])
+
+  status     ConversationStatus @default(new)
+  assignedTo String? // User ID
+  campaignId String? // Attribution
+  campaign   Campaign?          @relation(fields: [campaignId], references: [id])
+
+  // Source tracking
+  source String? // page_comment, dm, messenger, story_reply, etc.
+
+  // Lead link (after conversion)
+  leadId String?
+  lead   Lead?   @relation("ConversationLead")
+
+  // Metadata
+  metadata Json? // Post URL, story ID, ad ID, etc.
+
+  // Relations
+  messages     Message[]
+  attributions Attribution[]
+
+  // Timestamps
+  firstMessageAt DateTime  @default(now())
+  lastMessageAt  DateTime  @default(now())
+  lastReadAt     DateTime?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([platform, externalThreadId])
+  @@index([status, lastMessageAt])
+  @@index([participantId])
+  @@index([channelAccountId])
+  @@index([campaignId])
+  @@index([leadId])
+  @@index([assignedTo])
+  @@map("conversations")
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+}
+
+enum MessageType {
+  text
+  image
+  video
+  audio
+  file
+  sticker
+  location
+}
+
+model Message {
+  id                String           @id @default(uuid())
+  conversationId    String
+  conversation      Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  externalMessageId String // Meta message ID, WhatsApp message ID
+  direction         MessageDirection
+  type              MessageType      @default(text)
+  content           String?          @db.Text
+  mediaUrl          String?
+  sentAt            DateTime         @default(now())
+  deliveredAt       DateTime?
+  readAt            DateTime?
+
+  // Sender
+  senderId String? // Participant ID if inbound, User ID if outbound
+
+  // Metadata
+  metadata Json? // Read receipts, delivery status, etc.
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId, sentAt])
+  @@index([externalMessageId])
+  @@index([direction, sentAt])
+  @@map("marketing_messages")
+}
+
+model Attribution {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id])
+
+  // Attribution data
+  source       String? // facebook_page, instagram_post, whatsapp_broadcast, organic_search, referral
+  medium       String? // social, messaging, paid_ad, organic
+  campaignName String? // Campaign name (for non-campaign sources)
+  content      String? // Post ID, ad ID, story ID
+  term         String? // Keyword if applicable
+
+  // Touchpoints
+  firstTouchAt DateTime @default(now())
+  lastTouchAt  DateTime @default(now())
+  touchpoints  Json? // Array of touchpoints before conversion
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([campaignId])
+  @@index([source, medium])
+  @@map("attributions")
+}
+
+// ============================================
 // SALES (CRM)
 // ============================================
 
@@ -509,8 +767,17 @@ model Lead {
   convertedToStudentId String?
   convertedAt          DateTime?
 
+  // Marketing Attribution (from Marketing module)
+  marketingConversationId String? @unique // Link to Marketing conversation
+  marketingParticipantId  String? @unique // Link to Marketing participant
+  marketingCampaignId     String? // Link to Marketing campaign
+  marketingSource         String? // Source from Marketing (facebook_page, instagram, etc.)
+  marketingMedium         String? // Medium from Marketing (social, messaging, etc.)
+
   // Relations
-  followUps LeadFollowUp[]
+  followUps             LeadFollowUp[]
+  marketingConversation Conversation?  @relation("ConversationLead", fields: [marketingConversationId], references: [id])
+  marketingParticipant  Participant?   @relation("LeadMarketingParticipant", fields: [marketingParticipantId], references: [id])
 
   // Audit
   createdAt DateTime  @default(now())
