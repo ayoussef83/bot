@@ -22,6 +22,12 @@ import {
   FiUser,
   FiClock,
   FiX,
+  FiMail,
+  FiMessageSquare,
+  FiFileText,
+  FiLink,
+  FiShield,
+  FiSliders,
 } from 'react-icons/fi';
 
 type NavigationSection = {
@@ -160,9 +166,93 @@ const navigationSections: NavigationSection[] = [
     id: 'settings',
     label: 'Settings',
     icon: <FiSettings className="w-4 h-4" />,
-    path: '/dashboard/settings',
     group: 'Main',
     roles: ['super_admin'],
+    children: [
+      {
+        id: 'general',
+        label: 'General',
+        icon: <FiSettings className="w-4 h-4" />,
+        path: '/dashboard/settings/general',
+        roles: ['super_admin'],
+      },
+      {
+        id: 'organization',
+        label: 'Organization',
+        icon: <FiHome className="w-4 h-4" />,
+        path: '/dashboard/settings/organization',
+        roles: ['super_admin', 'management'],
+      },
+      {
+        id: 'users-roles',
+        label: 'Users & Roles',
+        icon: <FiUsers className="w-4 h-4" />,
+        path: '/dashboard/settings/users-roles',
+        roles: ['super_admin'],
+      },
+      {
+        id: 'security',
+        label: 'Security',
+        icon: <FiShield className="w-4 h-4" />,
+        path: '/dashboard/settings/security',
+        roles: ['super_admin'],
+      },
+      {
+        id: 'communications',
+        label: 'Communications',
+        icon: <FiMail className="w-4 h-4" />,
+        path: '/dashboard/settings/communications',
+        roles: ['super_admin', 'operations'],
+        children: [
+          {
+            id: 'providers',
+            label: 'Providers',
+            icon: <FiLink className="w-4 h-4" />,
+            path: '/dashboard/settings/communications/providers',
+          },
+          {
+            id: 'templates',
+            label: 'Templates',
+            icon: <FiFileText className="w-4 h-4" />,
+            path: '/dashboard/settings/communications/templates',
+          },
+          {
+            id: 'logs',
+            label: 'Logs',
+            icon: <FiMessageSquare className="w-4 h-4" />,
+            path: '/dashboard/settings/communications/logs',
+          },
+        ],
+      },
+      {
+        id: 'scheduling',
+        label: 'Scheduling',
+        icon: <FiClock className="w-4 h-4" />,
+        path: '/dashboard/settings/scheduling',
+        roles: ['super_admin', 'operations'],
+      },
+      {
+        id: 'custom-fields',
+        label: 'Custom Fields',
+        icon: <FiFileText className="w-4 h-4" />,
+        path: '/dashboard/settings/custom-fields',
+        roles: ['super_admin'],
+      },
+      {
+        id: 'integrations',
+        label: 'Integrations',
+        icon: <FiLink className="w-4 h-4" />,
+        path: '/dashboard/settings/integrations',
+        roles: ['super_admin'],
+      },
+      {
+        id: 'advanced',
+        label: 'Advanced',
+        icon: <FiSliders className="w-4 h-4" />,
+        path: '/dashboard/settings/advanced',
+        roles: ['super_admin'],
+      },
+    ],
   },
 ];
 
@@ -340,20 +430,69 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
                                   .filter(isChildVisible)
                                   .map((child) => {
                                     const childActive = child.path ? isActive(child.path) : false;
+                                    const childHasChildren = child.children && child.children.length > 0;
+                                    const childExpanded = isExpanded(child.id);
+                                    
                                     return (
                                       <li key={child.id}>
-                                        <Link
-                                          href={child.path || '#'}
-                                          onClick={onClose}
-                                          className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-                                            childActive
-                                              ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                              : 'text-gray-600 hover:bg-gray-50'
-                                          }`}
-                                        >
-                                          {child.icon}
-                                          <span>{child.label}</span>
-                                        </Link>
+                                        {childHasChildren ? (
+                                          <>
+                                            <button
+                                              onClick={() => toggleSection(child.id)}
+                                              className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+                                                childActive
+                                                  ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                                  : 'text-gray-600 hover:bg-gray-50'
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                {child.icon}
+                                                <span>{child.label}</span>
+                                              </div>
+                                              <FiChevronRight
+                                                className={`w-4 h-4 transition-transform ${childExpanded ? 'rotate-90' : ''}`}
+                                              />
+                                            </button>
+                                            {childExpanded && (
+                                              <ul className="ml-6 mt-1 space-y-1">
+                                                {child.children!
+                                                  .filter(isChildVisible)
+                                                  .map((grandchild) => {
+                                                    const grandchildActive = grandchild.path ? isActive(grandchild.path) : false;
+                                                    return (
+                                                      <li key={grandchild.id}>
+                                                        <Link
+                                                          href={grandchild.path || '#'}
+                                                          onClick={onClose}
+                                                          className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                                            grandchildActive
+                                                              ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                                              : 'text-gray-600 hover:bg-gray-50'
+                                                          }`}
+                                                        >
+                                                          {grandchild.icon}
+                                                          <span>{grandchild.label}</span>
+                                                        </Link>
+                                                      </li>
+                                                    );
+                                                  })}
+                                              </ul>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <Link
+                                            href={child.path || '#'}
+                                            onClick={onClose}
+                                            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                              childActive
+                                                ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                          >
+                                            {child.icon}
+                                            <span>{child.label}</span>
+                                          </Link>
+                                        )}
                                       </li>
                                     );
                                   })}
@@ -462,19 +601,67 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
                                 .filter(isChildVisible)
                                 .map((child) => {
                                   const childActive = child.path ? isActive(child.path) : false;
+                                  const childHasChildren = child.children && child.children.length > 0;
+                                  const childExpanded = isExpanded(child.id);
+                                  
                                   return (
                                     <li key={child.id}>
-                                      <Link
-                                        href={child.path || '#'}
-                                        className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-                                          childActive
-                                            ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                            : 'text-gray-600 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        {child.icon}
-                                        <span>{child.label}</span>
-                                      </Link>
+                                      {childHasChildren ? (
+                                        <>
+                                          <button
+                                            onClick={() => toggleSection(child.id)}
+                                            className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${
+                                              childActive
+                                                ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {child.icon}
+                                              <span>{child.label}</span>
+                                            </div>
+                                            <FiChevronRight
+                                              className={`w-4 h-4 transition-transform ${childExpanded ? 'rotate-90' : ''}`}
+                                            />
+                                          </button>
+                                          {childExpanded && (
+                                            <ul className="ml-6 mt-1 space-y-1">
+                                              {child.children!
+                                                .filter(isChildVisible)
+                                                .map((grandchild) => {
+                                                  const grandchildActive = grandchild.path ? isActive(grandchild.path) : false;
+                                                  return (
+                                                    <li key={grandchild.id}>
+                                                      <Link
+                                                        href={grandchild.path || '#'}
+                                                        className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                                          grandchildActive
+                                                            ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                                            : 'text-gray-600 hover:bg-gray-50'
+                                                        }`}
+                                                      >
+                                                        {grandchild.icon}
+                                                        <span>{grandchild.label}</span>
+                                                      </Link>
+                                                    </li>
+                                                  );
+                                                })}
+                                            </ul>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <Link
+                                          href={child.path || '#'}
+                                          className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
+                                            childActive
+                                              ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                              : 'text-gray-600 hover:bg-gray-50'
+                                          }`}
+                                        >
+                                          {child.icon}
+                                          <span>{child.label}</span>
+                                        </Link>
+                                      )}
                                     </li>
                                   );
                                 })}

@@ -7,8 +7,8 @@ export default function SettingsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to custom fields as default (first available section for super_admin)
-    router.replace('/dashboard/settings/custom-fields');
+    // Redirect to general settings as default
+    router.replace('/dashboard/settings/general');
   }, [router]);
 
   return (
