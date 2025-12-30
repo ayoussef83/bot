@@ -177,7 +177,7 @@ export class ReportsService {
       .reduce((sum, exp) => sum + exp.amount, 0);
     const otherOutflows = totalOutflows - instructorPayouts;
 
-    // Get opening balance (previous period closing balance or account initial balance)
+    // Get opening balance (previous period closing balance or sum of account balances)
     const previousPeriod = await this.prisma.financialPeriod.findFirst({
       where: {
         periodCode: {
@@ -189,9 +189,82 @@ export class ReportsService {
       },
     });
 
-    // Calculate opening balance from account balances at start of period
-    // This is simplified - in reality, we'd need to track balance history
-    const openingBalance = 0; // TODO: Calculate from balance history
+    let openingBalance = 0;
+    
+    if (previousPeriod) {
+      // Calculate previous period's closing balance
+      const prevStartDate = previousPeriod.startDate;
+      const prevEndDate = previousPeriod.endDate;
+      
+      // Get all payments before current period start
+      const prevPayments = await this.prisma.payment.aggregate({
+        where: {
+          receivedDate: {
+            lt: period.startDate,
+          },
+          status: 'received',
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+      
+      // Get all expenses before current period start
+      const prevExpenses = await this.prisma.expense.aggregate({
+        where: {
+          expenseDate: {
+            lt: period.startDate,
+          },
+          status: 'paid',
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+      
+      // Opening balance = sum of all account initial balances + net flow before period
+      const allAccounts = await this.prisma.cashAccount.findMany({
+        where: { isActive: true },
+      });
+      const initialBalances = allAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+      
+      const prevNetFlow = (prevPayments._sum.amount || 0) - (prevExpenses._sum.amount || 0);
+      openingBalance = initialBalances + prevNetFlow;
+    } else {
+      // First period: use sum of all account balances
+      const allAccounts = await this.prisma.cashAccount.findMany({
+        where: { isActive: true },
+      });
+      openingBalance = allAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+      
+      // Subtract transactions that occurred before period start
+      const prePeriodPayments = await this.prisma.payment.aggregate({
+        where: {
+          receivedDate: {
+            lt: period.startDate,
+          },
+          status: 'received',
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+      
+      const prePeriodExpenses = await this.prisma.expense.aggregate({
+        where: {
+          expenseDate: {
+            lt: period.startDate,
+          },
+          status: 'paid',
+        },
+        _sum: {
+          amount: true,
+        },
+      });
+      
+      const prePeriodNetFlow = (prePeriodPayments._sum.amount || 0) - (prePeriodExpenses._sum.amount || 0);
+      openingBalance = openingBalance - prePeriodNetFlow;
+    }
 
     const netCashFlow = totalInflows - totalOutflows;
     const closingBalance = openingBalance + netCashFlow;
