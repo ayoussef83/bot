@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -11,7 +11,7 @@ export class ReportsService {
     });
 
     if (!period) {
-      throw new Error('Period not found');
+      throw new NotFoundException('Financial period not found');
     }
 
     // Revenue: Sum of invoices issued in period
@@ -125,7 +125,7 @@ export class ReportsService {
     });
 
     if (!period) {
-      throw new Error('Period not found');
+      throw new NotFoundException('Financial period not found');
     }
 
     // Cash Inflows: Payments received in period
@@ -302,7 +302,7 @@ export class ReportsService {
     });
 
     if (!period) {
-      throw new Error('Period not found');
+      throw new NotFoundException('Financial period not found');
     }
 
     // Get invoices for the period (needed for revenue calculation)
@@ -411,7 +411,7 @@ export class ReportsService {
     });
 
     if (!period) {
-      throw new Error('Period not found');
+      throw new NotFoundException('Financial period not found');
     }
 
     // Get instructor expenses in period

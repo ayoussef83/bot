@@ -144,14 +144,17 @@ export class FinanceService {
       },
     });
 
+    const actualRevenueAmount = actualRevenue._sum.amount || 0;
+    const expectedRevenueAmount = expectedRevenue._sum.totalAmount || 0;
+
     return {
       cashPosition: {
         total: totalCash,
         breakdown: cashBreakdown,
       },
-      expectedRevenue: expectedRevenue._sum.totalAmount || 0,
-      actualRevenue,
-      variance: (expectedRevenue._sum.totalAmount || 0) - (actualRevenue._sum.amount || 0),
+      expectedRevenue: expectedRevenueAmount,
+      actualRevenue: actualRevenueAmount,
+      variance: expectedRevenueAmount - actualRevenueAmount,
       overdueInvoices: {
         count: overdueInvoices,
         amount: overdueAmount._sum.totalAmount || 0,

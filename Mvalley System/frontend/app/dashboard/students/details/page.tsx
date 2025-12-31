@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { studentsService, Student } from '@/lib/services';
+import { studentsService, Student, notificationsService, type NotificationChannel } from '@/lib/services';
 import { financeService, Payment } from '@/lib/services';
 import api from '@/lib/api';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
@@ -31,6 +31,13 @@ export default function StudentDetailPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageChannel, setMessageChannel] = useState<NotificationChannel>('sms');
+  const [messageRecipient, setMessageRecipient] = useState('');
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageError, setMessageError] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -147,36 +154,28 @@ export default function StudentDetailPage() {
       ),
     },
     {
-      key: 'type',
-      label: 'Type',
-      render: (value) => (
-        <span className="text-sm text-gray-500 capitalize">{value}</span>
-      ),
+      key: 'method',
+      label: 'Method',
+      render: (value) => <span className="text-sm text-gray-500 capitalize">{String(value || '-')}</span>,
     },
     {
       key: 'status',
       label: 'Status',
       render: (value) => {
         const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' } = {
-          completed: 'active',
+          received: 'active',
+          sent: 'active',
           pending: 'warning',
           overdue: 'inactive',
+          reversed: 'inactive',
+          failed: 'inactive',
         };
         return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
       },
     },
     {
-      key: 'paymentDate',
-      label: 'Payment Date',
-      render: (value) => (
-        <span className="text-sm text-gray-500">
-          {value ? new Date(value).toLocaleDateString() : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'dueDate',
-      label: 'Due Date',
+      key: 'receivedDate',
+      label: 'Received Date',
       render: (value) => (
         <span className="text-sm text-gray-500">
           {value ? new Date(value).toLocaleDateString() : '-'}
@@ -418,6 +417,58 @@ export default function StudentDetailPage() {
     },
   ];
 
+  const candidateRecipients = [
+    ...(student.phone ? [{ label: `Student Phone (${student.phone})`, value: student.phone, channel: 'sms' as const }] : []),
+    ...(student.parent?.phone ? [{ label: `Parent Phone (${student.parent.phone})`, value: student.parent.phone, channel: 'sms' as const }] : []),
+    ...(student.email ? [{ label: `Student Email (${student.email})`, value: student.email, channel: 'email' as const }] : []),
+    ...(student.parent?.email ? [{ label: `Parent Email (${student.parent.email})`, value: student.parent.email, channel: 'email' as const }] : []),
+  ];
+
+  const openMessageModal = (channel: NotificationChannel) => {
+    setMessageError('');
+    setMessageChannel(channel);
+    const defaultRecipient =
+      candidateRecipients.find((r) => r.channel === channel)?.value ||
+      (channel === 'sms' ? student.phone || student.parent?.phone || '' : student.email || student.parent?.email || '');
+    setMessageRecipient(defaultRecipient);
+    setMessageSubject('');
+    setMessageBody('');
+    setShowMessageModal(true);
+  };
+
+  const handleSendMessage = async () => {
+    setMessageError('');
+    if (!messageRecipient) {
+      setMessageError('Recipient is required');
+      return;
+    }
+    if (!messageBody.trim()) {
+      setMessageError('Message is required');
+      return;
+    }
+    if (messageChannel === 'email' && !messageSubject.trim()) {
+      setMessageError('Subject is required for email');
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      await notificationsService.sendMessage({
+        channel: messageChannel,
+        recipient: messageRecipient,
+        subject: messageChannel === 'email' ? messageSubject : undefined,
+        message: messageBody,
+        studentId: student.id,
+        parentId: student.parentId,
+      });
+      setShowMessageModal(false);
+    } catch (err: any) {
+      setMessageError(err.response?.data?.message || 'Failed to send message');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   // Sidebar with quick actions
   const sidebar = (
     <div className="space-y-4">
@@ -426,8 +477,7 @@ export default function StudentDetailPage() {
         <div className="space-y-2">
           <button
             onClick={() => {
-              // Send SMS functionality
-              alert('Send SMS functionality coming soon');
+              openMessageModal('sms');
             }}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
@@ -435,8 +485,7 @@ export default function StudentDetailPage() {
           </button>
           <button
             onClick={() => {
-              // Send Email functionality
-              alert('Send Email functionality coming soon');
+              openMessageModal('email');
             }}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
@@ -474,13 +523,116 @@ export default function StudentDetailPage() {
   );
 
   return (
-    <StandardDetailView
-      title={`${student.firstName} ${student.lastName}`}
-      subtitle={student.email || student.phone || 'Student Profile'}
-      actions={actions}
-      tabs={tabs}
-      breadcrumbs={breadcrumbs}
-      sidebar={sidebar}
-    />
+    <>
+      <StandardDetailView
+        title={`${student.firstName} ${student.lastName}`}
+        subtitle={student.email || student.phone || 'Student Profile'}
+        actions={actions}
+        tabs={tabs}
+        breadcrumbs={breadcrumbs}
+        sidebar={sidebar}
+      />
+
+      {showMessageModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" onClick={() => setShowMessageModal(false)}>
+              <div className="absolute inset-0 bg-gray-500 opacity-75" />
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Send {messageChannel === 'sms' ? 'SMS' : 'Email'}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  This will send immediately using your configured provider.
+                </p>
+              </div>
+
+              {messageError && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                  {messageError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
+                  {candidateRecipients.filter((r) => r.channel === messageChannel).length > 1 ? (
+                    <select
+                      value={messageRecipient}
+                      onChange={(e) => setMessageRecipient(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      {candidateRecipients
+                        .filter((r) => r.channel === messageChannel)
+                        .map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={messageRecipient}
+                      onChange={(e) => setMessageRecipient(e.target.value)}
+                      placeholder={messageChannel === 'sms' ? 'e.g., +2010...' : 'e.g., name@domain.com'}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  )}
+                </div>
+
+                {messageChannel === 'email' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input
+                      type="text"
+                      value={messageSubject}
+                      onChange={(e) => setMessageSubject(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Subject"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                  <textarea
+                    value={messageBody}
+                    onChange={(e) => setMessageBody(e.target.value)}
+                    rows={5}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    placeholder="Write your message..."
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowMessageModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  disabled={sendingMessage}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendMessage}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                  disabled={sendingMessage}
+                >
+                  {sendingMessage ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
