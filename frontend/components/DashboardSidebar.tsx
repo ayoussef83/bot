@@ -870,3 +870,4 @@ export default function DashboardSidebar({ userRole, isOpen = false, onClose }: 
   );
 }
 
+/* Force rebuild 1767195562 */
