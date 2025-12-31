@@ -129,6 +129,9 @@ This keeps credentials and data strictly isolated.
 - Create/update App Runner staging:
   - `ENV=staging SERVICE_NAME=mv-os-backend-staging DB_SECRET_NAME=mv-os/staging/database-url JWT_SECRET_NAME=mv-os/staging/jwt-secret ./cloud-deployment/create-or-update-app-runner-from-ecr.sh`
 
+### One-time staging infra
+- See `STAGING_SETUP.md`
+
 ### Backend → Production
 - Trigger build: `aws codebuild start-build --project-name mv-os-backend-build`
 - Create/update App Runner production:
