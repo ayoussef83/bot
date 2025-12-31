@@ -89,9 +89,12 @@ export default function PaymentsPage() {
       setCashAccounts(activeAccounts);
       if (activeAccounts.length > 0 && !formData.cashAccountId) {
         setFormData({ ...formData, cashAccountId: activeAccounts[0].id });
+      } else if (activeAccounts.length === 0) {
+        setError('No active cash accounts found. Please create a cash account first.');
       }
     } catch (err: any) {
       console.error('Error fetching cash accounts:', err);
+      setError('Failed to load cash accounts. Please try again.');
     }
   };
 
@@ -128,6 +131,9 @@ export default function PaymentsPage() {
     }
     if (!formData.cashAccountId) {
       errors.cashAccountId = 'Cash account is required';
+    }
+    if (cashAccounts.length === 0) {
+      errors.cashAccountId = 'No cash accounts available. Please create one first.';
     }
     if (!formData.method) {
       errors.method = 'Payment method is required';
@@ -493,21 +499,41 @@ export default function PaymentsPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Cash Account *</label>
-                    <select
-                      value={formData.cashAccountId}
-                      onChange={(e) => setFormData({ ...formData, cashAccountId: e.target.value })}
-                      className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
-                        formErrors.cashAccountId ? 'border-red-300' : ''
-                      }`}
-                      required
-                    >
-                      <option value="">Select Account</option>
-                      {cashAccounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.name} ({account.type}) - {account.balance.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
-                        </option>
-                      ))}
-                    </select>
+                    {cashAccounts.length === 0 ? (
+                      <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-sm text-yellow-800">
+                          No cash accounts available. Please{' '}
+                          <a
+                            href="/dashboard/finance/cash/accounts"
+                            className="text-indigo-600 hover:text-indigo-800 underline"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              router.push('/dashboard/finance/cash/accounts');
+                              setShowCreateModal(false);
+                            }}
+                          >
+                            create a cash account
+                          </a>{' '}
+                          first.
+                        </p>
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.cashAccountId}
+                        onChange={(e) => setFormData({ ...formData, cashAccountId: e.target.value })}
+                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                          formErrors.cashAccountId ? 'border-red-300' : ''
+                        }`}
+                        required
+                      >
+                        <option value="">Select Account</option>
+                        {cashAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name} ({account.type}) - {account.balance.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     {formErrors.cashAccountId && (
                       <p className="mt-1 text-sm text-red-600">{formErrors.cashAccountId}</p>
                     )}

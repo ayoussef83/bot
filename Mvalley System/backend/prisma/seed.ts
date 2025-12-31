@@ -86,23 +86,49 @@ async function main() {
 
   console.log('✅ Created expense categories');
 
-  // Create default cash account
-  const defaultCashAccount = await prisma.cashAccount.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
-    update: {},
-    create: {
-      id: '00000000-0000-0000-0000-000000000001',
-      name: 'Main Bank Account',
-      type: 'bank',
-      accountNumber: '0000000001',
-      bankName: 'Default Bank',
-      balance: 0,
-      currency: 'EGP',
-      isActive: true,
-    },
-  });
+  // Create default cash accounts (only if none exist)
+  const existingAccounts = await prisma.cashAccount.count();
+  if (existingAccounts === 0) {
+    const cashAccounts = [
+      {
+        name: 'Main Bank Account',
+        type: 'bank' as const,
+        accountNumber: '0000000001',
+        bankName: 'Default Bank',
+        balance: 0,
+        currency: 'EGP',
+        isActive: true,
+      },
+      {
+        name: 'Cash Register',
+        type: 'cash' as const,
+        accountNumber: '',
+        bankName: '',
+        balance: 0,
+        currency: 'EGP',
+        isActive: true,
+      },
+      {
+        name: 'Vodafone Cash',
+        type: 'wallet' as const,
+        accountNumber: '',
+        bankName: '',
+        balance: 0,
+        currency: 'EGP',
+        isActive: true,
+      },
+    ];
 
-  console.log('✅ Created default cash account');
+    for (const account of cashAccounts) {
+      await prisma.cashAccount.create({
+        data: account,
+      });
+    }
+
+    console.log('✅ Created default cash accounts');
+  } else {
+    console.log(`✅ Cash accounts already exist (${existingAccounts} accounts)`);
+  }
 
   // Create sample locations data (if needed)
   console.log('✅ Seed completed!');
