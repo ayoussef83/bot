@@ -50,10 +50,28 @@ export class MetaOAuthService {
     }
   }
 
+  private assertRedirectAllowed(redirectUri: string) {
+    const raw = String(redirectUri || '').trim();
+    if (!raw) throw new BadRequestException('redirectUri is required');
+
+    // Allow localhost for development, otherwise only allow configured FRONTEND_URL origins.
+    if (raw.startsWith('http://localhost') || raw.startsWith('http://127.0.0.1')) return;
+
+    const allowed = String(this.config.get<string>('FRONTEND_URL') || process.env.FRONTEND_URL || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => s.replace(/\/+$/, '')); // remove trailing slashes
+
+    const uriNoSlash = raw.replace(/\/+$/, '');
+    if (!allowed.length) throw new BadRequestException('FRONTEND_URL is not configured');
+
+    const ok = allowed.some((origin) => uriNoSlash.startsWith(origin));
+    if (!ok) throw new BadRequestException('Invalid redirectUri');
+  }
+
   getOAuthUrl(userId: string, redirectUri: string) {
-    if (!redirectUri?.startsWith('https://') && !redirectUri?.startsWith('http://localhost')) {
-      throw new BadRequestException('Invalid redirectUri');
-    }
+    this.assertRedirectAllowed(redirectUri);
 
     const state = this.signState({ uid: userId, ts: Date.now() });
 
@@ -104,6 +122,7 @@ export class MetaOAuthService {
   }
 
   async exchangeAndConnectPages(currentUserId: string, code: string, state: string, redirectUri: string) {
+    this.assertRedirectAllowed(redirectUri);
     const payload = this.verifyState(state);
     if (payload.uid !== currentUserId) {
       throw new BadRequestException('State user mismatch');

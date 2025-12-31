@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { MarketingPlatform } from '@prisma/client';
 
@@ -20,12 +21,15 @@ export class WebhooksController {
     @Query('hub.mode') mode?: string,
     @Query('hub.verify_token') token?: string,
     @Query('hub.challenge') challenge?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
     const verifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN || '';
     if (mode === 'subscribe' && token && verifyToken && token === verifyToken) {
+      if (res) res.status(200);
       return challenge || '';
     }
-    return { ok: false };
+    if (res) res.status(403);
+    throw new ForbiddenException('Invalid verify token');
   }
 
   @Post('meta/messenger')
