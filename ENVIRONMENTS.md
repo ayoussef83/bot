@@ -104,4 +104,16 @@ Rules:
 
 This keeps credentials and data strictly isolated.
 
+## Deploy commands (recommended)
+
+### Backend → Staging
+- Trigger build: `aws codebuild start-build --project-name mv-os-backend-build`
+- Create/update App Runner staging:
+  - `ENV=staging SERVICE_NAME=mv-os-backend-staging DB_SECRET_NAME=mv-os/staging/database-url JWT_SECRET_NAME=mv-os/staging/jwt-secret ./cloud-deployment/create-or-update-app-runner-from-ecr.sh`
+
+### Backend → Production
+- Trigger build: `aws codebuild start-build --project-name mv-os-backend-build`
+- Create/update App Runner production:
+  - `ENV=production SERVICE_NAME=mv-os-backend DB_SECRET_NAME=mv-os/database-url JWT_SECRET_NAME=mv-os/jwt-secret ./cloud-deployment/create-or-update-app-runner-from-ecr.sh`
+
 
