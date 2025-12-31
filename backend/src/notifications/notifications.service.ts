@@ -1,18 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationChannel, NotificationStatus } from '@prisma/client';
-import { EmailService } from './email.service';
-import { SmsService } from './sms.service';
-import { WhatsAppService } from './whatsapp.service';
 import { SendMessageDto } from './dto';
+import { EMAIL_PROVIDER, SMS_PROVIDER, WHATSAPP_PROVIDER } from './providers/tokens';
+import type { EmailProvider, SmsProvider, WhatsAppProvider } from './providers/interfaces';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private prisma: PrismaService,
-    private emailService: EmailService,
-    private smsService: SmsService,
-    private whatsappService: WhatsAppService,
+    @Inject(EMAIL_PROVIDER) private emailProvider: EmailProvider,
+    @Inject(SMS_PROVIDER) private smsProvider: SmsProvider,
+    @Inject(WHATSAPP_PROVIDER) private whatsappProvider: WhatsAppProvider,
   ) {}
 
   async sendMessage(dto: SendMessageDto) {
@@ -37,7 +36,7 @@ export class NotificationsService {
       let result;
       switch (dto.channel) {
         case 'email':
-          result = await this.emailService.send(
+          result = await this.emailProvider.send(
             dto.recipient,
             dto.subject || '',
             dto.message,
@@ -46,7 +45,7 @@ export class NotificationsService {
           );
           break;
         case 'sms':
-          result = await this.smsService.send(
+          result = await this.smsProvider.send(
             dto.recipient,
             dto.message,
             dto.template,
@@ -54,7 +53,7 @@ export class NotificationsService {
           );
           break;
         case 'whatsapp':
-          result = await this.whatsappService.send(
+          result = await this.whatsappProvider.send(
             dto.recipient,
             dto.message,
             dto.template,
