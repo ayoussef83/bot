@@ -21,12 +21,22 @@ frontend:
       commands:
         - echo "Building Next.js application..."
         - npm run build
+        - echo "Build complete. Output directory:"
+        - ls -la out 2>/dev/null || ls -la .next 2>/dev/null || echo "Checking build output..."
+        - |
+          if [ -d "Mvalley System/frontend" ]; then
+            echo "FRONTEND_DIR=Mvalley System/frontend" >> $AMPLIFY_ENV
+          elif [ -d "frontend" ]; then
+            echo "FRONTEND_DIR=frontend" >> $AMPLIFY_ENV
+          fi
   artifacts:
-    baseDirectory: frontend/out
+    baseDirectory: Mvalley System/frontend/out
     files:
       - '**/*'
   cache:
     paths:
+      - Mvalley System/frontend/node_modules/**/*
+      - Mvalley System/frontend/.next/cache/**/*
       - frontend/node_modules/**/*
       - frontend/.next/cache/**/*
 
