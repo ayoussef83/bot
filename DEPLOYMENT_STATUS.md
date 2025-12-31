@@ -1,175 +1,148 @@
-# 🚀 Deployment Status - Scheduler System
+# 🚀 Deployment Status - MV-OS
 
-## ✅ Changes Committed & Pushed
+## ✅ Backend: DEPLOYED & RUNNING
 
-**Commit**: `f5604d9d24`  
-**Message**: "feat: Add scheduled tasks and notifications system"
+**Service**: `mv-os-backend`  
+**Status**: ✅ **RUNNING**  
+**URL**: `https://mzmeyp2cw9.us-east-1.awsapprunner.com`  
+**Health**: ✅ Healthy
 
-**Files Changed**:
-- ✅ `backend/package.json` - Added dependencies
-- ✅ `backend/src/app.module.ts` - Added SchedulerModule
-- ✅ `backend/src/notifications/email.service.ts` - Zoho SMTP integration
-- ✅ `backend/src/scheduler/` - New scheduler module
-- ✅ `backend/prisma/seed-templates.ts` - Template seeding script
-- ✅ Documentation files
-
-## 📦 Deployment Pipeline
-
-### Step 1: CodeBuild (Automatic)
-CodeBuild should automatically trigger when it detects the push to `main` branch.
-
-**What happens**:
-1. CodeBuild clones the repository
-2. Builds Docker image from `backend/Dockerfile`
-3. Pushes image to ECR: `149959196988.dkr.ecr.us-east-1.amazonaws.com/mv-os-backend:latest`
-4. Tags image with commit hash
-
-**Check Status**:
+**Test Health Endpoint**:
 ```bash
-# List recent builds
-aws codebuild list-builds-for-project --project-name <your-project-name> --max-items 5
-
-# Or check AWS Console:
-# https://console.aws.amazon.com/codesuite/codebuild/projects
+curl https://mzmeyp2cw9.us-east-1.awsapprunner.com/api/health
 ```
 
-### Step 2: App Runner (Automatic)
-App Runner automatically detects new ECR image and deploys it.
-
-**What happens**:
-1. App Runner pulls new image from ECR
-2. Deploys new version
-3. Health check verifies service is running
-4. Traffic switches to new version
-
-**Check Status**:
-```bash
-# Check App Runner service
-aws apprunner describe-service --service-arn <service-arn>
-
-# Or check AWS Console:
-# https://console.aws.amazon.com/apprunner
+**Response**:
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-12-31T14:43:05.915Z",
+  "service": "mv-os-backend"
+}
 ```
-
-**Expected Deployment Time**: 5-10 minutes
-
-## 🔍 Verification Steps
-
-### 1. Check CodeBuild Status
-```bash
-aws codebuild list-builds-for-project --project-name <project-name> --max-items 1
-```
-
-### 2. Check App Runner Deployment
-```bash
-aws apprunner describe-service --service-arn <service-arn> --query 'Service.Status'
-```
-
-### 3. Check Scheduler Initialization
-Once deployed, check CloudWatch logs:
-```bash
-aws logs tail /aws/apprunner/mv-os-backend --follow
-```
-
-Look for:
-- `SchedulerService` initialization
-- No errors during startup
-- Module loaded successfully
-
-### 4. Test Email/SMS Integration
-1. Go to: `https://mv-os.mvalley-eg.com/dashboard/settings`
-2. Navigate to "Communications" tab
-3. Test SMS and Email sending
-4. Verify Zoho Email and SMSMisr are configured
-
-### 5. Seed Message Templates
-After deployment, seed default templates:
-
-**Option A: Via Database Connection**
-```bash
-cd backend
-npm run prisma:seed-templates
-```
-
-**Option B: Via Settings Page**
-- Go to Settings → Communications → Message Templates
-- Create templates manually or import defaults
-
-## 📅 Scheduler Schedule
-
-Once deployed, the scheduler will run:
-
-- **Payment Due Reminders**: Daily at 9:00 AM (Cairo time)
-- **Overdue Payment Reminders**: Daily at 10:00 AM (Cairo time)
-- **Session Reminders**: Every hour (checks for tomorrow's sessions)
-
-**First Run**: Tomorrow at 9:00 AM (if deployed today)
-
-## 🎯 Next Actions
-
-1. **Wait for Deployment** (5-10 minutes)
-   - Monitor CodeBuild logs
-   - Monitor App Runner deployment
-
-2. **Verify Service is Running**
-   - Check App Runner console
-   - Verify health check passes
-
-3. **Seed Templates**
-   - Run `npm run prisma:seed-templates`
-   - Or create via Settings page
-
-4. **Test Integration**
-   - Test email sending
-   - Test SMS sending
-   - Verify credentials are correct
-
-5. **Monitor First Scheduled Run**
-   - Check CloudWatch logs tomorrow at 9:00 AM
-   - Verify notifications are sent
-
-## 🐛 Troubleshooting
-
-### Build Fails
-- Check CodeBuild logs for errors
-- Verify Dockerfile is correct
-- Check dependencies in package.json
-
-### Deployment Fails
-- Check App Runner logs
-- Verify ECR image exists
-- Check health check endpoint
-
-### Scheduler Not Running
-- Check CloudWatch logs for errors
-- Verify SchedulerModule is imported
-- Check cron expressions are valid
-
-### Email/SMS Not Sending
-- Verify integration settings in database
-- Check CloudWatch logs for errors
-- Test credentials manually
-
-## ✅ Success Indicators
-
-- ✅ CodeBuild completes successfully
-- ✅ App Runner service status: "RUNNING"
-- ✅ CloudWatch logs show scheduler initialization
-- ✅ No errors in application logs
-- ✅ Email/SMS test sends successfully
 
 ---
 
-**Deployment initiated**: $(date)  
-**Expected completion**: ~10 minutes  
-**Monitor**: AWS Console → App Runner → mv-os-backend
+## ⏳ Frontend: READY TO DEPLOY
 
+**Status**: ✅ Build passes, ready for Amplify deployment  
+**API URL**: `https://mzmeyp2cw9.us-east-1.awsapprunner.com/api`
 
+### Quick Deploy Steps:
 
+1. **Go to AWS Amplify Console**:
+   ```
+   https://console.aws.amazon.com/amplify
+   ```
 
+2. **Create New App**:
+   - Click **"New app"** → **"Host web app"**
+   - Connect your Git repository (GitHub/GitLab/Bitbucket)
+   - Select branch: **`main`**
 
+3. **Configure Build**:
+   - Amplify will auto-detect `amplify.yml` from project root
+   - Or use the configuration in `amplify.yml`
 
+4. **Add Environment Variable**:
+   - **Key**: `NEXT_PUBLIC_API_URL`
+   - **Value**: `https://mzmeyp2cw9.us-east-1.awsapprunner.com/api`
 
+5. **Deploy**:
+   - Click **"Save and deploy"**
+   - Wait 5-10 minutes
 
+6. **Get Your URL**:
+   - Once deployed: `https://main.xxxxx.amplifyapp.com`
 
+---
 
+## 📋 Deployment Checklist
+
+- [x] Backend deployed to App Runner
+- [x] Backend health check passing
+- [x] Frontend builds successfully
+- [x] `amplify.yml` configured
+- [x] API URL documented
+- [ ] Frontend deployed to Amplify
+- [ ] Environment variables set in Amplify
+- [ ] Frontend tested and verified
+
+---
+
+## 🔐 Default Login Credentials
+
+After deployment, use these credentials:
+- **Email**: `admin@mindvalley.eg`
+- **Password**: `admin123`
+
+---
+
+## 📊 Current Configuration
+
+### Backend
+- **Platform**: AWS App Runner
+- **Instance**: 0.25 vCPU, 0.5 GB memory
+- **Port**: 3000
+- **Health Check**: `/api/health`
+- **Database**: AWS RDS (PostgreSQL)
+- **Secrets**: AWS Secrets Manager
+
+### Frontend
+- **Platform**: AWS Amplify (to be deployed)
+- **Framework**: Next.js 14
+- **Build**: Static export
+- **API**: Connects to App Runner backend
+
+---
+
+## 🎯 Next Steps
+
+1. **Deploy Frontend**:
+   - Follow steps above to deploy to Amplify
+   - Set environment variable: `NEXT_PUBLIC_API_URL`
+
+2. **Test Deployment**:
+   - Visit Amplify URL
+   - Test login
+   - Verify API connection
+
+3. **Monitor**:
+   - Check CloudWatch logs for backend
+   - Check Amplify build logs for frontend
+   - Monitor App Runner metrics
+
+---
+
+## 💰 Estimated Costs
+
+- **App Runner**: ~$5-10/month
+- **Amplify**: $0/month (free tier)
+- **RDS**: ~$14.71/month
+- **Secrets Manager**: ~$0.40/month
+- **Total**: ~$20-25/month
+
+---
+
+## 🔧 Troubleshooting
+
+### Backend Issues
+- Check App Runner logs: AWS Console → App Runner → mv-os-backend → Logs
+- Verify environment variables
+- Check database connectivity
+
+### Frontend Issues
+- Check Amplify build logs
+- Verify `NEXT_PUBLIC_API_URL` is set
+- Check CORS settings in backend
+
+### API Connection Issues
+- Verify backend is running
+- Check environment variable in Amplify
+- Test backend health endpoint
+
+---
+
+**Last Updated**: 2025-12-31  
+**Backend Status**: ✅ Running  
+**Frontend Status**: ⏳ Ready to deploy
