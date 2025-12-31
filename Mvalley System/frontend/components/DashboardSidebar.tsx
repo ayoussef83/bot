@@ -13,6 +13,7 @@ import {
   FiUserPlus,
   FiDollarSign,
   FiCreditCard,
+  FiCheckCircle,
   FiTrendingDown,
   FiSettings,
   FiChevronRight,

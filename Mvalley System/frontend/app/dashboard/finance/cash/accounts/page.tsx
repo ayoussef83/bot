@@ -249,7 +249,8 @@ export default function AccountsPage() {
   ];
 
   return (
-    <StandardListView
+    <>
+      <StandardListView
       title="Cash Accounts"
       subtitle="Manage bank accounts, cash registers, and digital wallets"
       primaryAction={{
@@ -332,7 +333,7 @@ export default function AccountsPage() {
         </>
       }
       getRowId={(row) => row.id}
-    />
+      />
 
       {/* Add/Edit Account Modal */}
       {showForm && (
@@ -562,7 +563,7 @@ export default function AccountsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

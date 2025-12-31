@@ -13,3 +13,5 @@ The logo should be:
 - "MINDVALLEY" text below (MIND in purple, VALLEY in green)
 
 
+
+

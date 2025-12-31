@@ -39,7 +39,14 @@ export interface CreateInvoiceDto {
 }
 
 export interface FinanceOverview {
-  cashPosition: number;
+  cashPosition: {
+    total: number;
+    breakdown: Array<{
+      name: string;
+      balance: number;
+      type?: string;
+    }>;
+  };
   expectedRevenue: number;
   actualRevenue: number;
   variance: number;
@@ -47,8 +54,15 @@ export interface FinanceOverview {
     count: number;
     amount: number;
   };
-  netResult: number;
+  netResult: {
+    revenue: number;
+    expenses: number;
+    profit: number;
+    margin?: number;
+  };
   unpaidInstructorBalances: number;
+  recentPayments?: Payment[];
+  recentExpenses?: Expense[];
 }
 
 export interface Payment {
@@ -64,10 +78,15 @@ export interface Payment {
   student?: any;
   referenceNumber?: string;
   notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
   allocations?: Array<{
     id: string;
     amount: number;
     invoiceId: string;
+    allocatedAt?: string;
+    allocatedBy?: string;
+    notes?: string;
     invoice?: Invoice;
   }>;
 }
@@ -111,6 +130,7 @@ export interface CashAccount {
   balance: number;
   currency: string;
   isActive: boolean;
+  notes?: string;
 }
 
 export interface ExpenseCategory {
@@ -133,7 +153,10 @@ export const financeService = {
   cancelInvoice: (id: string) => api.put(`/finance/invoices/${id}/cancel`),
 
   // Payments
-  getPayments: () => api.get<Payment[]>('/finance/payments'),
+  getPayments: (params?: { studentId?: string }) => {
+    const query = params ? new URLSearchParams(params as any).toString() : '';
+    return api.get<Payment[]>(`/finance/payments${query ? `?${query}` : ''}`);
+  },
   getPaymentById: (id: string) => api.get<Payment>(`/finance/payments/${id}`),
   createPayment: (data: any) => api.post<Payment>('/finance/payments', data),
   deletePayment: (id: string) => api.delete(`/finance/payments/${id}`),

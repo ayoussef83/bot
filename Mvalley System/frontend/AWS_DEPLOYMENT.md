@@ -153,3 +153,5 @@ In your NestJS backend, update CORS configuration to allow:
 - **Frontend URL:** https://mv-os.mvalley-eg.com (after setup)
 - **Marketing Website:** https://mvalley-eg.com
 
+
+

@@ -79,7 +79,7 @@ export default function CampaignsPage() {
   const fetchChannelAccounts = async () => {
     try {
       const response = await marketingService.getChannelAccounts();
-      const activeAccounts = response.data.filter((acc) => acc.status === 'active');
+      const activeAccounts = response.data.filter((acc) => acc.status === 'connected');
       setChannelAccounts(activeAccounts);
       if (activeAccounts.length > 0 && !formData.channelAccountId) {
         setFormData({ ...formData, channelAccountId: activeAccounts[0].id });

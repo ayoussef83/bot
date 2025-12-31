@@ -93,7 +93,7 @@ export default function FinanceOverviewPage() {
         />
         <SummaryCard
           title="Actual Revenue"
-          value={(actualRevenue._sum.amount || 0).toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+          value={(actualRevenue || 0).toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
           icon={<FiDollarSign className="w-5 h-5" />}
           variant="success"
         />
@@ -136,8 +136,8 @@ export default function FinanceOverviewPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-600">Margin</p>
-            <p className={`text-2xl font-bold mt-2 ${netResult.margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {netResult.margin.toFixed(1)}%
+            <p className={`text-2xl font-bold mt-2 ${(netResult.margin || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {(netResult.margin || 0).toFixed(1)}%
             </p>
           </div>
         </div>
@@ -175,7 +175,7 @@ export default function FinanceOverviewPage() {
             <FiCreditCard className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {overview.recentPayments.length === 0 ? (
+            {!overview.recentPayments || overview.recentPayments.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">No recent payments</p>
             ) : (
               overview.recentPayments.map((payment) => (
@@ -205,7 +205,7 @@ export default function FinanceOverviewPage() {
             <FiFileText className="w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-3">
-            {overview.recentExpenses.length === 0 ? (
+            {!overview.recentExpenses || overview.recentExpenses.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">No recent expenses</p>
             ) : (
               overview.recentExpenses.map((expense) => (

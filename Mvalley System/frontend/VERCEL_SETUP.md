@@ -63,3 +63,5 @@ Or set it in Vercel dashboard for the marketing website project.
 - Make sure your backend has CORS configured to allow requests from `mv-os.mvalley-eg.com`
 - The frontend will automatically use `/api` in production if `NEXT_PUBLIC_API_URL` is not set, but it's better to explicitly set it
 
+
+

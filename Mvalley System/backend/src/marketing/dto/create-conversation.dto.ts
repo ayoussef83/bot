@@ -35,3 +35,5 @@ export class CreateConversationDto {
   metadata?: Record<string, any>; // Post URL, story ID, ad ID, etc.
 }
 
+
+

@@ -161,6 +161,27 @@ class FinanceService {
     const response = await api.get('/finance/periods');
     return response.data;
   }
+
+  // Reconciliation
+  async getReconciliation(period: string): Promise<any> {
+    const response = await api.get(`/finance/reconciliation?period=${period}`);
+    return response.data;
+  }
+
+  async createReconciliationRecord(data: any): Promise<any> {
+    const response = await api.post('/finance/reconciliation', data);
+    return response.data;
+  }
+
+  async closePeriod(period: string): Promise<any> {
+    const response = await api.put(`/finance/reconciliation/close?period=${period}`);
+    return response.data;
+  }
+
+  async lockPeriod(period: string): Promise<any> {
+    const response = await api.put(`/finance/reconciliation/lock?period=${period}`);
+    return response.data;
+  }
 }
 
 export const financeReportsService = new FinanceService();

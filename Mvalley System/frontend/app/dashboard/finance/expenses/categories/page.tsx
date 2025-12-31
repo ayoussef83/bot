@@ -168,7 +168,8 @@ export default function ExpenseCategoriesPage() {
   ];
 
   return (
-    <StandardListView
+    <>
+      <StandardListView
       title="Expense Categories"
       subtitle="Manage expense categories for reporting and budgeting"
       primaryAction={{
@@ -231,7 +232,7 @@ export default function ExpenseCategoriesPage() {
         </>
       }
       getRowId={(row) => row.id}
-    />
+      />
 
       {/* Add/Edit Category Modal */}
       {showForm && (
@@ -383,7 +384,7 @@ export default function ExpenseCategoriesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

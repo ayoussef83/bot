@@ -4,7 +4,14 @@ export * from './sales.service';
 export * from './instructors.service';
 export * from './marketing.service';
 export * from './settings.service';
-export { financeReportsService } from './finance.service';
+export { 
+  financeReportsService, 
+  type FinancialPeriod,
+  type ProfitAndLossReport,
+  type CashFlowReport,
+  type ClassProfitabilityReport,
+  type InstructorCostsReport,
+} from './finance.service';
 export {
   financeService,
   type Invoice,

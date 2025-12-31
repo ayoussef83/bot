@@ -25,3 +25,5 @@ export class UpdateChannelAccountDto extends PartialType(CreateChannelAccountDto
   settings?: Record<string, any>;
 }
 
+
+

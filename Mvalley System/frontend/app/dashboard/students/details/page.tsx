@@ -61,7 +61,7 @@ export default function StudentDetailPage() {
       const response = await financeService.getPayments({ studentId });
       setPayments(response.data);
     } catch (err: any) {
-      console.error('Failed to load payments', err);
+      // Failed to load payments
     }
   };
 

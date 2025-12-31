@@ -336,7 +336,8 @@ export default function PaymentsPage() {
   ];
 
   return (
-    <StandardListView
+    <>
+      <StandardListView
       title="Payments"
       subtitle="Manage incoming payments and allocations"
       primaryAction={{
@@ -396,7 +397,7 @@ export default function PaymentsPage() {
         </>
       }
       getRowId={(row) => row.id}
-    />
+      />
 
       {/* Create Payment Modal */}
       {showCreateModal && (
@@ -640,7 +641,7 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

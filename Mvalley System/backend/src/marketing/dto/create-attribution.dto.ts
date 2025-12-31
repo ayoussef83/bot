@@ -42,3 +42,5 @@ export class CreateAttributionDto {
   touchpoints?: Record<string, any>; // Array of touchpoints before conversion
 }
 
+
+
