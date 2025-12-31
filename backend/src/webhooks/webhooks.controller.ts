@@ -51,16 +51,22 @@ export class WebhooksController {
         });
         if (!channel) continue;
 
-        const participant = await this.prisma.participant.upsert({
+        const existingParticipant = await this.prisma.participant.findFirst({
           where: { platformUserId: senderId },
-          update: { lastSeenAt: new Date() },
-          create: {
-            platformUserId: senderId,
-            type: 'unknown',
-            firstSeenAt: new Date(),
-            lastSeenAt: new Date(),
-          },
         });
+        const participant = existingParticipant
+          ? await this.prisma.participant.update({
+              where: { id: existingParticipant.id },
+              data: { lastSeenAt: new Date() },
+            })
+          : await this.prisma.participant.create({
+              data: {
+                platformUserId: senderId,
+                type: 'unknown',
+                firstSeenAt: new Date(),
+                lastSeenAt: new Date(),
+              },
+            });
 
         const threadId = `${pageId}:${senderId}`;
         const sentAt = new Date(tsMs);
