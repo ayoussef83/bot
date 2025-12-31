@@ -102,6 +102,12 @@ You should also enable GitHub **Branch protection** for `main`:
 - Block force-pushes / deletions
 - Restrict who can push to `main`
 
+You should also enable GitHub **Branch protection** for `develop`:
+- Require pull request before merging
+- Require status checks to pass (select **Branch policy**)
+- Block force-pushes / deletions
+- Restrict who can push to `develop`
+
 ## Staging vs Production AWS layout (recommended)
 
 - **Two App Runner services**

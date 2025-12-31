@@ -24,6 +24,33 @@ jobs:
           echo "❌ Policy violation: PRs into 'main' must come from 'develop' (or 'release/*')."
           exit 1
 
+  enforce-develop-from-feature:
+    name: Enforce develop PRs come from feature branches (not main/release)
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.base.ref == 'develop' }}
+    steps:
+      - name: Check source branch
+        run: |
+          echo "Base:  ${{ github.event.pull_request.base.ref }}"
+          echo "Head:  ${{ github.event.pull_request.head.ref }}"
+
+          HEAD="${{ github.event.pull_request.head.ref }}"
+
+          # Disallow promotion backwards
+          if [ "$HEAD" = "main" ] || [[ "$HEAD" == release/* ]]; then
+            echo "❌ Policy violation: PRs into 'develop' must not come from 'main' or 'release/*'."
+            exit 1
+          fi
+
+          # Allow standard dev branch prefixes + Dependabot
+          if [[ "$HEAD" == feature/* ]] || [[ "$HEAD" == bugfix/* ]] || [[ "$HEAD" == hotfix/* ]] || [[ "$HEAD" == chore/* ]] || [[ "$HEAD" == refactor/* ]] || [[ "$HEAD" == dependabot/* ]]; then
+            echo "✅ Allowed: develop <= $HEAD"
+            exit 0
+          fi
+
+          echo "❌ Policy violation: PRs into 'develop' must come from feature branches (feature/*, bugfix/*, hotfix/*, chore/*, refactor/*, dependabot/*)."
+          exit 1
+
   enforce-no-local-env-files:
     name: Prevent committing real .env files
     runs-on: ubuntu-latest
