@@ -43,6 +43,9 @@ import {
   RiPresentationFill,
   RiWalkFill,
 } from 'react-icons/ri';
+import { MdContactPhone } from 'react-icons/md';
+import { TbCash } from 'react-icons/tb';
+import { AiTwotoneDashboard } from 'react-icons/ai';
 
 type NavigationSection = {
   id: string;
@@ -58,7 +61,7 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: <FiHome className="w-4 h-4" />,
+    icon: <AiTwotoneDashboard className="w-4 h-4" />,
     path: '/dashboard',
     group: 'Main',
   },
@@ -102,7 +105,7 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'crm',
     label: 'CRM',
-    icon: <FiGitBranch className="w-4 h-4" />,
+    icon: <MdContactPhone className="w-4 h-4" />,
     group: 'Main',
     roles: ['super_admin', 'sales', 'management'],
     children: [
@@ -168,7 +171,7 @@ const navigationSections: NavigationSection[] = [
       {
         id: 'finance-cash',
         label: 'Cash',
-        icon: <FiCreditCard className="w-4 h-4" />,
+        icon: <TbCash className="w-4 h-4" />,
         roles: ['super_admin', 'management', 'accounting'],
         children: [
           {
