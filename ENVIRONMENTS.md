@@ -90,6 +90,18 @@ Rules:
 - Promote `develop` to staging App Runner for validation
 - Merge `develop` → `main` only after staging approval
 
+### GitHub enforcement (recommended)
+
+This repo includes a GitHub Actions policy (`.github/workflows/branch-policy.yml`) that:
+- Blocks PRs into `main` unless the source branch is `develop` (or `release/*`)
+- Fails the PR if a real `.env` file is committed (templates only under `env/*.example`)
+
+You should also enable GitHub **Branch protection** for `main`:
+- Require pull request before merging
+- Require status checks to pass (select **Branch policy**)
+- Block force-pushes / deletions
+- Restrict who can push to `main`
+
 ## Staging vs Production AWS layout (recommended)
 
 - **Two App Runner services**

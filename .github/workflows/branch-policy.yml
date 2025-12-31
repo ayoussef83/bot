@@ -1,0 +1,46 @@
+name: Branch policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  enforce-main-from-develop:
+    name: Enforce main PRs come from develop/release/*
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.base.ref == 'main' }}
+    steps:
+      - name: Check source branch
+        run: |
+          echo "Base:  ${{ github.event.pull_request.base.ref }}"
+          echo "Head:  ${{ github.event.pull_request.head.ref }}"
+
+          HEAD="${{ github.event.pull_request.head.ref }}"
+          if [ "$HEAD" = "develop" ] || [[ "$HEAD" == release/* ]]; then
+            echo "✅ Allowed: main <= $HEAD"
+            exit 0
+          fi
+
+          echo "❌ Policy violation: PRs into 'main' must come from 'develop' (or 'release/*')."
+          exit 1
+
+  enforce-no-local-env-files:
+    name: Prevent committing real .env files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for committed env files
+        run: |
+          set -euo pipefail
+          # Allow only templates under env/*.example
+          BAD=$(git ls-files | egrep -i '(^|/)\.env($|\.|/)' | egrep -v '^env/.*\.example$' || true)
+          if [ -n "$BAD" ]; then
+            echo "❌ Found committed env file(s):"
+            echo "$BAD"
+            echo ""
+            echo "Commit env templates only (env/*.example). Do not commit real .env files."
+            exit 1
+          fi
+          echo "✅ No committed .env files detected."
+
+
