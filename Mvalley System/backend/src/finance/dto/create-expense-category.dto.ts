@@ -1,0 +1,20 @@
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
+
+export class CreateExpenseCategoryDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  code: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+
+
+
