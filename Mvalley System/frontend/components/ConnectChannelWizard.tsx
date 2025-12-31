@@ -160,6 +160,20 @@ export default function ConnectChannelWizard({
     form.externalId.trim().length > 2 &&
     form.accessToken.trim().length > 10;
 
+  const startMetaOAuth = async () => {
+    setError('');
+    try {
+      const redirectUri = `${window.location.origin}/dashboard/settings/integrations/meta-callback`;
+      const res = await marketingService.getMetaOAuthUrl(redirectUri);
+      const url = res?.data?.url;
+      if (!url) throw new Error('No OAuth URL returned');
+      window.location.href = url;
+    } catch (e: any) {
+      const msg = e?.response?.data?.message;
+      setError(typeof msg === 'string' ? msg : msg?.message || 'Failed to start Meta connection');
+    }
+  };
+
   const handleSave = async () => {
     if (!integrationId || !platform || platform === 'linkedin') return;
     setSubmitting(true);
@@ -244,6 +258,25 @@ export default function ConnectChannelWizard({
 
             {step === 2 && platform !== 'linkedin' && (
               <div className="space-y-4">
+                {platform === 'facebook_page' && (
+                  <div className="border border-indigo-200 bg-indigo-50 rounded p-3">
+                    <div className="text-sm font-semibold text-indigo-900">Recommended</div>
+                    <div className="text-sm text-indigo-800 mt-1">
+                      Connect via Meta OAuth to enable Facebook Messenger automatically (no manual tokens).
+                    </div>
+                    <button
+                      type="button"
+                      onClick={startMetaOAuth}
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                    >
+                      Connect with Facebook
+                    </button>
+                    <div className="text-xs text-indigo-700 mt-2">
+                      You’ll be redirected to Facebook, then back to MV-OS.
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Account Name</label>

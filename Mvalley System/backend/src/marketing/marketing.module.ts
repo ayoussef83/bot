@@ -12,9 +12,12 @@ import { MessagesController } from './messages.controller';
 import { MessagesService } from './messages.service';
 import { ParticipantsController } from './participants.controller';
 import { ParticipantsService } from './participants.service';
+import { MetaOAuthController } from './meta/meta-oauth.controller';
+import { MetaOAuthService } from './meta/meta-oauth.service';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, JwtModule.register({})],
   controllers: [
     MarketingController,
     ChannelAccountsController,
@@ -22,6 +25,7 @@ import { ParticipantsService } from './participants.service';
     ConversationsController,
     MessagesController,
     ParticipantsController,
+    MetaOAuthController,
   ],
   providers: [
     MarketingService,
@@ -30,6 +34,7 @@ import { ParticipantsService } from './participants.service';
     ConversationsService,
     MessagesService,
     ParticipantsService,
+    MetaOAuthService,
   ],
   exports: [
     MarketingService,
@@ -38,6 +43,7 @@ import { ParticipantsService } from './participants.service';
     ConversationsService,
     MessagesService,
     ParticipantsService,
+    MetaOAuthService,
   ],
 })
 export class MarketingModule {}

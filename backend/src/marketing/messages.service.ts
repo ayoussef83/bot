@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMessageDto } from './dto';
 
@@ -7,6 +7,61 @@ export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateMessageDto) {
+    // Unified messaging: if outbound and Facebook Page, send via Meta API first, then store message.
+    if (data.direction === 'outbound') {
+      const conv = await this.prisma.conversation.findUnique({
+        where: { id: data.conversationId },
+        include: { channelAccount: true, participant: true },
+      });
+      if (!conv) throw new NotFoundException('Conversation not found');
+
+      if (conv.platform === 'facebook_page') {
+        const pageToken = conv.channelAccount?.accessToken;
+        const psid = conv.participant?.platformUserId;
+        if (!pageToken) throw new BadRequestException('Facebook Page token is missing');
+        if (!psid) throw new BadRequestException('Participant is missing platformUserId (PSID)');
+        if (data.type !== 'text') throw new BadRequestException('Only text messages are supported for Messenger right now');
+
+        const url = new URL('https://graph.facebook.com/v20.0/me/messages');
+        url.searchParams.set('access_token', pageToken);
+
+        const resp = await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messaging_type: 'RESPONSE',
+            recipient: { id: psid },
+            message: { text: data.content || '' },
+          }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          throw new BadRequestException(json?.error?.message || 'Failed to send Messenger message');
+        }
+        const metaMessageId = String(json?.message_id || data.externalMessageId);
+
+        const created = await this.prisma.message.create({
+          data: {
+            ...data,
+            externalMessageId: metaMessageId,
+            sentAt: data.sentAt ? new Date(data.sentAt) : new Date(),
+            deliveredAt: data.deliveredAt ? new Date(data.deliveredAt) : null,
+            readAt: data.readAt ? new Date(data.readAt) : null,
+          },
+          include: {
+            conversation: { include: { participant: true } },
+          },
+        });
+
+        await this.prisma.conversation.update({
+          where: { id: data.conversationId },
+          data: { lastMessageAt: created.sentAt },
+        });
+
+        return created;
+      }
+    }
+
     const message = await this.prisma.message.create({
       data: {
         ...data,

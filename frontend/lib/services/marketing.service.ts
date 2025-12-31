@@ -223,6 +223,21 @@ class MarketingService {
     return response;
   }
 
+  // Meta OAuth (Facebook Pages/Messenger)
+  async getMetaOAuthUrl(redirectUri: string): Promise<{ data: { url: string } }> {
+    const response = await api.get('/marketing/meta/oauth/url', { params: { redirectUri } });
+    return response;
+  }
+
+  async exchangeMetaOAuth(data: {
+    code: string;
+    state: string;
+    redirectUri: string;
+  }): Promise<{ data: { connected: ChannelAccount[] } }> {
+    const response = await api.post('/marketing/meta/oauth/exchange', data);
+    return response;
+  }
+
   async sendMessage(data: {
     conversationId: string;
     content: string;
