@@ -111,4 +111,35 @@ ngrok http 3000
 - Never debug by deploying to App Runner.
 - Never use production credentials in staging.
 
+## Git workflow without SSH keys (HTTPS + gh)
+
+If you can’t use SSH keys, keep your git remote on HTTPS and use GitHub CLI for admin tasks.
+
+### Create `develop` branch (CLI)
+
+```bash
+cd "/Users/ahmedyoussef/Mvalley System"
+git checkout main
+git pull
+git checkout -b develop
+git push -u origin develop
+```
+
+### Enforce branch protection (no UI clicks)
+
+1) Install GitHub CLI: `gh`
+2) Authenticate:
+
+```bash
+gh auth login
+```
+
+3) Run:
+
+```bash
+cd "/Users/ahmedyoussef/Mvalley System"
+chmod +x scripts/github/setup-branch-protection.sh
+./scripts/github/setup-branch-protection.sh
+```
+
 
