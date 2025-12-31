@@ -9,6 +9,7 @@ import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { FiLink, FiPlus, FiEdit, FiTrash2, FiCheckCircle, FiXCircle, FiAlertCircle, FiFacebook, FiInstagram, FiMessageCircle } from 'react-icons/fi';
+import ConnectChannelModal from '@/components/ConnectChannelModal';
 
 export default function ChannelsPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function ChannelsPage() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   useEffect(() => {
     fetchChannels();
@@ -175,15 +177,13 @@ export default function ChannelsPage() {
   ];
 
   return (
+    <>
     <StandardListView
       title="Channels"
       subtitle="Manage connected social media accounts"
       primaryAction={{
         label: 'Connect Channel',
-        onClick: () => {
-          // TODO: Open connect channel modal/OAuth flow
-          alert('Connect channel functionality coming soon');
-        },
+        onClick: () => setShowConnectModal(true),
         icon: <FiPlus className="w-4 h-4" />,
       }}
       searchPlaceholder="Search by channel name or platform..."
@@ -202,9 +202,7 @@ export default function ChannelsPage() {
           message="Connect your social media accounts to start receiving conversations"
           action={{
             label: 'Connect Channel',
-            onClick: () => {
-              alert('Connect channel functionality coming soon');
-            },
+            onClick: () => setShowConnectModal(true),
           }}
         />
       }
@@ -236,6 +234,17 @@ export default function ChannelsPage() {
       }
       getRowId={(row) => row.id}
     />
+
+    {/* Connect Channel Modal */}
+    <ConnectChannelModal
+      isOpen={showConnectModal}
+      onClose={() => setShowConnectModal(false)}
+      onSuccess={() => {
+        fetchChannels();
+        setShowConnectModal(false);
+      }}
+    />
+  </>
   );
 }
 

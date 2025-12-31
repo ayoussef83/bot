@@ -16,6 +16,16 @@ export interface ChannelAccount {
   };
 }
 
+export interface CreateChannelAccountData {
+  platform: 'facebook_page' | 'instagram_business' | 'whatsapp_business';
+  externalId: string;
+  name: string;
+  accessToken: string;
+  refreshToken?: string;
+  status?: 'connected' | 'disconnected' | 'error';
+  settings?: Record<string, any>;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -132,7 +142,7 @@ class MarketingService {
     return response;
   }
 
-  async createChannelAccount(data: Partial<ChannelAccount>): Promise<{ data: ChannelAccount }> {
+  async createChannelAccount(data: CreateChannelAccountData): Promise<{ data: ChannelAccount }> {
     const response = await api.post('/marketing/channel-accounts', data);
     return response;
   }
