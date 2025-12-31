@@ -14,10 +14,9 @@ import { ParticipantsController } from './participants.controller';
 import { ParticipantsService } from './participants.service';
 import { MetaOAuthController } from './meta/meta-oauth.controller';
 import { MetaOAuthService } from './meta/meta-oauth.service';
-import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [PrismaModule, JwtModule.register({})],
+  imports: [PrismaModule],
   controllers: [
     MarketingController,
     ChannelAccountsController,

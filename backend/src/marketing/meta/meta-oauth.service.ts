@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { JwtService } from '@nestjs/jwt';
 import { MarketingPlatform } from '@prisma/client';
+import * as jsonwebtoken from 'jsonwebtoken';
 
 type OAuthStatePayload = {
   uid: string;
@@ -14,7 +14,6 @@ export class MetaOAuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
   ) {}
 
   private graphVersion() {
@@ -33,15 +32,30 @@ export class MetaOAuthService {
     return v;
   }
 
+  private stateSecret() {
+    const v = this.config.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
+    if (!v) throw new BadRequestException('JWT_SECRET is not configured');
+    return v;
+  }
+
+  private signState(payload: OAuthStatePayload) {
+    return jsonwebtoken.sign(payload, this.stateSecret(), { expiresIn: '10m' });
+  }
+
+  private verifyState(state: string): OAuthStatePayload {
+    try {
+      return jsonwebtoken.verify(state, this.stateSecret()) as OAuthStatePayload;
+    } catch {
+      throw new BadRequestException('Invalid or expired state');
+    }
+  }
+
   getOAuthUrl(userId: string, redirectUri: string) {
     if (!redirectUri?.startsWith('https://') && !redirectUri?.startsWith('http://localhost')) {
       throw new BadRequestException('Invalid redirectUri');
     }
 
-    const state = this.jwt.sign(
-      { uid: userId, ts: Date.now() } satisfies OAuthStatePayload,
-      { expiresIn: '10m' },
-    );
+    const state = this.signState({ uid: userId, ts: Date.now() });
 
     const params = new URLSearchParams({
       client_id: this.appId(),
@@ -90,12 +104,7 @@ export class MetaOAuthService {
   }
 
   async exchangeAndConnectPages(currentUserId: string, code: string, state: string, redirectUri: string) {
-    let payload: OAuthStatePayload;
-    try {
-      payload = this.jwt.verify(state) as OAuthStatePayload;
-    } catch {
-      throw new BadRequestException('Invalid or expired state');
-    }
+    const payload = this.verifyState(state);
     if (payload.uid !== currentUserId) {
       throw new BadRequestException('State user mismatch');
     }
