@@ -32,6 +32,11 @@ import {
   FiShare2,
   FiMessageCircle,
   FiTrendingUp,
+  FiGitBranch,
+  FiRefreshCw,
+  FiBriefcase,
+  FiTarget,
+  FiRadio,
 } from 'react-icons/fi';
 
 type NavigationSection = {
@@ -92,7 +97,7 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'crm',
     label: 'CRM',
-    icon: <FiPhone className="w-4 h-4" />,
+    icon: <FiGitBranch className="w-4 h-4" />,
     group: 'Main',
     roles: ['super_admin', 'sales', 'management'],
     children: [
@@ -202,7 +207,7 @@ const navigationSections: NavigationSection[] = [
       {
         id: 'finance-reconciliation',
         label: 'Reconciliation',
-        icon: <FiCheckCircle className="w-4 h-4" />,
+        icon: <FiRefreshCw className="w-4 h-4" />,
         path: '/dashboard/finance/reconciliation',
         roles: ['super_admin', 'management', 'accounting'],
       },
@@ -247,7 +252,7 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'hr',
     label: 'HR',
-    icon: <FiUsers className="w-4 h-4" />,
+    icon: <FiBriefcase className="w-4 h-4" />,
     group: 'Main',
     roles: ['super_admin', 'operations', 'management', 'accounting'],
     children: [
@@ -298,14 +303,14 @@ const navigationSections: NavigationSection[] = [
       {
         id: 'marketing-campaigns',
         label: 'Campaigns',
-        icon: <FiTrendingUp className="w-4 h-4" />,
+        icon: <FiTarget className="w-4 h-4" />,
         path: '/dashboard/marketing/campaigns',
         roles: ['super_admin', 'management', 'operations', 'sales'],
       },
       {
         id: 'marketing-channels',
         label: 'Channels',
-        icon: <FiLink className="w-4 h-4" />,
+        icon: <FiRadio className="w-4 h-4" />,
         path: '/dashboard/marketing/channels',
         roles: ['super_admin', 'management'],
       },
