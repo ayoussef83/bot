@@ -282,70 +282,71 @@ export default function CampaignsPage() {
   ];
 
   return (
-    <StandardListView
-      title="Campaigns"
-      subtitle="Track marketing campaigns and their performance"
-      primaryAction={{
-        label: 'Create Campaign',
-        onClick: () => {
-          setShowCreateModal(true);
-        },
-        icon: <FiPlus className="w-4 h-4" />,
-      }}
-      searchPlaceholder="Search by campaign name or description..."
-      onSearch={setSearchTerm}
-      searchValue={searchTerm}
-      filters={filters}
-      columns={columns}
-      data={filteredCampaigns}
-      loading={loading}
-      actions={actions}
-      emptyMessage="No campaigns found"
-      emptyState={
-        <EmptyState
-          icon={<FiTrendingUp className="w-12 h-12 text-gray-400" />}
-          title="No campaigns"
-          message="Create your first marketing campaign to start tracking performance"
-          action={{
-            label: 'Create Campaign',
-            onClick: () => {
-              setShowCreateModal(true);
-            },
-          }}
-        />
-      }
-      summaryCards={
-        <>
-          <SummaryCard
-            title="Total Campaigns"
-            value={totalCampaigns}
-            icon={<FiTrendingUp className="w-5 h-5" />}
+    <>
+      <StandardListView
+        title="Campaigns"
+        subtitle="Track marketing campaigns and their performance"
+        primaryAction={{
+          label: 'Create Campaign',
+          onClick: () => {
+            setShowCreateModal(true);
+          },
+          icon: <FiPlus className="w-4 h-4" />,
+        }}
+        searchPlaceholder="Search by campaign name or description..."
+        onSearch={setSearchTerm}
+        searchValue={searchTerm}
+        filters={filters}
+        columns={columns}
+        data={filteredCampaigns}
+        loading={loading}
+        actions={actions}
+        emptyMessage="No campaigns found"
+        emptyState={
+          <EmptyState
+            icon={<FiTrendingUp className="w-12 h-12 text-gray-400" />}
+            title="No campaigns"
+            message="Create your first marketing campaign to start tracking performance"
+            action={{
+              label: 'Create Campaign',
+              onClick: () => {
+                setShowCreateModal(true);
+              },
+            }}
           />
-          <SummaryCard
-            title="Active"
-            value={activeCount}
-            variant="success"
-            icon={<FiCheckCircle className="w-5 h-5" />}
-          />
-          <SummaryCard
-            title="Paused"
-            value={pausedCount}
-            variant="warning"
-            icon={<FiPause className="w-5 h-5" />}
-          />
-          <SummaryCard
-            title="Total Conversations"
-            value={totalConversations}
-            variant="info"
-            icon={<FiMessageCircle className="w-5 h-5" />}
-          />
-        </>
-      }
-      getRowId={(row) => row.id}
-      onRowClick={(row) => {
-        router.push(`/dashboard/marketing/campaigns/details?id=${row.id}`);
-      }}
-    />
+        }
+        summaryCards={
+          <>
+            <SummaryCard
+              title="Total Campaigns"
+              value={totalCampaigns}
+              icon={<FiTrendingUp className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Active"
+              value={activeCount}
+              variant="success"
+              icon={<FiCheckCircle className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Paused"
+              value={pausedCount}
+              variant="warning"
+              icon={<FiPause className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Total Conversations"
+              value={totalConversations}
+              variant="info"
+              icon={<FiMessageCircle className="w-5 h-5" />}
+            />
+          </>
+        }
+        getRowId={(row) => row.id}
+        onRowClick={(row) => {
+          router.push(`/dashboard/marketing/campaigns/details?id=${row.id}`);
+        }}
+      />
 
       {/* Create Campaign Modal */}
       {showCreateModal && (
@@ -635,7 +636,7 @@ export default function CampaignsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
