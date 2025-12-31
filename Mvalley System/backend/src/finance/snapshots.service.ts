@@ -12,12 +12,11 @@ export class SnapshotsService {
     // Get payments
     const payments = await this.prisma.payment.findMany({
       where: {
-        paymentDate: {
+        receivedDate: {
           gte: startDate,
           lte: endDate,
         },
-        status: 'completed',
-        deletedAt: null,
+        status: 'received',
       },
     });
 
@@ -28,36 +27,37 @@ export class SnapshotsService {
           gte: startDate,
           lte: endDate,
         },
-        deletedAt: null,
       },
+      include: { category: true },
     });
 
     // Calculate revenue
     const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-    const subscriptionRevenue = payments
-      .filter((p) => p.type === 'subscription')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const campRevenue = payments
-      .filter((p) => p.type === 'camp')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const b2bRevenue = payments
-      .filter((p) => p.type === 'b2b')
-      .reduce((sum, p) => sum + p.amount, 0);
+    // Payment "type" is not modeled in Prisma; keep breakdowns as 0 for now.
+    const subscriptionRevenue = 0;
+    const campRevenue = 0;
+    const b2bRevenue = 0;
 
     // Calculate expenses
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const rentExpenses = expenses
-      .filter((e) => e.category === 'rent')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const instructorExpenses = expenses
-      .filter((e) => e.category === 'instructor')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const marketingExpenses = expenses
-      .filter((e) => e.category === 'marketing')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const operationsExpenses = expenses
-      .filter((e) => e.category === 'operations')
-      .reduce((sum, e) => sum + e.amount, 0);
+    // Best-effort bucketization based on expense category name/code.
+    const byBucket = expenses.reduce(
+      (acc, e) => {
+        const key = `${e.category?.code ?? ''} ${e.category?.name ?? ''}`.toLowerCase();
+        if (key.includes('rent')) acc.rent += e.amount;
+        else if (key.includes('instr') || key.includes('instructor')) acc.instructor += e.amount;
+        else if (key.includes('mkt') || key.includes('market')) acc.marketing += e.amount;
+        else if (key.includes('oper')) acc.operations += e.amount;
+        else acc.other += e.amount;
+        return acc;
+      },
+      { rent: 0, instructor: 0, marketing: 0, operations: 0, other: 0 },
+    );
+
+    const rentExpenses = byBucket.rent;
+    const instructorExpenses = byBucket.instructor;
+    const marketingExpenses = byBucket.marketing;
+    const operationsExpenses = byBucket.operations;
 
     // Get active students
     const activeStudents = await this.prisma.student.count({

@@ -1,9 +1,9 @@
 import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards } from '@nestjs/common';
 import { CashAccountsService } from './cash-accounts.service';
 import { CreateCashAccountDto } from './dto/create-cash-account.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('finance/cash-accounts')
 @UseGuards(JwtAuthGuard, RolesGuard)

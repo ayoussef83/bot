@@ -14,12 +14,11 @@ export class DashboardService {
     // Revenue
     const payments = await this.prisma.payment.findMany({
       where: {
-        paymentDate: {
+        receivedDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        status: 'completed',
-        deletedAt: null,
+        status: 'received',
       },
     });
     const monthlyRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -106,7 +105,6 @@ export class DashboardService {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        deletedAt: null,
       },
     });
     const cashOut = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -233,15 +231,14 @@ export class DashboardService {
     // Payments received
     const payments = await this.prisma.payment.findMany({
       where: {
-        paymentDate: {
+        receivedDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        status: 'completed',
-        deletedAt: null,
+        status: 'received',
       },
       include: {
-        student: {
+        Student: {
           select: {
             id: true,
             firstName: true,
@@ -250,7 +247,7 @@ export class DashboardService {
         },
       },
       orderBy: {
-        paymentDate: 'desc',
+        receivedDate: 'desc',
       },
     });
 
@@ -261,7 +258,6 @@ export class DashboardService {
         payments: {
           where: {
             status: 'pending',
-            deletedAt: null,
           },
         },
       },
@@ -287,15 +283,16 @@ export class DashboardService {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        deletedAt: null,
       },
+      include: { category: true },
     });
 
     const expenseBreakdown = expenses.reduce((acc, expense) => {
-      if (!acc[expense.category]) {
-        acc[expense.category] = 0;
+      const key = expense.category?.name || expense.categoryId;
+      if (!acc[key]) {
+        acc[key] = 0;
       }
-      acc[expense.category] += expense.amount;
+      acc[key] += expense.amount;
       return acc;
     }, {} as Record<string, number>);
 

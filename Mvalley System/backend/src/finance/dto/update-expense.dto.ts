@@ -1,17 +1,15 @@
 import {
-  IsEnum,
   IsNumber,
   IsString,
   IsDateString,
   IsOptional,
   Min,
 } from 'class-validator';
-import { ExpenseCategory } from '@prisma/client';
 
 export class UpdateExpenseDto {
   @IsOptional()
-  @IsEnum(ExpenseCategory)
-  category?: ExpenseCategory;
+  @IsString()
+  categoryId?: string;
 
   @IsOptional()
   @IsNumber()

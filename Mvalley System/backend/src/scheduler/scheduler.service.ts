@@ -21,7 +21,7 @@ export class SchedulerService {
   ) {}
 
   /**
-   * Check for payments due in 3 days and send reminders
+   * Check for invoices due in 3 days and send reminders
    * Runs daily at 9:00 AM
    */
   @Cron('0 9 * * *', {
@@ -29,7 +29,7 @@ export class SchedulerService {
     timeZone: 'Africa/Cairo',
   })
   async handlePaymentDueReminders() {
-    this.logger.log('Running payment due reminders check...');
+    this.logger.log('Running invoice due reminders check...');
 
     try {
       const threeDaysFromNow = new Date();
@@ -39,15 +39,16 @@ export class SchedulerService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Find payments due in 3 days that are still pending
-      const paymentsDue = await this.prisma.payment.findMany({
+      // Find invoices due in 3 days that are not fully paid/cancelled
+      const invoicesDue = await this.prisma.invoice.findMany({
         where: {
-          status: 'pending',
           dueDate: {
             gte: today,
             lte: threeDaysFromNow,
           },
-          deletedAt: null,
+          status: {
+            in: ['issued', 'partially_paid', 'overdue'],
+          },
         },
         include: {
           student: {
@@ -55,17 +56,22 @@ export class SchedulerService {
               parent: true,
             },
           },
+          paymentAllocations: true,
         },
       });
 
-      this.logger.log(`Found ${paymentsDue.length} payments due in 3 days`);
+      this.logger.log(`Found ${invoicesDue.length} invoices due in 3 days`);
 
-      for (const payment of paymentsDue) {
-        // Check if we already sent a reminder for this payment
+      for (const invoice of invoicesDue) {
+        const paidAmount = invoice.paymentAllocations.reduce((sum, a) => sum + a.amount, 0);
+        const remaining = Math.max(0, invoice.totalAmount - paidAmount);
+        if (remaining <= 0) continue;
+
+        // Check if we already sent a reminder for this invoice
         const existingNotification = await this.prisma.notification.findFirst({
           where: {
             template: 'payment_due_reminder',
-            payload: JSON.stringify({ paymentId: payment.id }),
+            payload: JSON.stringify({ invoiceId: invoice.id }),
             status: 'sent',
             createdAt: {
               gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
@@ -74,16 +80,16 @@ export class SchedulerService {
         });
 
         if (existingNotification) {
-          this.logger.debug(`Reminder already sent for payment ${payment.id}`);
+          this.logger.debug(`Reminder already sent for invoice ${invoice.id}`);
           continue;
         }
 
         // Get recipient (student or parent)
-        const recipient = payment.student?.parent?.phone || payment.student?.phone;
-        const recipientEmail = payment.student?.parent?.email || payment.student?.email;
+        const recipient = invoice.student?.parent?.phone || invoice.student?.phone;
+        const recipientEmail = invoice.student?.parent?.email || invoice.student?.email;
 
         if (!recipient && !recipientEmail) {
-          this.logger.warn(`No contact info for payment ${payment.id}`);
+          this.logger.warn(`No contact info for invoice ${invoice.id}`);
           continue;
         }
 
@@ -99,24 +105,24 @@ export class SchedulerService {
         if (!template || !template.isActive) {
           // Fallback message
           const daysUntilDue = Math.ceil(
-            (payment.dueDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+            (invoice.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
           );
-          const message = `Reminder: Payment of EGP ${payment.amount} is due in ${daysUntilDue} day(s). Please settle your payment to avoid service interruption.`;
+          const message = `Reminder: Invoice of EGP ${remaining} is due in ${daysUntilDue} day(s). Please settle to avoid service interruption.`;
           
           if (recipient) {
-            this.logger.log(`Sending SMS to ${recipient} for payment ${payment.id}`);
+            this.logger.log(`Sending SMS to ${recipient} for invoice ${invoice.id}`);
             try {
               await this.notificationsService.sendMessage({
                 channel: 'sms',
                 recipient,
                 message,
                 template: 'payment_due_reminder',
-                payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
-                studentId: payment.studentId || undefined,
+                payload: { invoiceId: invoice.id, amount: remaining, dueDate: invoice.dueDate },
+                studentId: invoice.studentId || undefined,
               });
-              this.logger.log(`✅ SMS sent successfully to ${recipient} for payment ${payment.id}`);
+              this.logger.log(`✅ SMS sent successfully to ${recipient} for invoice ${invoice.id}`);
             } catch (error: any) {
-              this.logger.error(`❌ Failed to send SMS to ${recipient} for payment ${payment.id}: ${error.message}`);
+              this.logger.error(`❌ Failed to send SMS to ${recipient} for invoice ${invoice.id}: ${error.message}`);
             }
           }
 
@@ -138,38 +144,38 @@ export class SchedulerService {
               subject: emailSubject,
               message: emailBody,
               template: 'payment_due_reminder',
-              payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
-              studentId: payment.studentId || undefined,
+              payload: { invoiceId: invoice.id, amount: remaining, dueDate: invoice.dueDate },
+              studentId: invoice.studentId || undefined,
             });
           }
         } else {
           // Use template with variable substitution
           let message = template.body;
           const daysUntilDue = Math.ceil(
-            (payment.dueDate!.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+            (invoice.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
           );
           
           // Simple variable replacement
-          message = message.replace(/\{\{amount\}\}/g, payment.amount.toString());
+          message = message.replace(/\{\{amount\}\}/g, remaining.toString());
           message = message.replace(/\{\{days\}\}/g, daysUntilDue.toString());
           message = message.replace(/\{\{studentName\}\}/g, 
-            payment.student ? `${payment.student.firstName} ${payment.student.lastName}` : 'Student'
+            invoice.student ? `${invoice.student.firstName} ${invoice.student.lastName}` : 'Student'
           );
 
           if (recipient) {
-            this.logger.log(`Sending SMS to ${recipient} for payment ${payment.id}`);
+            this.logger.log(`Sending SMS to ${recipient} for invoice ${invoice.id}`);
             try {
               await this.notificationsService.sendMessage({
                 channel: 'sms',
                 recipient,
                 message,
                 template: 'payment_due_reminder',
-                payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
-                studentId: payment.studentId || undefined,
+                payload: { invoiceId: invoice.id, amount: remaining, dueDate: invoice.dueDate },
+                studentId: invoice.studentId || undefined,
               });
-              this.logger.log(`✅ SMS sent successfully to ${recipient} for payment ${payment.id}`);
+              this.logger.log(`✅ SMS sent successfully to ${recipient} for invoice ${invoice.id}`);
             } catch (error: any) {
-              this.logger.error(`❌ Failed to send SMS to ${recipient} for payment ${payment.id}: ${error.message}`);
+              this.logger.error(`❌ Failed to send SMS to ${recipient} for invoice ${invoice.id}: ${error.message}`);
             }
           }
 
@@ -185,10 +191,10 @@ export class SchedulerService {
 
             const emailSubject = emailTemplate?.subject || 'Payment Due Reminder';
             let emailBody = emailTemplate?.body || message;
-            emailBody = emailBody.replace(/\{\{amount\}\}/g, payment.amount.toString());
+            emailBody = emailBody.replace(/\{\{amount\}\}/g, remaining.toString());
             emailBody = emailBody.replace(/\{\{days\}\}/g, daysUntilDue.toString());
             emailBody = emailBody.replace(/\{\{studentName\}\}/g,
-              payment.student ? `${payment.student.firstName} ${payment.student.lastName}` : 'Student'
+              invoice.student ? `${invoice.student.firstName} ${invoice.student.lastName}` : 'Student'
             );
 
             await this.notificationsService.sendMessage({
@@ -197,21 +203,21 @@ export class SchedulerService {
               subject: emailSubject,
               message: emailBody,
               template: 'payment_due_reminder',
-              payload: { paymentId: payment.id, amount: payment.amount, dueDate: payment.dueDate },
-              studentId: payment.studentId || undefined,
+              payload: { invoiceId: invoice.id, amount: remaining, dueDate: invoice.dueDate },
+              studentId: invoice.studentId || undefined,
             });
           }
         }
       }
 
-      this.logger.log(`Payment reminders processed: ${paymentsDue.length}`);
+      this.logger.log(`Invoice due reminders processed: ${invoicesDue.length}`);
     } catch (error) {
       this.logger.error('Error processing payment due reminders:', error);
     }
   }
 
   /**
-   * Check for overdue payments and send urgent reminders
+   * Check for overdue invoices and send urgent reminders
    * Runs daily at 10:00 AM
    */
   @Cron('0 10 * * *', {
@@ -219,20 +225,21 @@ export class SchedulerService {
     timeZone: 'Africa/Cairo',
   })
   async handleOverduePaymentReminders() {
-    this.logger.log('Running overdue payment reminders check...');
+    this.logger.log('Running overdue invoice reminders check...');
 
     try {
       const today = new Date();
       today.setHours(23, 59, 59, 999);
 
-      // Find overdue payments that are still pending
-      const overduePayments = await this.prisma.payment.findMany({
+      // Find overdue invoices that are not fully paid/cancelled
+      const overdueInvoices = await this.prisma.invoice.findMany({
         where: {
-          status: 'pending',
           dueDate: {
             lt: today,
           },
-          deletedAt: null,
+          status: {
+            in: ['issued', 'partially_paid', 'overdue'],
+          },
         },
         include: {
           student: {
@@ -240,17 +247,22 @@ export class SchedulerService {
               parent: true,
             },
           },
+          paymentAllocations: true,
         },
       });
 
-      this.logger.log(`Found ${overduePayments.length} overdue payments`);
+      this.logger.log(`Found ${overdueInvoices.length} overdue invoices`);
 
-      for (const payment of overduePayments) {
+      for (const invoice of overdueInvoices) {
+        const paidAmount = invoice.paymentAllocations.reduce((sum, a) => sum + a.amount, 0);
+        const remaining = Math.max(0, invoice.totalAmount - paidAmount);
+        if (remaining <= 0) continue;
+
         // Check if we already sent an overdue reminder today
         const existingNotification = await this.prisma.notification.findFirst({
           where: {
             template: 'payment_overdue',
-            payload: JSON.stringify({ paymentId: payment.id }),
+            payload: JSON.stringify({ invoiceId: invoice.id }),
             status: 'sent',
             createdAt: {
               gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
@@ -262,15 +274,15 @@ export class SchedulerService {
           continue;
         }
 
-        const recipient = payment.student?.parent?.phone || payment.student?.phone;
-        const recipientEmail = payment.student?.parent?.email || payment.student?.email;
+        const recipient = invoice.student?.parent?.phone || invoice.student?.phone;
+        const recipientEmail = invoice.student?.parent?.email || invoice.student?.email;
 
         if (!recipient && !recipientEmail) {
           continue;
         }
 
         const daysOverdue = Math.ceil(
-          (Date.now() - payment.dueDate!.getTime()) / (1000 * 60 * 60 * 24),
+          (Date.now() - invoice.dueDate.getTime()) / (1000 * 60 * 60 * 24),
         );
 
         // Get template or use fallback
@@ -284,27 +296,27 @@ export class SchedulerService {
 
         const message = template?.isActive && template?.body
           ? template.body
-              .replace(/\{\{amount\}\}/g, payment.amount.toString())
+              .replace(/\{\{amount\}\}/g, remaining.toString())
               .replace(/\{\{days\}\}/g, daysOverdue.toString())
               .replace(/\{\{studentName\}\}/g,
-                payment.student ? `${payment.student.firstName} ${payment.student.lastName}` : 'Student'
+                invoice.student ? `${invoice.student.firstName} ${invoice.student.lastName}` : 'Student'
               )
-          : `URGENT: Payment of EGP ${payment.amount} is ${daysOverdue} day(s) overdue. Please settle immediately to avoid service suspension.`;
+          : `URGENT: Invoice of EGP ${remaining} is ${daysOverdue} day(s) overdue. Please settle immediately to avoid service suspension.`;
 
         if (recipient) {
-          this.logger.log(`Sending overdue payment SMS to ${recipient} for payment ${payment.id}`);
+          this.logger.log(`Sending overdue invoice SMS to ${recipient} for invoice ${invoice.id}`);
           try {
             await this.notificationsService.sendMessage({
               channel: 'sms',
               recipient,
               message,
               template: 'payment_overdue',
-              payload: { paymentId: payment.id, amount: payment.amount, daysOverdue },
-              studentId: payment.studentId || undefined,
+              payload: { invoiceId: invoice.id, amount: remaining, daysOverdue },
+              studentId: invoice.studentId || undefined,
             });
-            this.logger.log(`✅ Overdue payment SMS sent successfully to ${recipient} for payment ${payment.id}`);
+            this.logger.log(`✅ Overdue invoice SMS sent successfully to ${recipient} for invoice ${invoice.id}`);
           } catch (error: any) {
-            this.logger.error(`❌ Failed to send overdue payment SMS to ${recipient} for payment ${payment.id}: ${error.message}`);
+            this.logger.error(`❌ Failed to send overdue invoice SMS to ${recipient} for invoice ${invoice.id}: ${error.message}`);
           }
         }
 
@@ -319,10 +331,10 @@ export class SchedulerService {
 
           const emailSubject = emailTemplate?.subject || 'URGENT: Payment Overdue';
           let emailBody = emailTemplate?.body || message;
-          emailBody = emailBody.replace(/\{\{amount\}\}/g, payment.amount.toString());
+          emailBody = emailBody.replace(/\{\{amount\}\}/g, remaining.toString());
           emailBody = emailBody.replace(/\{\{days\}\}/g, daysOverdue.toString());
           emailBody = emailBody.replace(/\{\{studentName\}\}/g,
-            payment.student ? `${payment.student.firstName} ${payment.student.lastName}` : 'Student'
+            invoice.student ? `${invoice.student.firstName} ${invoice.student.lastName}` : 'Student'
           );
 
           await this.notificationsService.sendMessage({
@@ -331,13 +343,13 @@ export class SchedulerService {
             subject: emailSubject,
             message: emailBody,
             template: 'payment_overdue',
-            payload: { paymentId: payment.id, amount: payment.amount, daysOverdue },
-            studentId: payment.studentId || undefined,
+            payload: { invoiceId: invoice.id, amount: remaining, daysOverdue },
+            studentId: invoice.studentId || undefined,
           });
         }
       }
 
-      this.logger.log(`Overdue payment reminders processed: ${overduePayments.length}`);
+      this.logger.log(`Overdue invoice reminders processed: ${overdueInvoices.length}`);
     } catch (error) {
       this.logger.error('Error processing overdue payment reminders:', error);
     }

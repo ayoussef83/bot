@@ -160,7 +160,7 @@ export class ConversationsService {
         lastName: data.lastName || participant.name?.split(' ').slice(1).join(' ') || 'Unknown',
         email: data.email || participant.email || undefined,
         phone: data.phone || participant.phone || '',
-        source: 'social', // Default source
+        source: 'social_media', // Default source
         status: 'new',
         notes: data.notes || `Converted from ${conversation.platform} conversation`,
         marketingConversationId: conversation.id,

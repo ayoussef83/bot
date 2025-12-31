@@ -1,4 +1,5 @@
-import { IsOptional, IsEnum, IsString, Transform } from 'class-transformer';
+import { Transform } from 'class-transformer';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ConversationStatus, MarketingPlatform } from '@prisma/client';
 
 export class GetConversationsQueryDto {
