@@ -318,7 +318,8 @@ export default function ExpensesPage() {
   ];
 
   return (
-    <StandardListView
+    <>
+      <StandardListView
       title="Expenses"
       subtitle="Manage outgoing expenses and approvals"
       primaryAction={{
@@ -378,7 +379,7 @@ export default function ExpensesPage() {
         </>
       }
       getRowId={(row) => row.id}
-    />
+      />
 
       {/* Create Expense Modal */}
       {showCreateModal && (
@@ -672,7 +673,7 @@ export default function ExpensesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
