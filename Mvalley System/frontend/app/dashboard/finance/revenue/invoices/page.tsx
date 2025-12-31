@@ -238,69 +238,70 @@ export default function InvoicesPage() {
   ];
 
   return (
-    <StandardListView
-      title="Invoices"
-      subtitle="Manage expected revenue from student enrollments and subscriptions"
-      primaryAction={{
-        label: 'Create Invoice',
-        onClick: () => {
-          setShowCreateModal(true);
-          fetchStudents();
-        },
-        icon: <FiPlus className="w-4 h-4" />,
-      }}
-      searchPlaceholder="Search by invoice number or student name..."
-      onSearch={setSearchTerm}
-      searchValue={searchTerm}
-      filters={filters}
-      columns={columns}
-      data={filteredInvoices}
-      loading={loading}
-      actions={actions}
-      emptyMessage="No invoices found"
-      emptyState={
-        <EmptyState
-          icon={<FiFileText className="w-12 h-12 text-gray-400" />}
-          title="No invoices"
-          message="Create invoices to track expected revenue"
-          action={{
-            label: 'Create Invoice',
-            onClick: () => {
-              setShowCreateModal(true);
-              fetchStudents();
-            },
-          }}
-        />
-      }
-      summaryCards={
-        <>
-          <SummaryCard
-            title="Total Invoices"
-            value={totalInvoices}
-            icon={<FiFileText className="w-5 h-5" />}
+    <>
+      <StandardListView
+        title="Invoices"
+        subtitle="Manage expected revenue from student enrollments and subscriptions"
+        primaryAction={{
+          label: 'Create Invoice',
+          onClick: () => {
+            setShowCreateModal(true);
+            fetchStudents();
+          },
+          icon: <FiPlus className="w-4 h-4" />,
+        }}
+        searchPlaceholder="Search by invoice number or student name..."
+        onSearch={setSearchTerm}
+        searchValue={searchTerm}
+        filters={filters}
+        columns={columns}
+        data={filteredInvoices}
+        loading={loading}
+        actions={actions}
+        emptyMessage="No invoices found"
+        emptyState={
+          <EmptyState
+            icon={<FiFileText className="w-12 h-12 text-gray-400" />}
+            title="No invoices"
+            message="Create invoices to track expected revenue"
+            action={{
+              label: 'Create Invoice',
+              onClick: () => {
+                setShowCreateModal(true);
+                fetchStudents();
+              },
+            }}
           />
-          <SummaryCard
-            title="Total Expected"
-            value={totalExpected.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
-            variant="info"
-            icon={<FiDollarSign className="w-5 h-5" />}
-          />
-          <SummaryCard
-            title="Outstanding"
-            value={totalOutstanding.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
-            variant={totalOutstanding > 0 ? 'warning' : 'default'}
-            icon={<FiAlertCircle className="w-5 h-5" />}
-          />
-          <SummaryCard
-            title="Overdue"
-            value={overdueCount}
-            variant={overdueCount > 0 ? 'warning' : 'default'}
-            icon={<FiClock className="w-5 h-5" />}
-          />
-        </>
-      }
-      getRowId={(row) => row.id}
-    />
+        }
+        summaryCards={
+          <>
+            <SummaryCard
+              title="Total Invoices"
+              value={totalInvoices}
+              icon={<FiFileText className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Total Expected"
+              value={totalExpected.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+              variant="info"
+              icon={<FiDollarSign className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Outstanding"
+              value={totalOutstanding.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+              variant={totalOutstanding > 0 ? 'warning' : 'default'}
+              icon={<FiAlertCircle className="w-5 h-5" />}
+            />
+            <SummaryCard
+              title="Overdue"
+              value={overdueCount}
+              variant={overdueCount > 0 ? 'warning' : 'default'}
+              icon={<FiClock className="w-5 h-5" />}
+            />
+          </>
+        }
+        getRowId={(row) => row.id}
+      />
 
       {/* Create Invoice Modal */}
       {showCreateModal && (
@@ -497,7 +498,7 @@ export default function InvoicesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
