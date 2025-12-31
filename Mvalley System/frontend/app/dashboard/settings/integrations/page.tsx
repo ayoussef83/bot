@@ -6,6 +6,7 @@ import SettingsCard from '@/components/settings/SettingsCard';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { FiLink, FiCheck, FiX, FiInfo, FiFacebook, FiInstagram, FiMessageCircle } from 'react-icons/fi';
 import { FaWhatsapp, FaLinkedin } from 'react-icons/fa';
+import ConnectChannelWizard from '@/components/ConnectChannelWizard';
 
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Array<{
@@ -22,6 +23,11 @@ export default function IntegrationsPage() {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardIntegrationId, setWizardIntegrationId] = useState<
+    'whatsapp' | 'facebook' | 'facebook_messenger' | 'instagram' | 'instagram_dm' | 'linkedin' | null
+  >(null);
+  const [wizardExistingAccount, setWizardExistingAccount] = useState<ChannelAccount | null>(null);
 
   useEffect(() => {
     fetchIntegrations();
@@ -296,12 +302,17 @@ export default function IntegrationsPage() {
                   }
                   footer={
                     <div className="flex justify-end">
-                      <a
-                        href={integration.configurePath || '/dashboard/marketing/channels'}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWizardIntegrationId(integration.id as any);
+                          setWizardExistingAccount(integration.channelAccount || null);
+                          setWizardOpen(true);
+                        }}
                         className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100"
                       >
                         {integration.status === 'active' ? 'Manage' : 'Connect'}
-                      </a>
+                      </button>
                     </div>
                   }
                 >
@@ -386,6 +397,21 @@ export default function IntegrationsPage() {
           </div>
         </div>
       </SettingsCard>
+
+      <ConnectChannelWizard
+        isOpen={wizardOpen}
+        integrationId={wizardIntegrationId}
+        existingAccount={wizardExistingAccount}
+        onClose={() => {
+          setWizardOpen(false);
+          setWizardIntegrationId(null);
+          setWizardExistingAccount(null);
+        }}
+        onSuccess={() => {
+          // Refresh integrations list so status updates immediately
+          fetchIntegrations();
+        }}
+      />
     </div>
   );
 }

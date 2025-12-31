@@ -5,6 +5,8 @@ export interface ChannelAccount {
   platform: 'facebook_page' | 'instagram_business' | 'whatsapp_business';
   externalId: string;
   name: string;
+  accessToken?: string;
+  refreshToken?: string;
   status: 'connected' | 'disconnected' | 'error';
   connectedAt: string;
   lastSyncAt?: string;
