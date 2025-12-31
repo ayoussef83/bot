@@ -38,6 +38,11 @@ import {
   FiTarget,
   FiRadio,
 } from 'react-icons/fi';
+import {
+  RiTeamFill,
+  RiPresentationFill,
+  RiWalkFill,
+} from 'react-icons/ri';
 
 type NavigationSection = {
   id: string;
@@ -88,7 +93,7 @@ const navigationSections: NavigationSection[] = [
       {
         id: 'instructors',
         label: 'Instructors',
-        icon: <FiUserCheck className="w-4 h-4" />,
+        icon: <RiPresentationFill className="w-4 h-4" />,
         path: '/dashboard/instructors',
         roles: ['super_admin', 'operations', 'management', 'accounting'],
       },
@@ -118,7 +123,7 @@ const navigationSections: NavigationSection[] = [
       {
         id: 'crm-leads',
         label: 'Leads',
-        icon: <FiUser className="w-4 h-4" />,
+        icon: <RiWalkFill className="w-4 h-4" />,
         path: '/dashboard/crm/leads',
         roles: ['super_admin', 'sales', 'management'],
       },
@@ -252,7 +257,7 @@ const navigationSections: NavigationSection[] = [
   {
     id: 'hr',
     label: 'HR',
-    icon: <FiBriefcase className="w-4 h-4" />,
+    icon: <RiTeamFill className="w-4 h-4" />,
     group: 'Main',
     roles: ['super_admin', 'operations', 'management', 'accounting'],
     children: [
