@@ -3,25 +3,37 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - TARGET=${TARGET:=backend}
-      - ECR_REPO=${ECR_REPO:=mv-os-backend}
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_TAG=${COMMIT_HASH:=latest}
-      - echo "Repository URI: $REPOSITORY_URI"
-      - echo "Target: $TARGET"
-      - echo "Current directory: $(pwd)"
-      - echo "Listing files:"
-      - ls -la
-      - echo "Finding Dockerfile..."
-      - find . -name "Dockerfile" -type f 2>/dev/null | head -5
+      - |
+        set -e
+        echo "Logging in to Amazon ECR..."
+        aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+
+        TARGET="${TARGET:-backend}"
+        ECR_REPO="${ECR_REPO:-mv-os-backend}"
+        REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO"
+        COMMIT_HASH="$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-7)"
+        IMAGE_TAG="${COMMIT_HASH:-latest}"
+
+        echo "Repository URI: $REPOSITORY_URI"
+        echo "Target: $TARGET"
+        echo "Current directory: $(pwd)"
+        echo "Listing files:"
+        ls -la
+        echo "Finding Dockerfile..."
+        find . -name "Dockerfile" -type f 2>/dev/null | head -5
   build:
     commands:
-      - echo Build started on `date`
-      - echo "Building Docker image..."
       - |
+        set -e
+        echo "Build started on $(date)"
+        echo "Building Docker image..."
+
+        TARGET="${TARGET:-backend}"
+        ECR_REPO="${ECR_REPO:-mv-os-backend}"
+        REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO"
+        COMMIT_HASH="$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-7)"
+        IMAGE_TAG="${COMMIT_HASH:-latest}"
+
         # Find target directory
         if [ -f "Mvalley System/$TARGET/Dockerfile" ]; then
           cd "Mvalley System/$TARGET"
@@ -32,20 +44,30 @@ phases:
           find . -name "Dockerfile" -type f
           exit 1
         fi
-      - echo "Building from: $(pwd)"
-      - echo "Dockerfile exists: $(test -f Dockerfile && echo 'YES' || echo 'NO')"
-      - |
+
+        echo "Building from: $(pwd)"
+        echo "Dockerfile exists: $(test -f Dockerfile && echo 'YES' || echo 'NO')"
+
         BUILD_ARGS=""
         if [ -n "${NEXT_PUBLIC_API_URL:-}" ]; then
           BUILD_ARGS="$BUILD_ARGS --build-arg NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL"
         fi
         echo "Docker build args: $BUILD_ARGS"
-        docker build $BUILD_ARGS -t $REPOSITORY_URI:latest -f Dockerfile .
-      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+
+        docker build $BUILD_ARGS -t "$REPOSITORY_URI:latest" -f Dockerfile .
+        docker tag "$REPOSITORY_URI:latest" "$REPOSITORY_URI:$IMAGE_TAG"
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo "Pushing Docker images..."
-      - docker push $REPOSITORY_URI:latest
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "✅ Image pushed successfully: $REPOSITORY_URI:latest"
+      - |
+        set -e
+        TARGET="${TARGET:-backend}"
+        ECR_REPO="${ECR_REPO:-mv-os-backend}"
+        REPOSITORY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPO"
+        COMMIT_HASH="$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c 1-7)"
+        IMAGE_TAG="${COMMIT_HASH:-latest}"
+
+        echo "Build completed on $(date)"
+        echo "Pushing Docker images..."
+        docker push "$REPOSITORY_URI:latest"
+        docker push "$REPOSITORY_URI:$IMAGE_TAG"
+        echo "✅ Image pushed successfully: $REPOSITORY_URI:latest"

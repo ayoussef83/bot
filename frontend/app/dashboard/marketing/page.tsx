@@ -24,7 +24,14 @@ export default function MarketingDashboard() {
       setOverview(response.data);
     } catch (err: any) {
       console.error('Error fetching marketing overview:', err);
-      setError(err.response?.data?.message || 'Failed to load marketing overview');
+      const rawMsg = err?.response?.data?.message ?? err?.message;
+      const msg =
+        typeof rawMsg === 'string'
+          ? rawMsg
+          : rawMsg && typeof rawMsg === 'object' && 'message' in rawMsg
+            ? String((rawMsg as any).message)
+            : 'Failed to load marketing overview';
+      setError(msg);
     } finally {
       setLoading(false);
     }
