@@ -16,6 +16,8 @@ frontend:
             exit 1
           fi
           pwd
+        - echo "Clearing build cache..."
+        - rm -rf .next out node_modules/.cache
         - npm install --legacy-peer-deps
     build:
       commands:
