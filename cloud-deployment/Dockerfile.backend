@@ -1,0 +1,35 @@
+# Backend Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY backend/package*.json ./
+RUN npm ci --only=production
+
+# Copy Prisma schema
+COPY backend/prisma ./prisma
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy application code
+COPY backend/dist ./dist
+COPY backend/package.json ./
+
+# Expose port
+EXPOSE 3000
+
+# Start application
+CMD ["node", "dist/main.js"]
+
+
+
+
+
+
+
+
+
+
+

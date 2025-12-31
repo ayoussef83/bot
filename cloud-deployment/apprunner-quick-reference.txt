@@ -1,0 +1,58 @@
+AWS App Runner - Quick Reference
+==================================
+
+STEP 2: Configure Build
+------------------------
+Runtime: Nodejs 18 (or Nodejs 22)
+
+Build command:
+cd backend && npm install && npm run build
+
+Start command:
+cd backend && npm run start:prod
+
+Port: 3000
+
+
+STEP 3: Configure Service
+--------------------------
+Service name: mv-os-backend
+
+Instance:
+- CPU: 0.25 vCPU
+- Memory: 0.5 GB
+
+Environment Variables:
+- NODE_ENV = production
+- PORT = 3000
+
+Secrets (Add from Secrets Manager):
+- DATABASE_URL = mv-os/database-url
+- JWT_SECRET = mv-os/jwt-secret
+
+Health Check:
+- Protocol: HTTP
+- Path: /api/health
+- Interval: 10 seconds
+- Timeout: 5 seconds
+- Healthy threshold: 1
+- Unhealthy threshold: 5
+
+
+After Deployment:
+-----------------
+1. Get Service URL from App Runner console
+2. Test: curl https://YOUR_URL/api/health
+3. Run migrations (see APP_RUNNER_SETUP.md)
+4. Update frontend API URL
+
+
+
+
+
+
+
+
+
+
+

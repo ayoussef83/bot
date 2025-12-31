@@ -1,0 +1,12 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  output: 'export',
+  images: { unoptimized: true },
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://mzmeyp2cw9.us-east-1.awsapprunner.com/api',
+  },
+}
+
+module.exports = nextConfig
+

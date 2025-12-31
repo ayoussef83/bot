@@ -1,0 +1,49 @@
+{
+  "ServiceName": "mv-os-backend",
+  "SourceConfiguration": {
+    "ImageRepository": {
+      "ImageIdentifier": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/mv-os-backend:latest",
+      "ImageConfiguration": {
+        "Port": "3000",
+        "RuntimeEnvironmentVariables": {
+          "NODE_ENV": "production",
+          "PORT": "3000"
+        },
+        "RuntimeEnvironmentSecrets": [
+          {
+            "Name": "DATABASE_URL",
+            "Value": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:mv-os/database-url"
+          },
+          {
+            "Name": "JWT_SECRET",
+            "Value": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:mv-os/jwt-secret"
+          }
+        ]
+      }
+    },
+    "AutoDeploymentsEnabled": true
+  },
+  "InstanceConfiguration": {
+    "Cpu": "0.25 vCPU",
+    "Memory": "0.5 GB"
+  },
+  "HealthCheckConfiguration": {
+    "Protocol": "HTTP",
+    "Path": "/api/health",
+    "Interval": 10,
+    "Timeout": 5,
+    "HealthyThreshold": 1,
+    "UnhealthyThreshold": 5
+  }
+}
+
+
+
+
+
+
+
+
+
+
+

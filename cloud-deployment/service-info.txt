@@ -1,0 +1,24 @@
+MV-OS Backend Service Information
+==================================
+
+Service ARN:
+arn:aws:apprunner:us-east-1:149959196988:service/mv-os-backend/1919b90f9fec4c60a9e1a7fcb8cf293e
+
+Service Name: mv-os-backend
+
+Service URL: (Check status - will be available after deployment completes)
+
+Status: Deploying (takes 5-10 minutes)
+
+Monitor at: https://console.aws.amazon.com/apprunner/home?region=us-east-1#/services/mv-os-backend
+
+
+
+
+
+
+
+
+
+
+

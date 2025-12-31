@@ -1,0 +1,31 @@
+{
+  "serviceName": "mv-os-backend",
+  "cluster": "mv-os-cluster",
+  "taskDefinition": "mv-os-backend",
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-xxxxx", "subnet-yyyyy"],
+      "securityGroups": ["sg-xxxxx"],
+      "assignPublicIp": "ENABLED"
+    }
+  },
+  "loadBalancer": {
+    "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:ACCOUNT_ID:targetgroup/mv-os-backend/xxxxx",
+    "containerName": "mv-os-backend",
+    "containerPort": 3000
+  },
+  "healthCheckGracePeriodSeconds": 60
+}
+
+
+
+
+
+
+
+
+
+
+

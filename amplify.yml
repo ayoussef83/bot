@@ -1,0 +1,32 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Installing dependencies..."
+        - |
+          if [ -d "Mvalley System/frontend" ]; then
+            cd "Mvalley System/frontend"
+            FRONTEND_DIR="Mvalley System/frontend"
+          elif [ -d "frontend" ]; then
+            cd "frontend"
+            FRONTEND_DIR="frontend"
+          else
+            echo "ERROR: Frontend directory not found"
+            exit 1
+          fi
+          pwd
+        - npm install --legacy-peer-deps
+    build:
+      commands:
+        - echo "Building Next.js application..."
+        - npm run build
+  artifacts:
+    baseDirectory: frontend/out
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - frontend/node_modules/**/*
+      - frontend/.next/cache/**/*
+
