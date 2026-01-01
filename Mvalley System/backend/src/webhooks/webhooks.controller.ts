@@ -45,16 +45,12 @@ export class WebhooksController {
     for (const entry of entries) {
       const messaging: any[] = Array.isArray(entry?.messaging) ? entry.messaging : [];
       for (const evt of messaging) {
-        const msg = evt?.message;
-        if (!msg || msg.is_echo) continue;
-
         const senderId = String(evt?.sender?.id || '');
         const pageId = String(evt?.recipient?.id || '');
-        const mid = String(msg?.mid || '');
-        const text = typeof msg?.text === 'string' ? msg.text : '';
         const tsMs = Number(evt?.timestamp || Date.now());
+        const sentAt = new Date(tsMs);
 
-        if (!senderId || !pageId || !mid) continue;
+        if (!senderId || !pageId) continue;
 
         const channel = await this.prisma.channelAccount.findFirst({
           where: { platform: MarketingPlatform.facebook_page, externalId: pageId },
@@ -79,10 +75,13 @@ export class WebhooksController {
             });
 
         const threadId = `${pageId}:${senderId}`;
-        const sentAt = new Date(tsMs);
-
         const conversation = await this.prisma.conversation.upsert({
-          where: { platform_externalThreadId: { platform: MarketingPlatform.facebook_page, externalThreadId: threadId } },
+          where: {
+            platform_externalThreadId: {
+              platform: MarketingPlatform.facebook_page,
+              externalThreadId: threadId,
+            },
+          },
           update: { lastMessageAt: sentAt },
           create: {
             channelAccountId: channel.id,
@@ -96,23 +95,87 @@ export class WebhooksController {
           },
         });
 
-        const existing = await this.prisma.message.findFirst({
-          where: { conversationId: conversation.id, externalMessageId: mid },
-        });
-        if (existing) continue;
+        // Enrich participant profile (best-effort). Meta doesn't provide age.
+        if (!participant.name || !participant.profilePictureUrl) {
+          try {
+            const graphVersion = process.env.META_GRAPH_VERSION || 'v20.0';
+            const url = new URL(`https://graph.facebook.com/${graphVersion}/${senderId}`);
+            url.searchParams.set('fields', 'first_name,last_name,profile_pic');
+            url.searchParams.set('access_token', channel.accessToken);
+            const resp = await fetch(url.toString(), { method: 'GET' });
+            const json = await resp.json().catch(() => ({}));
+            if (resp.ok) {
+              const first = String(json?.first_name || '').trim();
+              const last = String(json?.last_name || '').trim();
+              const name = `${first} ${last}`.trim();
+              const pic = String(json?.profile_pic || '').trim();
+              if (name || pic) {
+                await this.prisma.participant.update({
+                  where: { id: participant.id },
+                  data: {
+                    ...(name ? { name } : {}),
+                    ...(pic ? { profilePictureUrl: pic } : {}),
+                    lastSeenAt: new Date(),
+                  },
+                });
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
 
-        await this.prisma.message.create({
-          data: {
-            conversationId: conversation.id,
-            externalMessageId: mid,
-            direction: 'inbound',
-            type: 'text',
-            content: text,
-            sentAt,
-            senderId: participant.id,
-            metadata: evt,
-          },
-        });
+        // Handle inbound messages
+        const msg = evt?.message;
+        if (msg && !msg.is_echo) {
+          const mid = String(msg?.mid || '');
+          const text = typeof msg?.text === 'string' ? msg.text : '';
+          if (mid) {
+            const existing = await this.prisma.message.findFirst({
+              where: { conversationId: conversation.id, externalMessageId: mid },
+            });
+            if (!existing) {
+              await this.prisma.message.create({
+                data: {
+                  conversationId: conversation.id,
+                  externalMessageId: mid,
+                  direction: 'inbound',
+                  type: 'text',
+                  content: text,
+                  sentAt,
+                  senderId: participant.id,
+                  metadata: evt,
+                },
+              });
+            }
+          }
+        }
+
+        // Delivery receipts
+        const delivery = evt?.delivery;
+        if (delivery?.mids?.length) {
+          const deliveredAt = new Date(Number(delivery?.watermark || tsMs) || Date.now());
+          for (const mid of delivery.mids) {
+            await this.prisma.message
+              .updateMany({
+                where: { externalMessageId: String(mid) },
+                data: { deliveredAt },
+              })
+              .catch(() => undefined);
+          }
+        }
+
+        // Read receipts (Meta gives watermark; no message id)
+        const read = evt?.read;
+        if (read?.watermark) {
+          const readAt = new Date(Number(read.watermark) || Date.now());
+          await this.prisma.conversation
+            .update({
+              where: { id: conversation.id },
+              data: { lastReadAt: readAt },
+            })
+            .catch(() => undefined);
+        }
 
         // Update channel last sync (best-effort)
         await this.prisma.channelAccount

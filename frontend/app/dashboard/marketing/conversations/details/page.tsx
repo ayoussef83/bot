@@ -92,7 +92,8 @@ export default function ConversationDetailPage() {
       await fetchConversation(conversation.id);
     } catch (err: any) {
       console.error('Error sending message:', err);
-      alert(err.response?.data?.message || 'Failed to send message');
+      const msg = err?.response?.data?.message;
+      alert(typeof msg === 'string' ? msg : msg?.message || 'Failed to send message');
     } finally {
       setSending(false);
     }
@@ -110,7 +111,8 @@ export default function ConversationDetailPage() {
       router.push(`/dashboard/crm/leads/details?id=${convertData.existingLeadId || 'new'}`);
     } catch (err: any) {
       console.error('Error converting to lead:', err);
-      alert(err.response?.data?.message || 'Failed to convert to lead');
+      const msg = err?.response?.data?.message;
+      alert(typeof msg === 'string' ? msg : msg?.message || 'Failed to convert to lead');
     }
   };
 

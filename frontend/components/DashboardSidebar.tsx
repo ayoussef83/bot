@@ -129,6 +129,13 @@ const navigationSections: NavigationSection[] = [
         path: '/dashboard/crm/leads',
         roles: ['super_admin', 'sales', 'management'],
       },
+      {
+        id: 'crm-conversations',
+        label: 'Inbox',
+        icon: <FiMessageCircle className="w-4 h-4" />,
+        path: '/dashboard/marketing/conversations',
+        roles: ['super_admin', 'sales', 'management', 'operations'],
+      },
     ],
   },
   {
@@ -300,13 +307,7 @@ const navigationSections: NavigationSection[] = [
         path: '/dashboard/marketing',
         roles: ['super_admin', 'management', 'operations', 'sales'],
       },
-      {
-        id: 'marketing-conversations',
-        label: 'Conversations',
-        icon: <FiMessageCircle className="w-4 h-4" />,
-        path: '/dashboard/marketing/conversations',
-        roles: ['super_admin', 'management', 'operations', 'sales'],
-      },
+      // Conversations are managed under CRM → Inbox to align with CRM workflow.
       {
         id: 'marketing-campaigns',
         label: 'Campaigns',
