@@ -21,8 +21,10 @@ export class MessagesService {
         if (!pageToken) throw new BadRequestException('Facebook Page token is missing');
         if (!psid) throw new BadRequestException('Participant is missing platformUserId (PSID)');
         if (data.type !== 'text') throw new BadRequestException('Only text messages are supported for Messenger right now');
+        if (!String(data.content || '').trim()) throw new BadRequestException('Message content is required');
 
-        const url = new URL('https://graph.facebook.com/v20.0/me/messages');
+        const graphVersion = process.env.META_GRAPH_VERSION || 'v20.0';
+        const url = new URL(`https://graph.facebook.com/${graphVersion}/me/messages`);
         url.searchParams.set('access_token', pageToken);
 
         const resp = await fetch(url.toString(), {
@@ -57,6 +59,14 @@ export class MessagesService {
           where: { id: data.conversationId },
           data: { lastMessageAt: created.sentAt },
         });
+
+        // Update channel last sync
+        if (conv.channelAccountId) {
+          await this.prisma.channelAccount.update({
+            where: { id: conv.channelAccountId },
+            data: { lastSyncAt: new Date() },
+          }).catch(() => undefined);
+        }
 
         return created;
       }

@@ -107,6 +107,14 @@ export class WebhooksController {
             metadata: evt,
           },
         });
+
+        // Update channel last sync (best-effort)
+        await this.prisma.channelAccount
+          .update({
+            where: { id: channel.id },
+            data: { lastSyncAt: new Date() },
+          })
+          .catch(() => undefined);
       }
     }
 

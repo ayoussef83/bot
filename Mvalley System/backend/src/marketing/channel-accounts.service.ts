@@ -6,11 +6,20 @@ import { CreateChannelAccountDto, UpdateChannelAccountDto } from './dto';
 export class ChannelAccountsService {
   constructor(private prisma: PrismaService) {}
 
+  private sanitize(account: any) {
+    if (!account) return account;
+    // Never return tokens to the client
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { accessToken, refreshToken, ...rest } = account;
+    return rest;
+  }
+
   async create(data: CreateChannelAccountDto) {
-    return this.prisma.channelAccount.create({
+    const created = await this.prisma.channelAccount.create({
       data: {
         ...data,
         status: data.status || 'connected',
+        lastSyncAt: new Date(),
       },
       include: {
         _count: {
@@ -21,10 +30,11 @@ export class ChannelAccountsService {
         },
       },
     });
+    return this.sanitize(created);
   }
 
   async findAll() {
-    return this.prisma.channelAccount.findMany({
+    const rows = await this.prisma.channelAccount.findMany({
       include: {
         _count: {
           select: {
@@ -37,6 +47,7 @@ export class ChannelAccountsService {
         createdAt: 'desc',
       },
     });
+    return rows.map((r) => this.sanitize(r));
   }
 
   async findOne(id: string) {
@@ -56,7 +67,7 @@ export class ChannelAccountsService {
       throw new NotFoundException('Channel account not found');
     }
 
-    return account;
+    return this.sanitize(account);
   }
 
   async update(id: string, data: UpdateChannelAccountDto) {
@@ -64,7 +75,7 @@ export class ChannelAccountsService {
       where: { id },
       data: {
         ...data,
-        ...(data.status && { lastSyncAt: new Date() }),
+        lastSyncAt: new Date(),
       },
       include: {
         _count: {
@@ -76,7 +87,7 @@ export class ChannelAccountsService {
       },
     });
 
-    return account;
+    return this.sanitize(account);
   }
 
   async remove(id: string) {

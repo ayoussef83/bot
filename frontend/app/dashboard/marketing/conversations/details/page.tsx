@@ -139,6 +139,11 @@ export default function ConversationDetailPage() {
     );
   }
 
+  const isMessengerReplay =
+    conversation.platform === 'facebook_page' &&
+    (conversation.participant?.platformUserId?.startsWith('psid_test_') ||
+      messages.some((m) => m.externalMessageId?.startsWith('m_test_')));
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; status: 'active' | 'warning' | 'inactive' | 'error' }> = {
       new: { label: 'New', status: 'active' },
@@ -227,6 +232,12 @@ export default function ConversationDetailPage() {
           {/* Reply Box */}
           {conversation.status !== 'converted' && (
             <form onSubmit={handleSendReply} className="bg-white border border-gray-200 rounded-lg p-4">
+              {isMessengerReplay && (
+                <div className="mb-3 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+                  This conversation was created by an internal webhook test. Send a real Messenger message to the Page to create a real conversation,
+                  then replies will work.
+                </div>
+              )}
               <textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
@@ -237,7 +248,7 @@ export default function ConversationDetailPage() {
               <div className="mt-3 flex justify-end">
                 <button
                   type="submit"
-                  disabled={!replyText.trim() || sending}
+                  disabled={!replyText.trim() || sending || isMessengerReplay}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <FiSend className="w-4 h-4" />
