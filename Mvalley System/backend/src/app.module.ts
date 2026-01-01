@@ -16,6 +16,7 @@ import { SettingsModule } from './settings/settings.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { ParentsModule } from './parents/parents.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     SchedulerModule,
     MarketingModule,
     WebhooksModule,
+    ParentsModule,
   ],
   controllers: [HealthController],
 })

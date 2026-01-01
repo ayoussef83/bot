@@ -100,6 +100,13 @@ const navigationSections: NavigationSection[] = [
         path: '/dashboard/instructors',
         roles: ['super_admin', 'operations', 'management', 'accounting'],
       },
+      {
+        id: 'allocations',
+        label: 'Allocations',
+        icon: <FiLayers className="w-4 h-4" />,
+        path: '/dashboard/academics/allocations',
+        roles: ['super_admin', 'operations', 'management', 'sales'],
+      },
     ],
   },
   {

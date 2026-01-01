@@ -119,6 +119,61 @@ export class LeadsService {
     return lead;
   }
 
+  async convertToContact(leadId: string, convertedBy: string) {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, deletedAt: null },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    // If already linked, return the lead (idempotent)
+    if (lead.convertedToParentId) {
+      return this.prisma.lead.update({
+        where: { id: leadId },
+        data: { status: 'converted', convertedAt: lead.convertedAt ?? new Date() },
+        include: { convertedParent: true },
+      });
+    }
+
+    // Try to match an existing parent contact by phone (primary identifier)
+    let parent = await this.prisma.parent.findFirst({
+      where: { phone: lead.phone, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!parent) {
+      parent = await this.prisma.parent.create({
+        data: {
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          phone: lead.phone,
+          email: lead.email || undefined,
+        },
+      });
+    }
+
+    const updatedLead = await this.prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        status: 'converted',
+        convertedAt: new Date(),
+        convertedToParentId: parent.id,
+      },
+      include: { convertedParent: true },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: convertedBy,
+        action: 'update',
+        entityType: 'Lead',
+        entityId: leadId,
+        changes: JSON.stringify({ convertedToParentId: parent.id }),
+      },
+    });
+
+    return updatedLead;
+  }
+
   async remove(id: string, deletedBy: string) {
     const lead = await this.prisma.lead.update({
       where: { id },

@@ -61,6 +61,12 @@ export class LeadsController {
     return this.leadsService.convertToStudent(id, studentData, user.id);
   }
 
+  @Post(':id/convert-to-contact')
+  @Roles(UserRole.super_admin, UserRole.sales)
+  convertToContact(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.leadsService.convertToContact(id, user.id);
+  }
+
   @Delete(':id')
   @Roles(UserRole.super_admin, UserRole.sales)
   remove(@Param('id') id: string, @CurrentUser() user: any) {

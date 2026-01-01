@@ -219,6 +219,7 @@ model Parent {
   // Relations
   user     User?     @relation(fields: [userId], references: [id])
   students Student[]
+  convertedLeads Lead[] @relation("LeadConvertedParent")
 
   // Audit
   createdAt DateTime  @default(now())
@@ -1025,6 +1026,8 @@ model Lead {
 
   // Conversion
   convertedToStudentId String?
+  convertedToParentId  String?
+  convertedParent      Parent?    @relation("LeadConvertedParent", fields: [convertedToParentId], references: [id])
   convertedAt          DateTime?
 
   // Marketing Attribution (from Marketing module)
@@ -1048,6 +1051,7 @@ model Lead {
   @@index([status])
   @@index([source])
   @@index([phone])
+  @@index([convertedToParentId])
   @@map("leads")
 }
 

@@ -3,6 +3,7 @@ export * from './classes.service';
 export * from './sales.service';
 export * from './instructors.service';
 export * from './marketing.service';
+export * from './parents.service';
 export * from './settings.service';
 export * from './notifications.service';
 export { 

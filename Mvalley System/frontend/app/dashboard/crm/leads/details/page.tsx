@@ -119,6 +119,17 @@ export default function LeadDetailPage() {
     }
   };
 
+  const handleConvertToContact = async () => {
+    if (!lead || !confirm('Convert this lead to a contact (parent)?')) return;
+    try {
+      await api.post(`/leads/${lead.id}/convert-to-contact`);
+      // After conversion, allocation happens in Academics → Allocations
+      router.push('/dashboard/academics/allocations');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to convert lead');
+    }
+  };
+
   const handleFollowUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lead) return;
@@ -187,10 +198,16 @@ export default function LeadDetailPage() {
   // Action buttons
   const actions: ActionButton[] = [
     {
-      label: 'Convert to Student',
-      onClick: handleConvertToStudent,
+      label: 'Convert to Contact',
+      onClick: handleConvertToContact,
       variant: 'primary',
       icon: <FiUser className="w-4 h-4" />,
+    },
+    {
+      label: 'Convert to Student (legacy)',
+      onClick: handleConvertToStudent,
+      variant: 'secondary',
+      icon: <FiCheckCircle className="w-4 h-4" />,
     },
     {
       label: 'Delete',
