@@ -26,6 +26,7 @@ MEMORY="${MEMORY:-0.5 GB}"
 PORT="${PORT:-3000}"
 META_WEBHOOK_VERIFY_TOKEN="${META_WEBHOOK_VERIFY_TOKEN:-}"
 META_GRAPH_VERSION="${META_GRAPH_VERSION:-v20.0}"
+WHATSAPP_WEBHOOK_VERIFY_TOKEN="${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}"
 
 echo "🚀 App Runner Create/Update from ECR"
 echo "  ENV:           $ENVIRONMENT"
@@ -38,6 +39,11 @@ if [ -n "${META_WEBHOOK_VERIFY_TOKEN:-}" ]; then
   echo "  Meta verify:   (set)"
 else
   echo "  Meta verify:   (not set)"
+fi
+if [ -n "${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}" ]; then
+  echo "  WhatsApp verify: (set)"
+else
+  echo "  WhatsApp verify: (not set)"
 fi
 echo "  Meta graph:    $META_GRAPH_VERSION"
 echo ""
@@ -108,6 +114,9 @@ d = {
 token = os.environ.get("META_WEBHOOK_VERIFY_TOKEN") or ""
 if token.strip():
   d["META_WEBHOOK_VERIFY_TOKEN"] = token.strip()
+wa = os.environ.get("WHATSAPP_WEBHOOK_VERIFY_TOKEN") or ""
+if wa.strip():
+  d["WHATSAPP_WEBHOOK_VERIFY_TOKEN"] = wa.strip()
 print(json.dumps(d))
 PY
 )"

@@ -66,11 +66,152 @@ export class WebhooksController {
     return n < 1_000_000_000_000 ? n * 1000 : n;
   }
 
+  // WhatsApp Cloud API webhook verification
+  @Get('whatsapp')
+  whatsappVerify(
+    @Query('hub.mode') mode?: string,
+    @Query('hub.verify_token') token?: string,
+    @Query('hub.challenge') challenge?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '';
+    if (mode === 'subscribe' && token && verifyToken && token === verifyToken) {
+      if (res) res.status(200);
+      return challenge || '';
+    }
+    if (res) res.status(403);
+    throw new ForbiddenException('Invalid verify token');
+  }
+
   @Post('whatsapp')
-  whatsapp(@Body() body: any) {
-    // TODO: implement WhatsApp ingestion
-    // eslint-disable-next-line no-console
-    console.log('[WEBHOOK][WHATSAPP]', JSON.stringify(body));
+  async whatsapp(@Body() body: any) {
+    if (body?.object !== 'whatsapp_business_account') return { ok: true };
+
+    const entries: any[] = Array.isArray(body?.entry) ? body.entry : [];
+    for (const entry of entries) {
+      const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : [];
+      for (const ch of changes) {
+        const value = ch?.value || {};
+        const metadata = value?.metadata || {};
+        const phoneNumberId = String(metadata?.phone_number_id || '');
+        if (!phoneNumberId) continue;
+
+        const channel = await this.prisma.channelAccount.findFirst({
+          where: { platform: MarketingPlatform.whatsapp_business, externalId: phoneNumberId },
+        });
+        if (!channel) {
+          // eslint-disable-next-line no-console
+          console.warn('[WEBHOOK][WHATSAPP] No connected ChannelAccount for phone_number_id:', phoneNumberId);
+          continue;
+        }
+
+        await this.prisma.channelAccount
+          .update({ where: { id: channel.id }, data: { lastSyncAt: new Date() } })
+          .catch(() => undefined);
+
+        const contacts: any[] = Array.isArray(value?.contacts) ? value.contacts : [];
+        const messages: any[] = Array.isArray(value?.messages) ? value.messages : [];
+        const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : [];
+
+        for (const msg of messages) {
+          const waId = String(msg?.from || '');
+          const mid = String(msg?.id || '');
+          const tsMs = this.toUnixMs(msg?.timestamp);
+          const sentAt = new Date(tsMs);
+          if (!waId || !mid) continue;
+
+          const contact = contacts.find((c) => String(c?.wa_id || '') === waId);
+          const contactName = String(contact?.profile?.name || '').trim() || undefined;
+
+          const existingParticipant = await this.prisma.participant.findFirst({
+            where: { platformUserId: waId },
+          });
+          const participant = existingParticipant
+            ? await this.prisma.participant.update({
+                where: { id: existingParticipant.id },
+                data: {
+                  ...(contactName ? { name: contactName } : {}),
+                  lastSeenAt: new Date(),
+                },
+              })
+            : await this.prisma.participant.create({
+                data: {
+                  platformUserId: waId,
+                  type: 'unknown',
+                  ...(contactName ? { name: contactName } : {}),
+                  firstSeenAt: new Date(),
+                  lastSeenAt: new Date(),
+                },
+              });
+
+          const threadId = `${phoneNumberId}:${waId}`;
+          const conversation = await this.prisma.conversation.upsert({
+            where: {
+              platform_externalThreadId: {
+                platform: MarketingPlatform.whatsapp_business,
+                externalThreadId: threadId,
+              },
+            },
+            update: { lastMessageAt: sentAt },
+            create: {
+              channelAccountId: channel.id,
+              platform: MarketingPlatform.whatsapp_business,
+              externalThreadId: threadId,
+              participantId: participant.id,
+              status: 'new',
+              source: 'whatsapp',
+              firstMessageAt: sentAt,
+              lastMessageAt: sentAt,
+            },
+          });
+
+          const existing = await this.prisma.message.findFirst({
+            where: { conversationId: conversation.id, externalMessageId: mid },
+          });
+          if (existing) continue;
+
+          const text = typeof msg?.text?.body === 'string' ? msg.text.body : '';
+          await this.prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              externalMessageId: mid,
+              direction: 'inbound',
+              type: 'text',
+              content: text,
+              sentAt,
+              senderId: participant.id,
+              metadata: msg,
+            },
+          });
+        }
+
+        for (const st of statuses) {
+          const mid = String(st?.id || '');
+          const status = String(st?.status || '');
+          const tsMs = this.toUnixMs(st?.timestamp);
+          const at = new Date(tsMs);
+          if (!mid) continue;
+
+          if (status === 'delivered') {
+            await this.prisma.message
+              .updateMany({
+                where: { externalMessageId: mid },
+                data: { deliveredAt: at },
+              })
+              .catch(() => undefined);
+          }
+          if (status === 'read') {
+            await this.prisma.message
+              .updateMany({
+                where: { externalMessageId: mid },
+                data: { readAt: at },
+              })
+              .catch(() => undefined);
+          }
+        }
+      }
+    }
+
     return { ok: true };
   }
 
