@@ -48,6 +48,18 @@ export class StudentsController {
     return this.studentsService.findAll(user.role, user.id);
   }
 
+  @Get('insights/unallocated-paid')
+  @Roles(
+    UserRole.super_admin,
+    UserRole.management,
+    UserRole.operations,
+    UserRole.accounting,
+    UserRole.sales,
+  )
+  getUnallocatedPaidInsight() {
+    return this.studentsService.getUnallocatedPaidInsight();
+  }
+
   @Get(':id')
   @Roles(
     UserRole.super_admin,

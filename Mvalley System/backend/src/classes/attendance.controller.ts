@@ -14,6 +14,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import { CreateAttendanceDto, UpdateAttendanceDto, BulkAttendanceDto } from './dto';
+import { SetRosterDto } from './dto';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -40,6 +41,12 @@ export class AttendanceController {
       bulkAttendanceDto.attendances,
       user.id,
     );
+  }
+
+  @Post('roster')
+  @Roles(UserRole.super_admin, UserRole.operations)
+  setRoster(@Body() dto: SetRosterDto, @CurrentUser() user: any) {
+    return this.attendanceService.setRoster(dto.sessionId, dto.studentIds, user.id);
   }
 
   @Patch(':id')

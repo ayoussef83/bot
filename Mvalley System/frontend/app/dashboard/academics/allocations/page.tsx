@@ -6,6 +6,7 @@ import { ActionButton, Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
 import { studentsService, classesService, parentsService, Student, Class, ParentContact } from '@/lib/services';
 import { FiEdit, FiSave, FiX } from 'react-icons/fi';
+import HighlightedText from '@/components/HighlightedText';
 
 type Draft = {
   parentId: string;
@@ -56,9 +57,14 @@ export default function AllocationsPage() {
       render: (_, row) => (
         <div className="text-sm">
           <div className="font-medium text-gray-900">
-            {row.firstName} {row.lastName}
+            <HighlightedText
+              text={`${row.firstName} ${row.lastName}`}
+              query={searchTerm}
+            />
           </div>
-          <div className="text-gray-500">{row.phone || row.email || '-'}</div>
+          <div className="text-gray-500">
+            <HighlightedText text={row.phone || row.email || '-'} query={searchTerm} />
+          </div>
         </div>
       ),
     },
@@ -70,7 +76,14 @@ export default function AllocationsPage() {
         if (!isEditing) {
           return (
             <span className="text-sm text-gray-700">
-              {row.parent ? `${row.parent.firstName} ${row.parent.lastName}` : '-'}
+              {row.parent ? (
+                <HighlightedText
+                  text={`${row.parent.firstName} ${row.parent.lastName}`}
+                  query={searchTerm}
+                />
+              ) : (
+                '-'
+              )}
             </span>
           );
         }
@@ -96,7 +109,11 @@ export default function AllocationsPage() {
       render: (_, row) => {
         const isEditing = editingId === row.id;
         if (!isEditing) {
-          return <span className="text-sm text-gray-700">{row.class?.name || '-'}</span>;
+          return (
+            <span className="text-sm text-gray-700">
+              <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
+            </span>
+          );
         }
         return (
           <select
@@ -118,7 +135,9 @@ export default function AllocationsPage() {
       key: 'branch',
       label: 'Branch',
       render: (_, row) => (
-        <span className="text-sm text-gray-600">{row.class?.location || '-'}</span>
+        <span className="text-sm text-gray-600">
+          <HighlightedText text={row.class?.location || '-'} query={searchTerm} />
+        </span>
       ),
     },
     {
@@ -126,9 +145,14 @@ export default function AllocationsPage() {
       label: 'Instructor',
       render: (_, row) => (
         <span className="text-sm text-gray-600">
-          {row.class?.instructor?.user
-            ? `${row.class.instructor.user.firstName} ${row.class.instructor.user.lastName}`
-            : '-'}
+          {row.class?.instructor?.user ? (
+            <HighlightedText
+              text={`${row.class.instructor.user.firstName} ${row.class.instructor.user.lastName}`}
+              query={searchTerm}
+            />
+          ) : (
+            '-'
+          )}
         </span>
       ),
     },

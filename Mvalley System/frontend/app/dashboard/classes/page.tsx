@@ -10,6 +10,7 @@ import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import { downloadExport } from '@/lib/export';
 import { FiPlus, FiEdit, FiTrash2, FiBookOpen, FiUsers } from 'react-icons/fi';
+import HighlightedText from '@/components/HighlightedText';
 
 export default function ClassesPage() {
   const router = useRouter();
@@ -161,10 +162,11 @@ export default function ClassesPage() {
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             router.push(`/dashboard/classes/details?id=${row.id}`);
           }}
         >
-          {row.name}
+          <HighlightedText text={row.name} query={searchTerm} />
         </a>
       ),
     },
@@ -473,7 +475,7 @@ export default function ClassesPage() {
         }
         getRowId={(row) => row.id}
         onRowClick={(row) => {
-          router.push(`/dashboard/classes/${row.id}`);
+          router.push(`/dashboard/classes/details?id=${row.id}`);
         }}
       />
 

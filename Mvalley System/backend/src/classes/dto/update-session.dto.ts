@@ -28,6 +28,10 @@ export class UpdateSessionDto {
 
   @IsOptional()
   @IsString()
+  room?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()

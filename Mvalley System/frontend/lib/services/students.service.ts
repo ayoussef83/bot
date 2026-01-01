@@ -21,6 +21,7 @@ export const studentsService = {
   create: (data: Partial<Student>) => api.post<Student>('/students', data),
   update: (id: string, data: Partial<Student>) => api.patch<Student>(`/students/${id}`, data),
   delete: (id: string) => api.delete(`/students/${id}`),
+  getUnallocatedPaidInsight: () => api.get(`/students/insights/unallocated-paid`),
 };
 
 

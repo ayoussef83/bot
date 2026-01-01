@@ -25,6 +25,10 @@ export class CreateSessionDto {
 
   @IsOptional()
   @IsString()
+  room?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()

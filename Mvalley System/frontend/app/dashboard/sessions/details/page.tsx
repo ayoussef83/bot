@@ -146,7 +146,7 @@ export default function SessionDetailPage() {
     {
       label: 'Edit',
       onClick: () => {
-        router.push(`/dashboard/sessions/edit?id=${id}`);
+        router.push(`/dashboard/sessions?editId=${id}`);
       },
       icon: <FiEdit className="w-4 h-4" />,
     },

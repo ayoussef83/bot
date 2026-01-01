@@ -7,6 +7,58 @@ import { CreateStudentDto, UpdateStudentDto } from './dto';
 export class StudentsService {
   constructor(private prisma: PrismaService) {}
 
+  async getUnallocatedPaidInsight() {
+    const count = await this.prisma.student.count({
+      where: {
+        deletedAt: null,
+        classId: null,
+        payments: {
+          some: { status: 'received' },
+        },
+      },
+    });
+
+    // Sum payments for unallocated students (best-effort with current schema naming)
+    const sum = await this.prisma.payment.aggregate({
+      where: {
+        status: 'received',
+        studentId: { not: null },
+        Student: {
+          is: {
+            deletedAt: null,
+            classId: null,
+          },
+        },
+      } as any,
+      _sum: { amount: true },
+    });
+
+    // Provide a small sample list for UI drill-in if needed
+    const sample = await this.prisma.student.findMany({
+      where: {
+        deletedAt: null,
+        classId: null,
+        payments: { some: { status: 'received' } },
+      },
+      include: {
+        parent: true,
+        payments: {
+          where: { status: 'received' },
+          orderBy: { receivedDate: 'desc' },
+          take: 1,
+        },
+      },
+      take: 20,
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return {
+      count,
+      totalPaid: sum?._sum?.amount || 0,
+      sample,
+    };
+  }
+
   async create(data: CreateStudentDto, createdBy: string) {
     const student = await this.prisma.student.create({
       data: {

@@ -132,6 +132,38 @@ export class AttendanceService {
     return { count: created.count };
   }
 
+  async setRoster(sessionId: string, studentIds: string[], updatedBy: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, deletedAt: null },
+    });
+    if (!session) throw new NotFoundException('Session not found');
+
+    // Replace roster (do not mark session completed)
+    await this.prisma.sessionAttendance.deleteMany({
+      where: { sessionId },
+    });
+
+    await this.prisma.sessionAttendance.createMany({
+      data: studentIds.map((studentId) => ({
+        sessionId,
+        studentId,
+        attended: false,
+      })),
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: updatedBy,
+        action: 'update',
+        entityType: 'Session',
+        entityId: sessionId,
+        changes: JSON.stringify({ setRoster: true, count: studentIds.length }),
+      },
+    });
+
+    return { sessionId, count: studentIds.length };
+  }
+
   async findBySession(sessionId: string) {
     return this.prisma.sessionAttendance.findMany({
       where: { sessionId },

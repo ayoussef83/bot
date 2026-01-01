@@ -290,6 +290,8 @@ model Session {
   instructorId String?
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
 
+  room String?
+
   // Status
   status              String  @default("scheduled") // scheduled, completed, cancelled
   instructorConfirmed Boolean @default(false)

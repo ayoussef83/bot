@@ -153,6 +153,7 @@ export default function StandardListView<T = any>({
         loading={loading}
         actions={actions}
         emptyMessage={emptyMessage}
+        highlightQuery={onSearch ? searchValue : undefined}
         selectable={selectable}
         selectedRows={selectedRows}
         onSelectionChange={onSelectionChange}

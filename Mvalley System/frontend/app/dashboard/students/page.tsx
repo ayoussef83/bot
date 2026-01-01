@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import { downloadExport } from '@/lib/export';
 import { FiPlus, FiEdit, FiTrash2, FiUsers } from 'react-icons/fi';
 import StatusBadge from '@/components/settings/StatusBadge';
+import HighlightedText from '@/components/HighlightedText';
 
 export default function StudentsPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
+  const [unallocatedPaidCount, setUnallocatedPaidCount] = useState<number>(0);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -33,6 +35,15 @@ export default function StudentsPage() {
 
   useEffect(() => {
     fetchStudents();
+    studentsService
+      .getUnallocatedPaidInsight()
+      .then((res: any) => {
+        setUnallocatedPaidCount(Number(res?.data?.count || 0));
+      })
+      .catch(() => {
+        // Non-blocking card
+        setUnallocatedPaidCount(0);
+      });
   }, []);
 
   const fetchStudents = async () => {
@@ -132,10 +143,11 @@ export default function StudentsPage() {
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             router.push(`/dashboard/students/details?id=${encodeURIComponent(row.id)}`);
           }}
         >
-          {row.firstName} {row.lastName}
+          <HighlightedText text={`${row.firstName} ${row.lastName}`} query={searchTerm} />
         </a>
       ),
     },
@@ -170,7 +182,9 @@ export default function StudentsPage() {
       key: 'class',
       label: 'Class',
       render: (_, row) => (
-        <span className="text-sm text-gray-500">{row.class?.name || '-'}</span>
+        <span className="text-sm text-gray-500">
+          <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
+        </span>
       ),
     },
   ];
@@ -414,6 +428,14 @@ export default function StudentsPage() {
               value={totalStudents - activeStudents}
               variant="warning"
               icon={<FiUsers className="w-8 h-8" />}
+            />
+            <SummaryCard
+              title="Paid, Unallocated"
+              value={unallocatedPaidCount}
+              variant={unallocatedPaidCount > 0 ? 'danger' : 'default'}
+              subtitle="Students with payments but no class"
+              icon={<FiUsers className="w-8 h-8" />}
+              onClick={() => router.push('/dashboard/academics/allocations')}
             />
           </>
         }

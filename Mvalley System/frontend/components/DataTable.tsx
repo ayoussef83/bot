@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import HighlightedText from './HighlightedText';
 
 export interface Column<T = any> {
   key: string;
@@ -24,6 +25,7 @@ interface DataTableProps<T = any> {
   data: T[];
   loading?: boolean;
   onRowClick?: (row: T) => void;
+  highlightQuery?: string;
   selectable?: boolean;
   selectedRows?: string[];
   onSelectionChange?: (selected: string[]) => void;
@@ -39,6 +41,7 @@ export default function DataTable<T = any>({
   data,
   loading = false,
   onRowClick,
+  highlightQuery,
   selectable = false,
   selectedRows = [],
   onSelectionChange,
@@ -196,6 +199,11 @@ export default function DataTable<T = any>({
                   {columns.map((column) => {
                     const value = (row as any)[column.key];
                     const content = column.render ? column.render(value, row) : value;
+                    const canHighlight =
+                      !column.render &&
+                      (typeof content === 'string' || typeof content === 'number') &&
+                      typeof highlightQuery === 'string' &&
+                      highlightQuery.trim().length > 0;
 
                     return (
                       <td
@@ -204,7 +212,11 @@ export default function DataTable<T = any>({
                           column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''
                         }`}
                       >
-                        {content}
+                        {canHighlight ? (
+                          <HighlightedText text={String(content)} query={highlightQuery} />
+                        ) : (
+                          content
+                        )}
                       </td>
                     );
                   })}
