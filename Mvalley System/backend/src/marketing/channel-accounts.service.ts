@@ -70,7 +70,7 @@ export class ChannelAccountsService {
       data.externalId,
       data.accessToken,
     );
-    if (!verification.ok) {
+    if (verification.ok === false) {
       throw new BadRequestException(
         `Invalid access token for ${data.platform}: ${verification.reason}`,
       );
@@ -147,7 +147,7 @@ export class ChannelAccountsService {
       nextExternalId,
       nextAccessToken,
     );
-    if (!verification.ok) {
+    if (verification.ok === false) {
       throw new BadRequestException(
         `Invalid access token for ${nextPlatform}: ${verification.reason}`,
       );
