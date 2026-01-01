@@ -5,7 +5,9 @@ export const metadata: Metadata = {
   title: 'MV-OS - MindValley Operating System',
   description: 'Education & Operations Management System',
   icons: {
-    icon: '/mindvalley-logo.png',
+    icon: [{ url: '/mindvalley-logo.png?v=20260101', type: 'image/png' }],
+    apple: [{ url: '/mindvalley-logo.png?v=20260101', type: 'image/png' }],
+    shortcut: '/mindvalley-logo.png?v=20260101',
   },
 }
 
