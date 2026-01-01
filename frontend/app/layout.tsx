@@ -4,6 +4,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'MV-OS - MindValley Operating System',
   description: 'Education & Operations Management System',
+  icons: {
+    icon: '/mindvalley-logo.png',
+  },
 }
 
 export default function RootLayout({
