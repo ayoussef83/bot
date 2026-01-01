@@ -56,7 +56,18 @@ export default function ConversationDetailPage() {
   const fetchConversation = async (id: string) => {
     try {
       const response = await marketingService.getConversation(id);
-      setConversation(response.data);
+      const conv = response.data;
+      setConversation(conv);
+
+      // Opening a conversation should move it from "New" -> "In Progress"
+      if (conv?.status === 'new') {
+        try {
+          const updated = await marketingService.markConversationViewed(id);
+          setConversation(updated.data);
+        } catch {
+          // best-effort; don't block UI
+        }
+      }
     } catch (err: any) {
       console.error('Error fetching conversation:', err);
       setError(err.response?.data?.message || 'Failed to load conversation');

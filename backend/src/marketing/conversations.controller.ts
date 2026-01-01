@@ -45,6 +45,12 @@ export class ConversationsController {
     return this.conversationsService.findOne(id);
   }
 
+  @Post(':id/mark-viewed')
+  @Roles(UserRole.super_admin, UserRole.management, UserRole.operations, UserRole.sales)
+  markViewed(@Param('id') id: string) {
+    return this.conversationsService.markViewed(id);
+  }
+
   @Patch(':id')
   @Roles(UserRole.super_admin, UserRole.management, UserRole.operations)
   update(

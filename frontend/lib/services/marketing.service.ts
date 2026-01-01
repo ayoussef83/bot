@@ -204,6 +204,11 @@ class MarketingService {
     return response;
   }
 
+  async markConversationViewed(id: string): Promise<{ data: Conversation }> {
+    const response = await api.post(`/marketing/conversations/${id}/mark-viewed`);
+    return response;
+  }
+
   async convertToLead(id: string, data: {
     existingLeadId?: string;
     createNewLead?: boolean;

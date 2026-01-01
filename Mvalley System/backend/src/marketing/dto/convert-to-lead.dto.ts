@@ -1,9 +1,6 @@
 import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class ConvertToLeadDto {
-  @IsString()
-  conversationId: string;
-
   @IsOptional()
   @IsString()
   existingLeadId?: string; // If linking to existing lead

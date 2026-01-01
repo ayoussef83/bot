@@ -107,6 +107,30 @@ export class ConversationsService {
     });
   }
 
+  async markViewed(id: string) {
+    // When a user opens a conversation, we treat it as "in progress"
+    // so counters drop from "New" -> "In Progress".
+    const conversation = await this.findOne(id);
+    if (conversation.status !== 'new') return conversation;
+
+    return this.prisma.conversation.update({
+      where: { id },
+      data: {
+        status: 'in_progress',
+        lastReadAt: new Date(),
+      },
+      include: {
+        channelAccount: true,
+        participant: true,
+        campaign: true,
+        lead: true,
+        messages: {
+          orderBy: { sentAt: 'asc' },
+        },
+      },
+    });
+  }
+
   async convertToLead(id: string, data: ConvertToLeadDto, userId: string) {
     const conversation = await this.findOne(id);
 
