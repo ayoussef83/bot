@@ -108,6 +108,11 @@ export class WebhooksController {
           );
         }
 
+        const effectivePageId =
+          !channel && normalized.isMetaTestPayload
+            ? String(effectiveChannel.externalId || pageId)
+            : pageId;
+
         const existingParticipant = await this.prisma.participant.findFirst({
           where: { platformUserId: senderId },
         });
@@ -125,7 +130,7 @@ export class WebhooksController {
               },
             });
 
-        const threadId = `${pageId}:${senderId}`;
+        const threadId = `${effectivePageId}:${senderId}`;
         const conversation = await this.prisma.conversation.upsert({
           where: {
             platform_externalThreadId: {
@@ -179,7 +184,13 @@ export class WebhooksController {
         // Handle inbound messages
         const msg = evt?.message;
         if (msg && !msg.is_echo) {
-          const mid = String(msg?.mid || '');
+          let mid = String(msg?.mid || '');
+          // Meta "Send to server" test uses a static message id like "test_message_id"
+          // which would be de-duplicated; make it unique so repeated tests are visible.
+          if (normalized.isMetaTestPayload) {
+            if (!mid || mid === 'test_message_id') mid = `meta_test_${Date.now()}`;
+            else if (mid.startsWith('test_')) mid = `${mid}_${tsMs}`;
+          }
           const text = typeof msg?.text === 'string' ? msg.text : '';
           if (mid) {
             const existing = await this.prisma.message.findFirst({
