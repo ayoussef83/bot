@@ -28,6 +28,20 @@ export type ConnectChannelWizardProps = {
 
 type Step = 1 | 2 | 3;
 
+function looksLikeAppSecret(v: string) {
+  const t = v.trim();
+  return /^[a-f0-9]{32}$/i.test(t);
+}
+
+function looksLikeMetaAccessToken(platform: WizardPlatform, v: string) {
+  const t = v.trim();
+  if (t.length < 40) return false;
+  if (looksLikeAppSecret(t)) return false;
+  if (platform === 'instagram_business') return /^IG/i.test(t);
+  if (platform === 'facebook_page' || platform === 'whatsapp_business') return /^EA/i.test(t);
+  return true;
+}
+
 function platformForIntegration(id: WizardIntegrationId): WizardPlatform {
   switch (id) {
     case 'whatsapp':
@@ -158,7 +172,7 @@ export default function ConnectChannelWizard({
     platform !== 'linkedin' &&
     form.name.trim().length > 1 &&
     form.externalId.trim().length > 2 &&
-    form.accessToken.trim().length > 10;
+    looksLikeMetaAccessToken(platform, form.accessToken);
 
   const startMetaOAuth = async () => {
     setError('');
@@ -179,13 +193,16 @@ export default function ConnectChannelWizard({
     setSubmitting(true);
     setError('');
     try {
+      if (looksLikeAppSecret(form.accessToken)) {
+        setError('That looks like a Meta App Secret, not an Access Token. Please paste an Access Token.');
+        return;
+      }
       const payload = {
         platform,
         name: form.name.trim(),
         externalId: form.externalId.trim(),
         accessToken: form.accessToken.trim(),
         refreshToken: form.refreshToken.trim() ? form.refreshToken.trim() : undefined,
-        status: 'connected' as const,
       };
 
       if (existingAccount?.id) {
