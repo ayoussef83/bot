@@ -18,6 +18,7 @@ export default function AllocationsPage() {
   const [parents, setParents] = useState<ParentContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({ parentId: '', classId: '' });
@@ -183,7 +184,28 @@ export default function AllocationsPage() {
     ];
   };
 
-  const rows = useMemo(() => students, [students]);
+  const rows = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) => {
+      const fullName = `${s.firstName || ''} ${s.lastName || ''}`.trim().toLowerCase();
+      const phone = (s.phone || '').toLowerCase();
+      const email = (s.email || '').toLowerCase();
+      const parentName = s.parent
+        ? `${s.parent.firstName || ''} ${s.parent.lastName || ''}`.trim().toLowerCase()
+        : '';
+      const className = (s.class?.name || '').toLowerCase();
+      const branch = (s.class?.location || '').toLowerCase();
+      return (
+        fullName.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q) ||
+        parentName.includes(q) ||
+        className.includes(q) ||
+        branch.includes(q)
+      );
+    });
+  }, [students, searchTerm]);
 
   return (
     <div className="space-y-4">
@@ -200,13 +222,15 @@ export default function AllocationsPage() {
         actions={actions}
         loading={loading || saving}
         getRowId={(r) => r.id}
+        searchPlaceholder="Search student, parent, phone, class, branch..."
+        searchValue={searchTerm}
+        onSearch={setSearchTerm}
         emptyState={
           <EmptyState
             title="No students yet"
             message="Create students first, then allocate them to contacts and classes."
           />
         }
-        searchPlaceholder="Search students..."
         onRowClick={(row) => {
           if (editingId) return;
           // keep current behavior: details page
