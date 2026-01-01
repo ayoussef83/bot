@@ -24,6 +24,8 @@ JWT_SECRET_NAME="${JWT_SECRET_NAME:-mv-os/staging/jwt-secret}"
 CPU="${CPU:-0.25 vCPU}"
 MEMORY="${MEMORY:-0.5 GB}"
 PORT="${PORT:-3000}"
+META_WEBHOOK_VERIFY_TOKEN="${META_WEBHOOK_VERIFY_TOKEN:-}"
+META_GRAPH_VERSION="${META_GRAPH_VERSION:-v20.0}"
 
 echo "🚀 App Runner Create/Update from ECR"
 echo "  ENV:           $ENVIRONMENT"
@@ -32,6 +34,12 @@ echo "  Region:        $REGION"
 echo "  ECR:           $ECR_REPO:$ECR_TAG"
 echo "  DB secret:     $DB_SECRET_NAME"
 echo "  JWT secret:    $JWT_SECRET_NAME"
+if [ -n "${META_WEBHOOK_VERIFY_TOKEN:-}" ]; then
+  echo "  Meta verify:   (set)"
+else
+  echo "  Meta verify:   (not set)"
+fi
+echo "  Meta graph:    $META_GRAPH_VERSION"
 echo ""
 
 # Ensure ECR access role exists (to pull private ECR images)
@@ -90,12 +98,18 @@ EXISTING_ARN="$(aws apprunner list-services \
   --query "ServiceSummaryList[?ServiceName=='$SERVICE_NAME'].ServiceArn" \
   --output text 2>/dev/null || true)"
 
-RUNTIME_ENV_VARS_JSON="$(cat <<EOF
-{
-  "NODE_ENV": "$ENVIRONMENT",
-  "PORT": "$PORT"
+RUNTIME_ENV_VARS_JSON="$(python3 - <<'PY'
+import json, os
+d = {
+  "NODE_ENV": os.environ.get("ENVIRONMENT", os.environ.get("ENV", "staging")),
+  "PORT": os.environ.get("PORT", "3000"),
+  "META_GRAPH_VERSION": os.environ.get("META_GRAPH_VERSION", "v20.0"),
 }
-EOF
+token = os.environ.get("META_WEBHOOK_VERIFY_TOKEN") or ""
+if token.strip():
+  d["META_WEBHOOK_VERIFY_TOKEN"] = token.strip()
+print(json.dumps(d))
+PY
 )"
 
 if [ -n "$EXISTING_ARN" ] && [ "$EXISTING_ARN" != "None" ]; then
