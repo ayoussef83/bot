@@ -7,3 +7,4 @@ export * from './create-cash-account.dto';
 export * from './generate-snapshot.dto';
 export * from './update-expense.dto';
 export * from './update-payment.dto';
+export * from './bank-sync.dto';

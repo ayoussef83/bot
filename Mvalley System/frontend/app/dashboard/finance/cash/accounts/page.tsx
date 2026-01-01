@@ -6,7 +6,7 @@ import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
-import { FiDollarSign, FiPlus, FiEdit, FiEye, FiCreditCard, FiTrendingUp, FiX } from 'react-icons/fi';
+import { FiDollarSign, FiPlus, FiEdit, FiCreditCard, FiTrendingUp, FiX, FiRefreshCw, FiUpload } from 'react-icons/fi';
 
 interface CreateCashAccountDto {
   name: string;
@@ -38,6 +38,17 @@ export default function AccountsPage() {
     notes: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Bank Sync modal state
+  const [showBankSync, setShowBankSync] = useState(false);
+  const [syncAccount, setSyncAccount] = useState<CashAccount | null>(null);
+  const [syncMode, setSyncMode] = useState<'manual' | 'csv'>('manual');
+  const [syncAsOfDate, setSyncAsOfDate] = useState('');
+  const [syncBalance, setSyncBalance] = useState<number>(0);
+  const [syncNotes, setSyncNotes] = useState('');
+  const [syncFile, setSyncFile] = useState<File | null>(null);
+  const [syncSubmitting, setSyncSubmitting] = useState(false);
+  const [syncError, setSyncError] = useState('');
 
   useEffect(() => {
     fetchAccounts();
@@ -118,6 +129,61 @@ export default function AccountsPage() {
     });
     setShowForm(true);
     setFormErrors({});
+  };
+
+  const openBankSync = (account: CashAccount) => {
+    setSyncAccount(account);
+    setSyncMode('manual');
+    setSyncAsOfDate(new Date().toISOString().slice(0, 10));
+    setSyncBalance(account.balance || 0);
+    setSyncNotes('');
+    setSyncFile(null);
+    setSyncError('');
+    setShowBankSync(true);
+  };
+
+  const closeBankSync = () => {
+    setShowBankSync(false);
+    setSyncAccount(null);
+    setSyncFile(null);
+    setSyncSubmitting(false);
+    setSyncError('');
+  };
+
+  const handleBankSync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!syncAccount) return;
+    setSyncSubmitting(true);
+    setSyncError('');
+    try {
+      const asOfDateIso = syncAsOfDate ? new Date(syncAsOfDate).toISOString() : undefined;
+      if (syncMode === 'manual') {
+        await financeService.setManualBankBalance({
+          cashAccountId: syncAccount.id,
+          balance: Number(syncBalance || 0),
+          asOfDate: asOfDateIso,
+          notes: syncNotes || undefined,
+        });
+      } else {
+        if (!syncFile) {
+          setSyncError('Please choose a CSV statement file.');
+          return;
+        }
+        await financeService.uploadBankStatementCsv({
+          cashAccountId: syncAccount.id,
+          file: syncFile,
+          asOfDate: asOfDateIso,
+          notes: syncNotes || undefined,
+        });
+      }
+      await fetchAccounts();
+      closeBankSync();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message;
+      setSyncError(typeof msg === 'string' ? msg : msg?.message || 'Failed to sync bank balance');
+    } finally {
+      setSyncSubmitting(false);
+    }
   };
 
   const handleDelete = async (account: CashAccount) => {
@@ -241,6 +307,15 @@ export default function AccountsPage() {
   ];
 
   const actions = (row: CashAccount): ActionButton[] => [
+    ...(row.type === 'bank'
+      ? [
+          {
+            label: 'Sync Balance',
+            onClick: () => openBankSync(row),
+            icon: <FiRefreshCw className="w-4 h-4" />,
+          } as ActionButton,
+        ]
+      : []),
     {
       label: 'Edit',
       onClick: () => handleEdit(row),
@@ -555,6 +630,146 @@ export default function AccountsPage() {
                       className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
                     >
                       {editingAccount ? 'Update Account' : 'Create Account'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bank Sync Modal */}
+      {showBankSync && syncAccount && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={closeBankSync}
+            ></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">Sync Bank Balance</h2>
+                  <button onClick={closeBankSync} className="text-gray-400 hover:text-gray-600">
+                    <FiX className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="mb-4 text-sm text-gray-600">
+                  <div className="font-medium text-gray-900">{syncAccount.name}</div>
+                  <div>
+                    Current MV-OS balance:{' '}
+                    <span className="font-semibold">
+                      {Number(syncAccount.balance || 0).toLocaleString('en-US', {
+                        style: 'currency',
+                        currency: 'EGP',
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                {syncError && (
+                  <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                    {syncError}
+                  </div>
+                )}
+
+                <form onSubmit={handleBankSync} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSyncMode('manual')}
+                      className={`px-3 py-2 rounded-md text-sm border ${
+                        syncMode === 'manual'
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Manual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSyncMode('csv')}
+                      className={`px-3 py-2 rounded-md text-sm border ${
+                        syncMode === 'csv'
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      CSV Upload
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">As of date</label>
+                    <input
+                      type="date"
+                      value={syncAsOfDate}
+                      onChange={(e) => setSyncAsOfDate(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {syncMode === 'manual' ? (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Actual bank balance</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={syncBalance}
+                        onChange={(e) => setSyncBalance(parseFloat(e.target.value) || 0)}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Use this if the portal only shows balance but you can’t export a statement.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Statement CSV</label>
+                      <div className="mt-1 flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          onChange={(e) => setSyncFile(e.target.files?.[0] || null)}
+                          className="block w-full text-sm text-gray-700"
+                        />
+                        <FiUpload className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        CSV must include a <span className="font-medium">Balance</span> column. If CIB exports different headers, send us a sample header row and we’ll support it.
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Notes (optional)</label>
+                    <textarea
+                      rows={2}
+                      value={syncNotes}
+                      onChange={(e) => setSyncNotes(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      placeholder="e.g., Statement for Dec 2025"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={closeBankSync}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                      disabled={syncSubmitting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+                      disabled={syncSubmitting}
+                    >
+                      {syncSubmitting ? 'Syncing…' : 'Sync'}
                     </button>
                   </div>
                 </form>

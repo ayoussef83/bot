@@ -16,6 +16,8 @@ import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
 import { ReconciliationController } from './reconciliation.controller';
 import { ReconciliationService } from './reconciliation.service';
+import { BankSyncController } from './bank-sync.controller';
+import { BankSyncService } from './bank-sync.service';
 
 @Module({
   imports: [PrismaModule],
@@ -28,6 +30,7 @@ import { ReconciliationService } from './reconciliation.service';
     InvoicesController,
     ReportsController,
     ReconciliationController,
+    BankSyncController,
   ],
   providers: [
     FinanceService,
@@ -38,6 +41,7 @@ import { ReconciliationService } from './reconciliation.service';
     InvoicesService,
     ReportsService,
     ReconciliationService,
+    BankSyncService,
   ],
   exports: [
     FinanceService,
@@ -48,6 +52,7 @@ import { ReconciliationService } from './reconciliation.service';
     InvoicesService,
     ReportsService,
     ReconciliationService,
+    BankSyncService,
   ],
 })
 export class FinanceModule {}

@@ -141,6 +141,19 @@ export interface ExpenseCategory {
   isActive: boolean;
 }
 
+export interface BankSyncRun {
+  id: string;
+  cashAccountId: string;
+  source: 'manual' | 'csv_upload';
+  asOfDate: string;
+  endingBalance: number;
+  fileName?: string;
+  rowCount?: number;
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
 export const financeService = {
   // Overview
   getOverview: () => api.get<FinanceOverview>('/finance/overview'),
@@ -180,5 +193,21 @@ export const financeService = {
   getExpenseCategoryById: (id: string) => api.get<ExpenseCategory>(`/finance/expense-categories/${id}`),
   createExpenseCategory: (data: any) => api.post<ExpenseCategory>('/finance/expense-categories', data),
   updateExpenseCategory: (id: string, data: any) => api.put<ExpenseCategory>(`/finance/expense-categories/${id}`, data),
+
+  // Bank Sync (Safe: manual or CSV import)
+  setManualBankBalance: (data: { cashAccountId: string; balance: number; asOfDate?: string; notes?: string }) =>
+    api.post('/finance/bank-sync/manual', data),
+  uploadBankStatementCsv: (params: { cashAccountId: string; file: File; asOfDate?: string; notes?: string }) => {
+    const fd = new FormData();
+    fd.append('cashAccountId', params.cashAccountId);
+    if (params.asOfDate) fd.append('asOfDate', params.asOfDate);
+    if (params.notes) fd.append('notes', params.notes);
+    fd.append('file', params.file);
+    return api.post('/finance/bank-sync/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getBankSyncRuns: (cashAccountId?: string) =>
+    api.get<BankSyncRun[]>(`/finance/bank-sync/runs${cashAccountId ? `?cashAccountId=${encodeURIComponent(cashAccountId)}` : ''}`),
 };
 

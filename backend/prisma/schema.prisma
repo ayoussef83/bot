@@ -422,6 +422,11 @@ enum ReconciliationType {
   reversal
 }
 
+enum BankSyncSource {
+  manual
+  csv_upload
+}
+
 // Invoice (Logical, Internal) - Expected Revenue
 model Invoice {
   id             String   @id @default(uuid())
@@ -598,6 +603,7 @@ model CashAccount {
   // Relations
   payments Payment[]
   expenses Expense[]
+  bankSyncRuns BankSyncRun[]
 
   // Audit
   createdAt DateTime @default(now())
@@ -606,6 +612,27 @@ model CashAccount {
   @@index([type])
   @@index([isActive])
   @@map("cash_accounts")
+}
+
+model BankSyncRun {
+  id            String         @id @default(uuid())
+  cashAccountId String
+  cashAccount   CashAccount    @relation(fields: [cashAccountId], references: [id])
+
+  source        BankSyncSource
+  asOfDate      DateTime
+  endingBalance Float
+
+  fileName String?
+  rowCount Int?
+  notes    String?
+  createdBy String?
+
+  createdAt DateTime @default(now())
+
+  @@index([cashAccountId])
+  @@index([asOfDate])
+  @@map("bank_sync_runs")
 }
 
 // Financial Period (Monthly)
