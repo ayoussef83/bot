@@ -7,9 +7,12 @@ import { MarketingPlatform } from '@prisma/client';
 export class WebhooksController {
   constructor(private readonly prisma: PrismaService) {}
 
-  private normalizeMetaPageWebhook(body: any): { entry: any[] } | null {
+  private normalizeMetaPageWebhook(
+    body: any,
+  ): { entry: any[]; isMetaTestPayload: boolean } | null {
     // Standard Page webhook format: { object: "page", entry: [...] }
-    if (body?.object === 'page' && Array.isArray(body?.entry)) return { entry: body.entry };
+    if (body?.object === 'page' && Array.isArray(body?.entry))
+      return { entry: body.entry, isMetaTestPayload: false };
 
     // Meta Webhooks "Test" tool sample format: { field: "messages", value: { sender, recipient, timestamp, message } }
     if (body?.field && body?.value && typeof body.value === 'object') {
@@ -23,6 +26,7 @@ export class WebhooksController {
             messaging: [v],
           },
         ],
+        isMetaTestPayload: true,
       };
     }
 
@@ -79,10 +83,29 @@ export class WebhooksController {
         const channel = await this.prisma.channelAccount.findFirst({
           where: { platform: MarketingPlatform.facebook_page, externalId: pageId },
         });
-        if (!channel) {
+        const effectiveChannel =
+          channel ||
+          (normalized.isMetaTestPayload
+            ? await this.prisma.channelAccount.findFirst({
+                where: { platform: MarketingPlatform.facebook_page },
+                orderBy: { updatedAt: 'desc' },
+              })
+            : null);
+        if (!effectiveChannel) {
           // eslint-disable-next-line no-console
-          console.warn('[WEBHOOK][META] No connected ChannelAccount for pageId:', pageId);
+          console.warn(
+            '[WEBHOOK][META] No connected ChannelAccount for pageId:',
+            pageId,
+            normalized.isMetaTestPayload ? '(meta test payload; no facebook_page channel exists)' : '',
+          );
           continue;
+        }
+        if (!channel && normalized.isMetaTestPayload) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[WEBHOOK][META] Meta test payload used non-matching pageId; falling back to channel externalId:',
+            effectiveChannel.externalId,
+          );
         }
 
         const existingParticipant = await this.prisma.participant.findFirst({
@@ -112,7 +135,7 @@ export class WebhooksController {
           },
           update: { lastMessageAt: sentAt },
           create: {
-            channelAccountId: channel.id,
+            channelAccountId: effectiveChannel.id,
             platform: MarketingPlatform.facebook_page,
             externalThreadId: threadId,
             participantId: participant.id,
@@ -129,7 +152,7 @@ export class WebhooksController {
             const graphVersion = process.env.META_GRAPH_VERSION || 'v20.0';
             const url = new URL(`https://graph.facebook.com/${graphVersion}/${senderId}`);
             url.searchParams.set('fields', 'first_name,last_name,profile_pic');
-            url.searchParams.set('access_token', channel.accessToken);
+            url.searchParams.set('access_token', effectiveChannel.accessToken);
             const resp = await fetch(url.toString(), { method: 'GET' });
             const json = await resp.json().catch(() => ({}));
             if (resp.ok) {
@@ -208,7 +231,7 @@ export class WebhooksController {
         // Update channel last sync (best-effort)
         await this.prisma.channelAccount
           .update({
-            where: { id: channel.id },
+            where: { id: effectiveChannel.id },
             data: { lastSyncAt: new Date() },
           })
           .catch(() => undefined);
