@@ -7,6 +7,35 @@ import { MarketingPlatform } from '@prisma/client';
 export class WebhooksController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeMetaPageWebhook(body: any): { entry: any[] } | null {
+    // Standard Page webhook format: { object: "page", entry: [...] }
+    if (body?.object === 'page' && Array.isArray(body?.entry)) return { entry: body.entry };
+
+    // Meta Webhooks "Test" tool sample format: { field: "messages", value: { sender, recipient, timestamp, message } }
+    if (body?.field && body?.value && typeof body.value === 'object') {
+      const v = body.value;
+      const pageId = String(v?.recipient?.id || '');
+      return {
+        entry: [
+          {
+            id: pageId,
+            time: Date.now(),
+            messaging: [v],
+          },
+        ],
+      };
+    }
+
+    return null;
+  }
+
+  private toUnixMs(ts: unknown): number {
+    const n = Number(ts);
+    if (!Number.isFinite(n) || n <= 0) return Date.now();
+    // Meta samples sometimes send seconds (10 digits); production commonly sends ms (13 digits)
+    return n < 1_000_000_000_000 ? n * 1000 : n;
+  }
+
   @Post('whatsapp')
   whatsapp(@Body() body: any) {
     // TODO: implement WhatsApp ingestion
@@ -33,15 +62,16 @@ export class WebhooksController {
 
   @Post('meta/messenger')
   async metaMessenger(@Body() body: any) {
-    if (body?.object !== 'page') return { ok: true };
+    const normalized = this.normalizeMetaPageWebhook(body);
+    if (!normalized) return { ok: true };
 
-    const entries: any[] = Array.isArray(body?.entry) ? body.entry : [];
+    const entries: any[] = Array.isArray(normalized?.entry) ? normalized.entry : [];
     for (const entry of entries) {
       const messaging: any[] = Array.isArray(entry?.messaging) ? entry.messaging : [];
       for (const evt of messaging) {
         const senderId = String(evt?.sender?.id || '');
         const pageId = String(evt?.recipient?.id || '');
-        const tsMs = Number(evt?.timestamp || Date.now());
+        const tsMs = this.toUnixMs(evt?.timestamp);
         const sentAt = new Date(tsMs);
 
         if (!senderId || !pageId) continue;
@@ -49,7 +79,11 @@ export class WebhooksController {
         const channel = await this.prisma.channelAccount.findFirst({
           where: { platform: MarketingPlatform.facebook_page, externalId: pageId },
         });
-        if (!channel) continue;
+        if (!channel) {
+          // eslint-disable-next-line no-console
+          console.warn('[WEBHOOK][META] No connected ChannelAccount for pageId:', pageId);
+          continue;
+        }
 
         const existingParticipant = await this.prisma.participant.findFirst({
           where: { platformUserId: senderId },
