@@ -168,11 +168,13 @@ export default function ConnectChannelWizard({
   };
 
   const canProceedStep1 = Boolean(platform);
+  const p = platform;
   const canProceedStep2 =
-    platform !== 'linkedin' &&
+    p !== null &&
+    p !== 'linkedin' &&
     form.name.trim().length > 1 &&
     form.externalId.trim().length > 2 &&
-    looksLikeMetaAccessToken(platform, form.accessToken);
+    looksLikeMetaAccessToken(p, form.accessToken);
 
   const startMetaOAuth = async () => {
     setError('');
