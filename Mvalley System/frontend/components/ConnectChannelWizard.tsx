@@ -34,7 +34,7 @@ function looksLikeAppSecret(v: string) {
 }
 
 function looksLikeMetaAccessToken(platform: WizardPlatform, v: string) {
-  const t = v.trim();
+  const t = v.replace(/[\s\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
   if (t.length < 40) return false;
   if (looksLikeAppSecret(t)) return false;
   if (platform === 'instagram_business') return /^IG/i.test(t);
@@ -193,8 +193,12 @@ export default function ConnectChannelWizard({
     setSubmitting(true);
     setError('');
     try {
-      const cleanedAccessToken = form.accessToken.replace(/\s+/g, '').trim();
-      const cleanedRefreshToken = form.refreshToken.replace(/\s+/g, '').trim();
+      const cleanedAccessToken = form.accessToken
+        .replace(/[\s\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+        .trim();
+      const cleanedRefreshToken = form.refreshToken
+        .replace(/[\s\u200B-\u200D\uFEFF\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+        .trim();
 
       if (looksLikeAppSecret(cleanedAccessToken)) {
         setError('That looks like a Meta App Secret, not an Access Token. Please paste an Access Token.');
