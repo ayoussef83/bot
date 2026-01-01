@@ -193,7 +193,10 @@ export default function ConnectChannelWizard({
     setSubmitting(true);
     setError('');
     try {
-      if (looksLikeAppSecret(form.accessToken)) {
+      const cleanedAccessToken = form.accessToken.replace(/\s+/g, '').trim();
+      const cleanedRefreshToken = form.refreshToken.replace(/\s+/g, '').trim();
+
+      if (looksLikeAppSecret(cleanedAccessToken)) {
         setError('That looks like a Meta App Secret, not an Access Token. Please paste an Access Token.');
         return;
       }
@@ -201,8 +204,8 @@ export default function ConnectChannelWizard({
         platform,
         name: form.name.trim(),
         externalId: form.externalId.trim(),
-        accessToken: form.accessToken.trim(),
-        refreshToken: form.refreshToken.trim() ? form.refreshToken.trim() : undefined,
+        accessToken: cleanedAccessToken,
+        refreshToken: cleanedRefreshToken ? cleanedRefreshToken : undefined,
       };
 
       if (existingAccount?.id) {

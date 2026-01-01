@@ -16,6 +16,10 @@ export class ChannelAccountsService {
     externalId: string,
     accessToken: string,
   ): Promise<{ ok: true; name?: string } | { ok: false; reason: string }> {
+    // Normalize in case the token was pasted with hidden whitespace/newlines
+    accessToken = String(accessToken || '').replace(/\s+/g, '').trim();
+    externalId = String(externalId || '').trim();
+
     // This prevents accidental pasting of Meta App Secret (often 32-char hex) into "Access token"
     if (/^[a-f0-9]{32}$/i.test(accessToken.trim())) {
       return { ok: false, reason: 'Looks like an App Secret, not an Access Token.' };
