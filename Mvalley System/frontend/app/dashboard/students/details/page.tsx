@@ -353,38 +353,7 @@ export default function StudentDetailPage() {
         </div>
       ),
     },
-    {
-      id: 'classes',
-      label: 'Courses',
-      count: student.class ? 1 : 0,
-      icon: <FiBookOpen className="w-4 h-4" />,
-      content: (
-        <div>
-          {student.class ? (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-gray-900">{student.class.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {student.class.location} • Capacity: {student.class.capacity}
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push(`/dashboard/courses/details?id=${student.classId}`)}
-                  className="text-sm text-indigo-600 hover:text-indigo-900"
-                >
-                  View Course →
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>No courses enrolled</p>
-            </div>
-          )}
-        </div>
-      ),
-    },
+    // Removed legacy "Courses" tab (was duplicating the new multi-course enrollments tab).
     {
       id: 'courses',
       label: 'Courses',
