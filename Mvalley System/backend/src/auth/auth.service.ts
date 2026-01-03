@@ -28,7 +28,7 @@ export class AuthService {
     }
 
     // Log login
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: user.id,
         action: 'login',
@@ -45,7 +45,7 @@ export class AuthService {
     const payload = { email: user.email, sub: user.id, role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
-      users: {
+      user: {
         id: user.id,
         email: user.email,
         firstName: user.firstName,

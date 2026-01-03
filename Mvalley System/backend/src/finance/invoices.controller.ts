@@ -4,6 +4,7 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { InvoiceStatus } from '@prisma/client';
 
 @Controller('finance/invoices')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,8 +37,8 @@ export class InvoicesController {
 
   @Put(':id/status')
   @Roles('super_admin', 'accounting')
-  async updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
-    return this.invoicesService.updateStatus(id, body.status);
+  async updateStatus(@Param('id') id: string, @Body() body: { status: InvoiceStatus }) {
+    return this.invoicesService.updateStatus(id, body.status as InvoiceStatus);
   }
 
   @Put(':id/cancel')
@@ -46,10 +47,6 @@ export class InvoicesController {
     return this.invoicesService.cancel(id);
   }
 }
-
-
-
-
 
 
 

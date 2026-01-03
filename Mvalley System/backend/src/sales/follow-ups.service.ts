@@ -7,7 +7,7 @@ export class FollowUpsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateFollowUpDto, createdBy: string) {
-    const followUp = await this.prisma.leadsFollowUp.create({
+    const followUp = await this.prisma.leadFollowUp.create({
       data: {
         ...data,
         createdBy,
@@ -21,7 +21,7 @@ export class FollowUpsService {
   }
 
   async findByLead(leadId: string) {
-    return this.prisma.leadsFollowUp.findMany({
+    return this.prisma.leadFollowUp.findMany({
       where: { leadId },
       orderBy: {
         createdAt: 'desc',

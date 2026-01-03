@@ -250,7 +250,7 @@ export default function SessionsPage() {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            router.push(`/dashboard/sessions/details?id=${encodeURIComponent(row.id)}`);
+            router.push(`/dashboard/sessions/details?id=${row.id}`);
           }}
         >
           <HighlightedText
@@ -262,16 +262,16 @@ export default function SessionsPage() {
     },
     {
       key: 'class',
-      label: 'Course',
+      label: 'Class',
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/courses/details?id=${encodeURIComponent(row.classId)}`}
+          href={`/dashboard/classes/details?id=${row.classId}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            router.push(`/dashboard/courses/details?id=${encodeURIComponent(row.classId)}`);
+            router.push(`/dashboard/classes/details?id=${row.classId}`);
           }}
         >
           <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
@@ -600,7 +600,7 @@ export default function SessionsPage() {
           onClick: openCreate,
           icon: <FiPlus className="w-4 h-4" />,
         }}
-        searchPlaceholder="Search by course name or instructor..."
+        searchPlaceholder="Search by class name or instructor..."
         onSearch={setSearchTerm}
         searchValue={searchTerm}
         filters={filters}

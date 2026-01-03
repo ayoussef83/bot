@@ -15,19 +15,19 @@ export class AttendanceService {
   ) {}
 
   async create(data: CreateAttendanceDto, createdBy: string) {
-    const attendance = await this.prisma.sessions_attendances.create({
+    const attendance = await this.prisma.sessionAttendance.create({
       data: {
         ...data,
       },
       include: {
         session: {
           include: {
-            classes: true,
+            class: true,
           },
         },
-        students: {
+        student: {
           include: {
-            parents: true,
+            parent: true,
           },
         },
       },
@@ -39,7 +39,7 @@ export class AttendanceService {
     }
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -52,16 +52,16 @@ export class AttendanceService {
   }
 
   async update(id: string, data: UpdateAttendanceDto, updatedBy: string) {
-    const attendance = await this.prisma.sessions_attendances.update({
+    const attendance = await this.prisma.sessionAttendance.update({
       where: { id },
       data,
       include: {
         session: {
           include: {
-            classes: true,
+            class: true,
           },
         },
-        students: true,
+        student: true,
       },
     });
 
@@ -71,7 +71,7 @@ export class AttendanceService {
     }
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -84,14 +84,14 @@ export class AttendanceService {
     return attendance;
   }
 
-  async bulkUpdate(sessionId: string, session_attendances: Array<{ studentId: string; attended: boolean; notes?: string }>, updatedBy: string) {
+  async bulkUpdate(sessionId: string, attendances: Array<{ studentId: string; attended: boolean; notes?: string }>, updatedBy: string) {
     // Delete existing attendances for this session
-    await this.prisma.sessions_attendances.deleteMany({
+    await this.prisma.sessionAttendance.deleteMany({
       where: { sessionId },
     });
 
     // Create new attendances
-    const created = await this.prisma.sessions_attendances.createMany({
+    const created = await this.prisma.sessionAttendance.createMany({
       data: attendances.map((att) => ({
         sessionId,
         studentId: att.studentId,
@@ -101,11 +101,11 @@ export class AttendanceService {
     });
 
     // Update session status and get classId for recalculation
-    const session = await this.prisma.sessions.findUnique({
+    const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
     });
 
-    await this.prisma.sessions.update({
+    await this.prisma.session.update({
       where: { id: sessionId },
       data: {
         status: 'completed',
@@ -119,7 +119,7 @@ export class AttendanceService {
     }
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -133,17 +133,17 @@ export class AttendanceService {
   }
 
   async setRoster(sessionId: string, studentIds: string[], updatedBy: string) {
-    const session = await this.prisma.sessions.findFirst({
+    const session = await this.prisma.session.findFirst({
       where: { id: sessionId, deletedAt: null },
     });
     if (!session) throw new NotFoundException('Session not found');
 
     // Replace roster (do not mark session completed)
-    await this.prisma.sessions_attendances.deleteMany({
+    await this.prisma.sessionAttendance.deleteMany({
       where: { sessionId },
     });
 
-    await this.prisma.sessions_attendances.createMany({
+    await this.prisma.sessionAttendance.createMany({
       data: studentIds.map((studentId) => ({
         sessionId,
         studentId,
@@ -151,7 +151,7 @@ export class AttendanceService {
       })),
     });
 
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -165,12 +165,12 @@ export class AttendanceService {
   }
 
   async findBySession(sessionId: string) {
-    return this.prisma.sessions_attendances.findMany({
+    return this.prisma.sessionAttendance.findMany({
       where: { sessionId },
       include: {
-        students: {
+        student: {
           include: {
-            parents: true,
+            parent: true,
           },
         },
       },

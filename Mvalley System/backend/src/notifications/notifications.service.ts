@@ -16,7 +16,7 @@ export class NotificationsService {
 
   async sendMessage(dto: SendMessageDto) {
     // Create notification record
-    const notification = await this.prisma.notifications.create({
+    const notification = await this.prisma.notification.create({
       data: {
         channel: dto.channel,
         recipient: dto.recipient,
@@ -65,7 +65,7 @@ export class NotificationsService {
       }
 
       // Update notification status
-      await this.prisma.notifications.update({
+      await this.prisma.notification.update({
         where: { id: notification.id },
         data: {
           status: 'sent',
@@ -76,7 +76,7 @@ export class NotificationsService {
       return { ...notification, status: 'sent', sentAt: new Date() };
     } catch (error) {
       // Update notification status to failed
-      await this.prisma.notifications.update({
+      await this.prisma.notification.update({
         where: { id: notification.id },
         data: {
           status: 'failed',
@@ -94,7 +94,7 @@ export class NotificationsService {
     studentId?: string;
     leadId?: string;
   }) {
-    return this.prisma.notifications.findMany({
+    return this.prisma.notification.findMany({
       where: {
         ...(filters?.channel && { channel: filters.channel }),
         ...(filters?.status && { status: filters.status }),
@@ -109,7 +109,7 @@ export class NotificationsService {
   }
 
   async findOne(id: string) {
-    return this.prisma.notifications.findUnique({
+    return this.prisma.notification.findUnique({
       where: { id },
     });
   }

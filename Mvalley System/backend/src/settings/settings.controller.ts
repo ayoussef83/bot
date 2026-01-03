@@ -42,7 +42,7 @@ export class SettingsController {
 
   @Post('custom-fields')
   @Roles(UserRole.super_admin)
-  createCustomField(@Body() dto: CreateCustomFieldDto, @CurrentUser() users: any) {
+  createCustomField(@Body() dto: CreateCustomFieldDto, @CurrentUser() user: any) {
     return this.settingsService.createCustomField(dto, user?.id);
   }
 
@@ -86,7 +86,7 @@ export class SettingsController {
 
   @Post('templates')
   @Roles(UserRole.super_admin)
-  createTemplate(@Body() dto: CreateMessageTemplateDto, @CurrentUser() users: any) {
+  createTemplate(@Body() dto: CreateMessageTemplateDto, @CurrentUser() user: any) {
     return this.settingsService.createTemplate(dto, user?.id);
   }
 

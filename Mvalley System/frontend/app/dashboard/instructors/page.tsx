@@ -152,7 +152,7 @@ export default function InstructorsPage() {
     },
     {
       key: 'costType',
-      label: 'Fees Type',
+      label: 'Cost Type',
       sortable: true,
       render: (value) => (
         <span className="text-sm text-gray-500 capitalize">{value}</span>
@@ -160,7 +160,7 @@ export default function InstructorsPage() {
     },
     {
       key: 'costAmount',
-      label: 'Fees',
+      label: 'Cost Amount',
       sortable: true,
       align: 'right',
       render: (value, row) => (
@@ -174,7 +174,7 @@ export default function InstructorsPage() {
     },
     {
       key: 'classes',
-      label: 'Courses',
+      label: 'Classes',
       render: (_, row) => (
         <span className="text-sm text-gray-500">{row.classes?.length || 0}</span>
       ),
@@ -200,7 +200,7 @@ export default function InstructorsPage() {
   const filters: FilterConfig[] = [
     {
       key: 'costType',
-      label: 'Fees Type',
+      label: 'Cost Type',
       type: 'select',
       options: [
         { value: 'hourly', label: 'Hourly' },
@@ -267,7 +267,7 @@ export default function InstructorsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Fees Type</label>
+                      <label className="block text-sm font-medium text-gray-700">Cost Type</label>
                       <select
                         value={formData.costType}
                         onChange={(e) => setFormData({ ...formData, costType: e.target.value })}
@@ -278,7 +278,9 @@ export default function InstructorsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Fees (EGP)</label>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Cost Amount (EGP)
+                      </label>
                       <input
                         type="number"
                         required

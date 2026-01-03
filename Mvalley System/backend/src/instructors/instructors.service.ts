@@ -7,12 +7,12 @@ export class InstructorsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateInstructorDto, createdBy: string) {
-    const instructor = await this.prisma.instructors.create({
+    const instructor = await this.prisma.instructor.create({
       data: {
         ...data,
       },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             email: true,
@@ -35,7 +35,7 @@ export class InstructorsService {
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -48,10 +48,10 @@ export class InstructorsService {
   }
 
   async findAll() {
-    return this.prisma.instructors.findMany({
+    return this.prisma.instructor.findMany({
       where: { deletedAt: null },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             email: true,
@@ -73,10 +73,10 @@ export class InstructorsService {
   }
 
   async findOne(id: string) {
-    const instructor = await this.prisma.instructors.findFirst({
+    const instructor = await this.prisma.instructor.findFirst({
       where: { id, deletedAt: null },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             email: true,
@@ -95,8 +95,8 @@ export class InstructorsService {
         sessions: {
           orderBy: { scheduledDate: 'desc' },
           include: {
-            classes: true,
-            session_attendances: true,
+            class: true,
+            attendances: true,
           },
         },
       },
@@ -110,11 +110,11 @@ export class InstructorsService {
   }
 
   async update(id: string, data: UpdateInstructorDto, updatedBy: string) {
-    const instructor = await this.prisma.instructors.update({
+    const instructor = await this.prisma.instructor.update({
       where: { id },
       data,
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             email: true,
@@ -127,7 +127,7 @@ export class InstructorsService {
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -141,13 +141,13 @@ export class InstructorsService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const instructor = await this.prisma.instructors.update({
+    const instructor = await this.prisma.instructor.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: deletedBy,
         action: 'delete',

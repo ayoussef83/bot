@@ -14,11 +14,12 @@ export class DashboardService {
     // Revenue
     const payments = await this.prisma.payment.findMany({
       where: {
-        receivedDate: {
+        paymentDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        status: 'received',
+        status: 'completed',
+        deletedAt: null,
       },
     });
     const monthlyRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -101,11 +102,11 @@ export class DashboardService {
     // Cash in/out
     const expenses = await this.prisma.expense.findMany({
       where: {
-        paidDate: {
+        expenseDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        status: 'paid',
+        deletedAt: null,
       },
     });
     const cashOut = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -232,14 +233,15 @@ export class DashboardService {
     // Payments received
     const payments = await this.prisma.payment.findMany({
       where: {
-        receivedDate: {
+        paymentDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        status: 'received',
+        status: 'completed',
+        deletedAt: null,
       },
       include: {
-        Student: {
+        student: {
           select: {
             id: true,
             firstName: true,
@@ -248,7 +250,7 @@ export class DashboardService {
         },
       },
       orderBy: {
-        receivedDate: 'desc',
+        paymentDate: 'desc',
       },
     });
 
@@ -258,62 +260,47 @@ export class DashboardService {
       include: {
         payments: {
           where: {
-            status: 'received',
-          },
-        },
-        invoices: {
-          where: {
-            status: {
-              not: 'paid',
-            },
+            status: 'pending',
+            deletedAt: null,
           },
         },
       },
     });
 
     const outstandingBalances = outstanding
-      .map((student) => {
-        const totalInvoiced = student.invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-        const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
-        const outstandingAmount = totalInvoiced - totalPaid;
-        return {
-          studentId: student.id,
-          studentName: `${student.firstName} ${student.lastName}`,
-          outstandingAmount,
-          pendingInvoices: student.invoices.length,
-        };
-      })
+      .map((student) => ({
+        studentId: student.id,
+        studentName: `${student.firstName} ${student.lastName}`,
+        outstandingAmount: student.payments.reduce(
+          (sum, p) => sum + p.amount,
+          0,
+        ),
+        pendingPayments: student.payments.length,
+      }))
       .filter((s) => s.outstandingAmount > 0)
       .sort((a, b) => b.outstandingAmount - a.outstandingAmount);
 
     // Expense breakdown
     const expenses = await this.prisma.expense.findMany({
       where: {
-        paidDate: {
+        expenseDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
-        status: 'paid',
-      },
-      include: {
-        category: true,
+        deletedAt: null,
       },
     });
 
     const expenseBreakdown = expenses.reduce((acc, expense) => {
-      const categoryName = expense.category?.name || 'Uncategorized';
-      if (!acc[categoryName]) {
-        acc[categoryName] = 0;
+      if (!acc[expense.category]) {
+        acc[expense.category] = 0;
       }
-      acc[categoryName] += expense.amount;
+      acc[expense.category] += expense.amount;
       return acc;
     }, {} as Record<string, number>);
 
     return {
-      paymentsReceived: payments.map((p) => ({
-        ...p,
-        student: p.Student,
-      })),
+      paymentsReceived: payments,
       totalReceived: payments.reduce((sum, p) => sum + p.amount, 0),
       outstandingBalances,
       totalOutstanding: outstandingBalances.reduce(

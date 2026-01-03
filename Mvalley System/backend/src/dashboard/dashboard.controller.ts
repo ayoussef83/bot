@@ -35,9 +35,9 @@ export class DashboardController {
 
   @Get('instructor')
   @Roles(UserRole.instructor)
-  async getInstructorDashboard(@CurrentUser() users: any) {
+  async getInstructorDashboard(@CurrentUser() user: any) {
     // Get instructor ID from user relation
-    const instructor = await this.prisma.instructors.findUnique({
+    const instructor = await this.prisma.instructor.findUnique({
       where: { userId: user.id },
     });
     if (!instructor) {

@@ -167,22 +167,11 @@ export default function StudentsPage() {
       },
     },
     {
-      key: 'course',
-      label: 'Course',
-      render: (_, row) => {
-        const enrollments = row.enrollments || [];
-        if (enrollments.length === 0) {
-          return <span className="text-sm text-gray-500">-</span>;
-        }
-        const courseNames = enrollments
-          .map((enr: any) => enr.courseLevel?.course?.name || enr.courseLevel?.name || 'Unknown')
-          .filter((name: string) => name !== 'Unknown');
-        if (courseNames.length === 0) {
-          return <span className="text-sm text-gray-500">-</span>;
-        }
-        const displayText = courseNames.join(', ');
-        return <span className="text-sm text-gray-500">{displayText}</span>;
-      },
+      key: 'class',
+      label: 'Class',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">{row.class?.name || '-'}</span>
+      ),
     },
   ];
 

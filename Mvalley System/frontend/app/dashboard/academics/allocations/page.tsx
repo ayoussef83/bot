@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import StandardListView from '@/components/StandardListView';
 import { ActionButton, Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
-import { studentsService, classesService, Student, Class, type StudentEnrollment } from '@/lib/services';
+import { studentsService, classesService, parentsService, Student, Class, ParentContact, type StudentEnrollment } from '@/lib/services';
 import { FiEdit, FiSave, FiX } from 'react-icons/fi';
 import HighlightedText from '@/components/HighlightedText';
 import { useSearchParams } from 'next/navigation';
 
 type Draft = {
+  parentId: string;
   classId: string;
 };
 
@@ -29,21 +30,27 @@ export default function AllocationsPage() {
   const searchParams = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [parents, setParents] = useState<ParentContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ classId: '' });
+  const [draft, setDraft] = useState<Draft>({ parentId: '', classId: '' });
   const [saving, setSaving] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
     setError('');
     try {
-      const [s, c] = await Promise.all([studentsService.getAll(), classesService.getAll()]);
+      const [s, c, p] = await Promise.all([
+        studentsService.getAll(),
+        classesService.getAll(),
+        parentsService.getAll(),
+      ]);
       setStudents(Array.isArray(s.data) ? s.data : []);
       setClasses(Array.isArray(c.data) ? c.data : []);
+      setParents(Array.isArray(p.data) ? p.data : []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load allocations');
     } finally {
@@ -58,6 +65,8 @@ export default function AllocationsPage() {
   // If coming from a class quick-action, preselect that class in the row editor when you click "Edit row"
   const preselectedClassId = searchParams?.get('classId') || '';
 
+  const parentLabel = (p: ParentContact) => `${p.firstName} ${p.lastName} (${p.phone})`;
+
   const columns: Column<EnrollmentRow>[] = [
     {
       key: 'student',
@@ -65,26 +74,51 @@ export default function AllocationsPage() {
       render: (_, row) => (
         <div className="text-sm">
           <div className="font-medium text-gray-900">
-            <a
-              href={`/dashboard/students/details?id=${encodeURIComponent(row.studentId)}`}
-              className="text-indigo-600 hover:text-indigo-900"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.location.href = `/dashboard/students/details?id=${encodeURIComponent(row.studentId)}`;
-              }}
-            >
-              <HighlightedText
-                text={`${row.student.firstName} ${row.student.lastName}`}
-                query={searchTerm}
-              />
-            </a>
+            <HighlightedText
+              text={`${row.student.firstName} ${row.student.lastName}`}
+              query={searchTerm}
+            />
           </div>
           <div className="text-gray-500">
             <HighlightedText text={row.student.phone || row.student.email || '-'} query={searchTerm} />
           </div>
         </div>
       ),
+    },
+    {
+      key: 'parent',
+      label: 'Contact (Parent)',
+      render: (_, row) => {
+        const isEditing = editingId === row.enrollmentId;
+        if (!isEditing) {
+          return (
+            <span className="text-sm text-gray-700">
+              {row.student.parent ? (
+                <HighlightedText
+                  text={`${row.student.parent.firstName} ${row.student.parent.lastName}`}
+                  query={searchTerm}
+                />
+              ) : (
+                '-'
+              )}
+            </span>
+          );
+        }
+        return (
+          <select
+            value={draft.parentId}
+            onChange={(e) => setDraft((d) => ({ ...d, parentId: e.target.value }))}
+            className="w-full rounded-md border-gray-300 text-sm"
+          >
+            <option value="">— Unassigned —</option>
+            {parents.map((p) => (
+              <option key={p.id} value={p.id}>
+                {parentLabel(p)}
+              </option>
+            ))}
+          </select>
+        );
+      },
     },
     {
       key: 'course',
@@ -100,7 +134,7 @@ export default function AllocationsPage() {
     },
     {
       key: 'class',
-      label: 'Course Group',
+      label: 'Group (Class)',
       render: (_, row) => {
         const isEditing = editingId === row.enrollmentId;
         if (!isEditing) {
@@ -129,35 +163,27 @@ export default function AllocationsPage() {
     {
       key: 'branch',
       label: 'Branch',
-      render: (_, row) => {
-        const isEditing = editingId === row.enrollmentId;
-        const selected = isEditing
-          ? classes.find((c) => c.id === draft.classId)
-          : (row.enrollment?.class as any);
-        const branch = selected ? ((selected as any).locationName || (selected as any).location || '-') : '-';
-        return (
-          <span className="text-sm text-gray-600">
-            <HighlightedText text={branch} query={searchTerm} />
-          </span>
-        );
-      },
+      render: (_, row) => (
+        <span className="text-sm text-gray-600">
+          <HighlightedText text={row.enrollment?.class?.locationName || row.enrollment?.class?.location || '-'} query={searchTerm} />
+        </span>
+      ),
     },
     {
       key: 'instructor',
       label: 'Instructor',
-      render: (_, row) => {
-        const isEditing = editingId === row.enrollmentId;
-        const selected: any = isEditing ? classes.find((c) => c.id === draft.classId) : row.enrollment?.class;
-        const name =
-          selected?.instructor?.user
-            ? `${selected.instructor.user.firstName} ${selected.instructor.user.lastName}`
-            : '-';
-        return (
-          <span className="text-sm text-gray-600">
-            <HighlightedText text={name} query={searchTerm} />
-          </span>
-        );
-      },
+      render: (_, row) => (
+        <span className="text-sm text-gray-600">
+          {row.enrollment?.class?.instructor?.user ? (
+            <HighlightedText
+              text={`${row.enrollment.class.instructor.user.firstName} ${row.enrollment.class.instructor.user.lastName}`}
+              query={searchTerm}
+            />
+          ) : (
+            '-'
+          )}
+        </span>
+      ),
     },
   ];
 
@@ -171,6 +197,7 @@ export default function AllocationsPage() {
           onClick: () => {
             setEditingId(row.enrollmentId);
             setDraft({
+              parentId: row.student.parentId || '',
               classId: row.enrollment.classId || preselectedClassId || '',
             });
           },
@@ -186,6 +213,10 @@ export default function AllocationsPage() {
           setSaving(true);
           setError('');
           try {
+            // Parent is on Student
+            await studentsService.update(row.studentId, {
+              parentId: draft.parentId ? draft.parentId : null,
+            });
             // Allocation is on Enrollment
             await studentsService.updateEnrollment(row.enrollmentId, {
               classId: draft.classId ? draft.classId : null,
@@ -287,7 +318,7 @@ export default function AllocationsPage() {
       )}
       <StandardListView
         title="Allocations"
-        subtitle="Assign each enrollment (Course Level) to a Course Group inline—students can have multiple courses."
+        subtitle="Assign each enrollment (Course Level) to a Group (Class) inline—students can have multiple courses."
         data={rows}
         columns={columns}
         actions={actions}

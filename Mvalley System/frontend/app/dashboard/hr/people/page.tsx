@@ -168,7 +168,7 @@ export default function PeoplePage() {
     },
     {
       key: 'classes',
-      label: 'Courses',
+      label: 'Classes',
       sortable: false,
       render: (_, row) => (
         <span className="text-sm text-gray-600">

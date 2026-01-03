@@ -18,4 +18,3 @@ The logo should be:
 
 
 
-

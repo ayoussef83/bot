@@ -20,34 +20,17 @@ export class ClassesService {
   async create(data: CreateClassDto, createdBy: string) {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
-
-    // Ensure a matching Course + default Level exists so "Courses" dropdowns show newly created courses like "Python".
-    const courseName = (data.name || '').trim();
-    if (!courseName) throw new BadRequestException('Course name is required');
-    const course = await this.prisma.coursess.upsert({
-      where: { name: courseName },
-      update: { deletedAt: null, isActive: true },
-      create: { name: courseName, isActive: true },
-    });
-    const level = await this.prisma.courses_levels.upsert({
-      where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
-      update: { deletedAt: null, isActive: true, sortOrder: 1 },
-      create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
-    });
-
-    const classEntity = await this.prisma.classeses.create({
+    const classEntity = await this.prisma.class.create({
       data: {
         ...data,
-        courseLevelId: level.id,
-        locationName: (data as any).locationName || String((data as any).location || ''),
         instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
         startDate,
         endDate,
       },
       include: {
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -68,7 +51,7 @@ export class ClassesService {
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -81,12 +64,12 @@ export class ClassesService {
   }
 
   async findAll() {
-    return this.prisma.classeses.findMany({
+    return this.prisma.class.findMany({
       where: { deletedAt: null },
       include: {
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -111,12 +94,12 @@ export class ClassesService {
   }
 
   async findOne(id: string) {
-    const classEntity = await this.prisma.classeses.findFirst({
+    const classEntity = await this.prisma.class.findFirst({
       where: { id, deletedAt: null },
       include: {
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -129,15 +112,15 @@ export class ClassesService {
         students: {
           where: { deletedAt: null },
           include: {
-            parents: true,
+            parent: true,
           },
         },
         sessions: {
           orderBy: { scheduledDate: 'desc' },
           include: {
-            session_attendances: {
+            attendances: {
               include: {
-                students: true,
+                student: true,
               },
             },
           },
@@ -155,7 +138,7 @@ export class ClassesService {
   async update(id: string, data: UpdateClassDto, updatedBy: string) {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
-    const classEntity = await this.prisma.classeses.update({
+    const classEntity = await this.prisma.class.update({
       where: { id },
       data: {
         ...data,
@@ -164,9 +147,9 @@ export class ClassesService {
         endDate,
       },
       include: {
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -185,7 +168,7 @@ export class ClassesService {
     await this.recalculateMetrics(id);
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -199,13 +182,13 @@ export class ClassesService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const classEntity = await this.prisma.classeses.update({
+    const classEntity = await this.prisma.class.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: deletedBy,
         action: 'delete',
@@ -218,12 +201,12 @@ export class ClassesService {
   }
 
   async recalculateMetrics(classId: string) {
-    const classEntity = await this.prisma.classeses.findUnique({
+    const classEntity = await this.prisma.class.findUnique({
       where: { id: classId },
       include: {
         sessions: {
           include: {
-            session_attendances: {
+            attendances: {
               where: { attended: true },
             },
           },
@@ -235,7 +218,7 @@ export class ClassesService {
 
     const sessions = classEntity.sessions.filter((s) => s.status === 'completed');
     if (sessions.length === 0) {
-      await this.prisma.classeses.update({
+      await this.prisma.class.update({
         where: { id: classId },
         data: {
           avgStudentsPerSession: 0,
@@ -247,14 +230,14 @@ export class ClassesService {
     }
 
     const totalAttendances = sessions.reduce(
-      (sum, session) => sum + session.session_attendances.length,
+      (sum, session) => sum + session.attendances.length,
       0,
     );
     const avgStudentsPerSession = totalAttendances / sessions.length;
     const utilizationPercentage = (avgStudentsPerSession / classEntity.capacity) * 100;
     const isUnderfilled = utilizationPercentage < 60; // Flag if less than 60% capacity
 
-    await this.prisma.classeses.update({
+    await this.prisma.class.update({
       where: { id: classId },
       data: {
         avgStudentsPerSession,

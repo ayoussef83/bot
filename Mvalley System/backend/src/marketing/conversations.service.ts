@@ -8,15 +8,15 @@ export class ConversationsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateConversationDto) {
-    return this.prisma.conversations.create({
+    return this.prisma.conversation.create({
       data: {
         ...data,
         status: data.status || 'new',
       },
       include: {
-        channel_accounts: true,
-        participants: true,
-        campaigns: true,
+        channelAccount: true,
+        participant: true,
+        campaign: true,
         lead: true,
         messages: {
           orderBy: { sentAt: 'asc' },
@@ -39,7 +39,7 @@ export class ConversationsService {
     assignedTo?: string;
     participantId?: string;
   }) {
-    return this.prisma.conversations.findMany({
+    return this.prisma.conversation.findMany({
       where: {
         ...(query.status && { status: query.status }),
         ...(query.platform && { platform: query.platform as any }),
@@ -49,9 +49,9 @@ export class ConversationsService {
         ...(query.participantId && { participantId: query.participantId }),
       },
       include: {
-        channel_accounts: true,
-        participants: true,
-        campaigns: true,
+        channelAccount: true,
+        participant: true,
+        campaign: true,
         lead: true,
         messages: {
           orderBy: { sentAt: 'desc' },
@@ -70,12 +70,12 @@ export class ConversationsService {
   }
 
   async findOne(id: string) {
-    const conversation = await this.prisma.conversations.findUnique({
+    const conversation = await this.prisma.conversation.findUnique({
       where: { id },
       include: {
-        channel_accounts: true,
-        participants: true,
-        campaigns: true,
+        channelAccount: true,
+        participant: true,
+        campaign: true,
         lead: true,
         messages: {
           orderBy: { sentAt: 'asc' },
@@ -92,13 +92,13 @@ export class ConversationsService {
   }
 
   async update(id: string, data: UpdateConversationDto) {
-    return this.prisma.conversations.update({
+    return this.prisma.conversation.update({
       where: { id },
       data,
       include: {
-        channel_accounts: true,
-        participants: true,
-        campaigns: true,
+        channelAccount: true,
+        participant: true,
+        campaign: true,
         lead: true,
         messages: {
           orderBy: { sentAt: 'asc' },
@@ -113,16 +113,16 @@ export class ConversationsService {
     const conversation = await this.findOne(id);
     if (conversation.status !== 'new') return conversation;
 
-    return this.prisma.conversations.update({
+    return this.prisma.conversation.update({
       where: { id },
       data: {
         status: 'in_progress',
         lastReadAt: new Date(),
       },
       include: {
-        channel_accounts: true,
-        participants: true,
-        campaigns: true,
+        channelAccount: true,
+        participant: true,
+        campaign: true,
         lead: true,
         messages: {
           orderBy: { sentAt: 'asc' },
@@ -140,7 +140,7 @@ export class ConversationsService {
 
     // Check if linking to existing lead
     if (data.existingLeadId) {
-      const existingLead = await this.prisma.leads.findUnique({
+      const existingLead = await this.prisma.lead.findUnique({
         where: { id: data.existingLeadId },
       });
 
@@ -149,7 +149,7 @@ export class ConversationsService {
       }
 
       // Update lead with marketing attribution
-      await this.prisma.leads.update({
+      await this.prisma.lead.update({
         where: { id: data.existingLeadId },
         data: {
           marketingConversationId: conversation.id,
@@ -161,7 +161,7 @@ export class ConversationsService {
       });
 
       // Link conversation to lead
-      await this.prisma.conversations.update({
+      await this.prisma.conversation.update({
         where: { id },
         data: {
           leadId: data.existingLeadId,
@@ -178,7 +178,7 @@ export class ConversationsService {
     }
 
     const participant = conversation.participant;
-    const lead = await this.prisma.leads.create({
+    const lead = await this.prisma.lead.create({
       data: {
         firstName: data.firstName || participant.name?.split(' ')[0] || 'Unknown',
         lastName: data.lastName || participant.name?.split(' ').slice(1).join(' ') || 'Unknown',
@@ -201,7 +201,7 @@ export class ConversationsService {
     });
 
     // Link conversation to lead
-    await this.prisma.conversations.update({
+    await this.prisma.conversation.update({
       where: { id },
       data: {
         leadId: lead.id,
@@ -213,7 +213,7 @@ export class ConversationsService {
   }
 
   async remove(id: string) {
-    await this.prisma.conversations.delete({
+    await this.prisma.conversation.delete({
       where: { id },
     });
 

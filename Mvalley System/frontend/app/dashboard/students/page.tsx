@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { coursesService, studentsService, Student, parentsService, classesService, type Class } from '@/lib/services';
+import { useRouter } from 'next/navigation';
+import { studentsService, Student, parentsService } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
@@ -13,25 +13,7 @@ import StatusBadge from '@/components/settings/StatusBadge';
 import HighlightedText from '@/components/HighlightedText';
 
 export default function StudentsPage() {
-  const toErrorString = (err: any, fallback: string) => {
-    const msg = err?.response?.data?.message ?? err?.message ?? err;
-    if (typeof msg === 'string') return msg;
-    if (Array.isArray(msg)) return msg.filter(Boolean).join(', ') || fallback;
-    if (msg && typeof msg === 'object') {
-      const nested = (msg as any).message;
-      if (typeof nested === 'string') return nested;
-      if (Array.isArray(nested)) return nested.filter(Boolean).join(', ') || fallback;
-      try {
-        return JSON.stringify(msg);
-      } catch {
-        return fallback;
-      }
-    }
-    return fallback;
-  };
-
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,11 +21,13 @@ export default function StudentsPage() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [trackFilter, setTrackFilter] = useState('');
   const [unallocatedPaidCount, setUnallocatedPaidCount] = useState<number>(0);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     age: '',
+    learningTrack: 'general',
     status: 'active',
     email: '',
     phone: '',
@@ -51,12 +35,6 @@ export default function StudentsPage() {
   const [parentLookup, setParentLookup] = useState<{ found: boolean; parent?: any } | null>(null);
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [checkingPhone, setCheckingPhone] = useState(false);
-  const [parentForm, setParentForm] = useState({ firstName: '', lastName: '', email: '' });
-
-  const [levels, setLevels] = useState<any[]>([]);
-  const [courseGroups, setCourseGroups] = useState<Class[]>([]);
-  const [selectedCourseGroupIds, setSelectedCourseGroupIds] = useState<string[]>([]);
-  const [phoneGate, setPhoneGate] = useState<'empty' | 'checking' | 'found' | 'new'>('empty');
 
   useEffect(() => {
     fetchStudents();
@@ -71,39 +49,13 @@ export default function StudentsPage() {
       });
   }, []);
 
-  useEffect(() => {
-    // Support deep-link edit: /dashboard/students?editId=...
-    const editId = searchParams?.get('editId');
-    if (!editId) return;
-    const found = students.find((s) => s.id === editId);
-    if (!found) return;
-    handleEdit(found);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, students]);
-
-  useEffect(() => {
-    // Load available courses/levels
-    coursesService
-      .listLevels()
-      .then((res: any) => setLevels(res.data || []))
-      .catch(() => setLevels([]));
-  }, []);
-
-  useEffect(() => {
-    // Load actual course groups (what you see in /dashboard/courses)
-    classesService
-      .getAll()
-      .then((res: any) => setCourseGroups(res.data || []))
-      .catch(() => setCourseGroups([]));
-  }, []);
-
   const fetchStudents = async () => {
     try {
       const response = await studentsService.getAll();
       setStudents(response.data);
       setError('');
     } catch (err: any) {
-      setError(toErrorString(err, 'Failed to load students'));
+      setError(err.response?.data?.message || 'Failed to load students');
     } finally {
       setLoading(false);
     }
@@ -115,73 +67,14 @@ export default function StudentsPage() {
       if (editingStudent) {
         await studentsService.update(editingStudent.id, {
           ...formData,
-          learningTrack: 'general',
           age: parseInt(formData.age),
         });
       } else {
-        if (!formData.phone.trim()) {
-          setError('Phone is required');
-          return;
-        }
-        if (phoneGate === 'empty' || phoneGate === 'checking') {
-          setError('Please enter a phone number and wait for verification.');
-          return;
-        }
-
-        let parentId = selectedParentId || undefined;
-        if (phoneGate === 'new') {
-          if (!parentForm.firstName.trim() || !parentForm.lastName.trim()) {
-            setError('Parent first name and last name are required for a new phone number.');
-            return;
-          }
-          const createdParent = await parentsService.create({
-            firstName: parentForm.firstName.trim(),
-            lastName: parentForm.lastName.trim(),
-            phone: formData.phone.trim(),
-            email: parentForm.email.trim() || undefined,
-          });
-          parentId = createdParent.data?.id;
-          setSelectedParentId(parentId || '');
-        }
-
-        const created = await studentsService.create({
+        await studentsService.create({
           ...formData,
-          learningTrack: 'general',
           age: parseInt(formData.age),
-          parentId,
+          parentId: selectedParentId || undefined,
         });
-
-        const createdStudentId = (created as any)?.data?.id;
-        if (createdStudentId && selectedCourseGroupIds.length > 0) {
-          // Map each selected course-group (class) to a matching CourseLevel (by name). If missing, create Course + Level 1.
-          for (const classId of selectedCourseGroupIds) {
-            const courseGroup = courseGroups.find((c) => c.id === classId);
-            if (!courseGroup?.name) continue;
-
-            let level = levels.find(
-              (l: any) => String(l?.course?.name || '').trim() === courseGroup.name.trim(),
-            );
-            if (!level) {
-              const createdCourse = await coursesService.create({
-                name: courseGroup.name.trim(),
-                isActive: true,
-              });
-              const createdLevel = await coursesService.createLevel({
-                courseId: createdCourse.data.id,
-                name: 'Level 1',
-                sortOrder: 1,
-                isActive: true,
-              });
-              level = { ...createdLevel.data, course: createdCourse.data };
-              setLevels((prev) => [...prev, level]);
-            }
-
-            await studentsService.addEnrollment(createdStudentId, {
-              courseLevelId: level.id,
-              classId: courseGroup.id,
-            });
-          }
-        }
       }
       setShowForm(false);
       setEditingStudent(null);
@@ -189,18 +82,16 @@ export default function StudentsPage() {
         firstName: '',
         lastName: '',
         age: '',
+        learningTrack: 'general',
         status: 'active',
         email: '',
         phone: '',
       });
       setParentLookup(null);
       setSelectedParentId('');
-      setParentForm({ firstName: '', lastName: '', email: '' });
-      setSelectedCourseGroupIds([]);
-      setPhoneGate('empty');
       fetchStudents();
     } catch (err: any) {
-      setError(toErrorString(err, 'Failed to save student'));
+      setError(err.response?.data?.message || 'Failed to save student');
     }
   };
 
@@ -210,20 +101,13 @@ export default function StudentsPage() {
       firstName: student.firstName,
       lastName: student.lastName,
       age: student.age.toString(),
+      learningTrack: student.learningTrack,
       status: student.status,
       email: student.email || '',
       phone: student.phone || '',
     });
     setParentLookup(null);
     setSelectedParentId(student.parentId || '');
-    setParentForm({
-      firstName: student.parent?.firstName || '',
-      lastName: student.parent?.lastName || '',
-      email: student.parent?.email || '',
-    });
-    setSelectedCourseGroupIds(
-      (student.enrollments || []).map((e: any) => e.classId).filter(Boolean),
-    );
     setShowForm(true);
   };
 
@@ -235,35 +119,21 @@ export default function StudentsPage() {
     if (phone.length < 7) {
       setParentLookup(null);
       setSelectedParentId('');
-      setPhoneGate('empty');
       return;
     }
     setCheckingPhone(true);
-    setPhoneGate('checking');
     t = setTimeout(() => {
       parentsService
         .lookupByPhone(phone)
         .then((res: any) => {
           const data = res?.data;
           setParentLookup(data);
-          if (data?.found && data?.parent?.id) {
-            setSelectedParentId(data.parent.id);
-            setParentForm({
-              firstName: data.parent?.firstName || '',
-              lastName: data.parent?.lastName || '',
-              email: data.parent?.email || '',
-            });
-            setPhoneGate('found');
-          } else {
-            setSelectedParentId('');
-            setParentForm({ firstName: '', lastName: '', email: '' });
-            setPhoneGate('new');
-          }
+          if (data?.found && data?.parent?.id) setSelectedParentId(data.parent.id);
+          else setSelectedParentId('');
         })
         .catch(() => {
           setParentLookup(null);
           setSelectedParentId('');
-          setPhoneGate('new');
         })
         .finally(() => setCheckingPhone(false));
     }, 350);
@@ -277,7 +147,7 @@ export default function StudentsPage() {
       await studentsService.delete(id);
       fetchStudents();
     } catch (err: any) {
-      setError(toErrorString(err, 'Failed to delete student'));
+      setError(err.response?.data?.message || 'Failed to delete student');
     }
   };
 
@@ -293,9 +163,11 @@ export default function StudentsPage() {
         student.phone?.includes(searchTerm);
 
       const matchesStatus = statusFilter === '' || student.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesTrack = trackFilter === '' || student.learningTrack === trackFilter;
+
+      return matchesSearch && matchesStatus && matchesTrack;
     });
-  }, [students, searchTerm, statusFilter]);
+  }, [students, searchTerm, statusFilter, trackFilter]);
 
   // Column definitions
   const columns: Column<Student>[] = [
@@ -324,10 +196,11 @@ export default function StudentsPage() {
       render: (value) => <span className="text-sm text-gray-500">{value}</span>,
     },
     {
-      key: 'courses',
-      label: 'Courses',
-      render: (_, row) => (
-        <span className="text-sm text-gray-500">{(row.enrollments || []).length}</span>
+      key: 'learningTrack',
+      label: 'Track',
+      sortable: true,
+      render: (value) => (
+        <span className="text-sm text-gray-500 capitalize">{value}</span>
       ),
     },
     {
@@ -344,26 +217,13 @@ export default function StudentsPage() {
       },
     },
     {
-      key: 'course',
-      label: 'Course',
-      render: (_, row) => {
-        const enrollments = row.enrollments || [];
-        if (enrollments.length === 0) {
-          return <span className="text-sm text-gray-500">-</span>;
-        }
-        const courseNames = enrollments
-          .map((enr: any) => enr.courseLevel?.course?.name || enr.courseLevel?.name || 'Unknown')
-          .filter((name: string) => name !== 'Unknown');
-        if (courseNames.length === 0) {
-          return <span className="text-sm text-gray-500">-</span>;
-        }
-        const displayText = courseNames.join(', ');
-        return (
-          <span className="text-sm text-gray-500">
-            <HighlightedText text={displayText} query={searchTerm} />
-          </span>
-        );
-      },
+      key: 'class',
+      label: 'Class',
+      render: (_, row) => (
+        <span className="text-sm text-gray-500">
+          <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
+        </span>
+      ),
     },
   ];
 
@@ -396,6 +256,19 @@ export default function StudentsPage() {
       value: statusFilter,
       onChange: setStatusFilter,
     },
+    {
+      key: 'track',
+      label: 'Learning Track',
+      type: 'select',
+      options: [
+        { value: 'AI', label: 'AI' },
+        { value: 'robotics', label: 'Robotics' },
+        { value: 'coding', label: 'Coding' },
+        { value: 'general', label: 'General' },
+      ],
+      value: trackFilter,
+      onChange: setTrackFilter,
+    },
   ];
 
   // Summary statistics
@@ -422,224 +295,121 @@ export default function StudentsPage() {
                   {editingStudent ? 'Edit Student' : 'Add New Student'}
                 </h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Phone-first gate */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Parent Phone (required)
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                      placeholder="e.g. 010xxxxxxxx"
-                    />
-                    {!editingStudent && (
-                      <div className="mt-2 text-xs text-gray-600">
-                        {checkingPhone ? (
-                          <span>Checking phone…</span>
-                        ) : phoneGate === 'found' ? (
-                          <div className="bg-green-50 border border-green-200 rounded p-3 space-y-2">
-                            <div className="font-medium text-green-800">
-                              ✓ Existing parent found: {parentLookup?.parent?.firstName}{' '}
-                              {parentLookup?.parent?.lastName}
-                            </div>
-                            {(parentLookup?.parent?.students || []).length > 0 ? (
-                              <div className="text-green-700">
-                                <div className="font-medium mb-1">Existing students:</div>
-                                <div className="space-y-1">
-                                  {(parentLookup?.parent?.students || []).map((s: any) => (
-                                    <a
-                                      key={s.id}
-                                      href={`/dashboard/students/details?id=${s.id}`}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        router.push(`/dashboard/students/details?id=${s.id}`);
-                                      }}
-                                      className="block text-indigo-600 hover:text-indigo-900 hover:underline"
-                                    >
-                                      → {s.firstName} {s.lastName}
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-green-700">No existing students</div>
-                            )}
-                            <div className="text-green-800 font-medium mt-2 pt-2 border-t border-green-200">
-                              Adding a new student to this parent
-                            </div>
-                          </div>
-                        ) : phoneGate === 'new' && formData.phone.trim().length >= 7 ? (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
-                            <div className="font-medium text-yellow-800">New parent phone</div>
-                            <div className="text-yellow-700">
-                              Please enter parent details below.
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">First Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.firstName}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
                   </div>
 
-                  {/* Parent details (for new phone numbers) */}
-                  {!editingStudent && phoneGate === 'new' && (
-                    <div className="rounded-md border border-gray-200 p-3 bg-gray-50 space-y-3">
-                      <div className="text-sm font-medium text-gray-900">Parent Details</div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">Parent First Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={parentForm.firstName}
-                            onChange={(e) => setParentForm({ ...parentForm, firstName: e.target.value })}
-                            className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">Parent Last Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={parentForm.lastName}
-                            onChange={(e) => setParentForm({ ...parentForm, lastName: e.target.value })}
-                            className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Parent Email (optional)</label>
-                        <input
-                          type="email"
-                          value={parentForm.email}
-                          onChange={(e) => setParentForm({ ...parentForm, email: e.target.value })}
-                          className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Age</label>
+                      <input
+                        type="number"
+                        required
+                        min="5"
+                        max="18"
+                        value={formData.age}
+                        onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Learning Track</label>
+                      <select
+                        value={formData.learningTrack}
+                        onChange={(e) => setFormData({ ...formData, learningTrack: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="general">General</option>
+                        <option value="AI">AI</option>
+                        <option value="robotics">Robotics</option>
+                        <option value="coding">Coding</option>
+                      </select>
+                    </div>
+                  </div>
 
-                  {/* Student fields - disabled until phone is verified */}
-                  {(() => {
-                    const phoneOk =
-                      editingStudent ||
-                      ((phoneGate === 'found' || phoneGate === 'new') && !checkingPhone);
-                    const parentOk =
-                      editingStudent ||
-                      (phoneGate === 'found' ? !!selectedParentId : phoneGate === 'new'
-                        ? !!parentForm.firstName.trim() && !!parentForm.lastName.trim()
-                        : false);
-                    const enabled = phoneOk && parentOk;
-
-                    return (
-                      <fieldset disabled={!enabled} className={!enabled ? 'opacity-60' : ''}>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Student First Name</label>
-                            <input
-                              type="text"
-                              required
-                              value={formData.firstName}
-                              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                              className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Student Last Name</label>
-                            <input
-                              type="text"
-                              required
-                              value={formData.lastName}
-                              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                              className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Age</label>
-                            <input
-                              type="number"
-                              required
-                              min="5"
-                              max="18"
-                              value={formData.age}
-                              onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                              className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Student Email (optional)</label>
-                            <input
-                              type="email"
-                              value={formData.email}
-                              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                              className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Courses (replaces Track) */}
-                        <div className="mt-4">
-                          <div className="flex items-center justify-between">
-                            <label className="block text-sm font-medium text-gray-700">
-                              Courses (one student can have multiple)
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => router.push('/dashboard/courses')}
-                              className="text-xs text-indigo-600 hover:text-indigo-900"
-                            >
-                              Manage Courses →
-                            </button>
-                          </div>
-                          {courseGroups.length === 0 ? (
-                            <div className="mt-2 text-sm text-gray-500">
-                              No courses found yet. Add a course in /dashboard/courses and it will appear here.
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Email</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Phone</label>
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                      {!editingStudent && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          {checkingPhone ? (
+                            <span>Checking parent by phone…</span>
+                          ) : parentLookup?.found ? (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
+                              <div className="font-medium text-yellow-800">
+                                Existing parent found: {parentLookup.parent?.firstName}{' '}
+                                {parentLookup.parent?.lastName}
+                              </div>
+                              <div className="text-yellow-700">
+                                Kids: {(parentLookup.parent?.students || [])
+                                  .map((s: any) => `${s.firstName} ${s.lastName}`)
+                                  .join(', ') || '—'}
+                              </div>
+                              <label className="mt-2 inline-flex items-center gap-2 text-yellow-900">
+                                <input
+                                  type="checkbox"
+                                  checked={!!selectedParentId}
+                                  onChange={(e) =>
+                                    setSelectedParentId(e.target.checked ? parentLookup.parent?.id : '')
+                                  }
+                                />
+                                Link new student to this parent
+                              </label>
                             </div>
-                          ) : (
-                            <div className="mt-2 max-h-40 overflow-auto rounded-md border border-gray-200 bg-white p-2 space-y-2">
-                              {courseGroups.map((cg: any) => {
-                                const label = `${cg?.name || 'Course'}${cg?.location ? ` (${cg.location})` : ''}`;
-                                const checked = selectedCourseGroupIds.includes(cg.id);
-                                return (
-                                  <label key={cg.id} className="flex items-center gap-2 text-sm text-gray-700">
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) => {
-                                        const next = e.target.checked
-                                          ? Array.from(new Set([...selectedCourseGroupIds, cg.id]))
-                                          : selectedCourseGroupIds.filter((x) => x !== cg.id);
-                                        setSelectedCourseGroupIds(next);
-                                      }}
-                                    />
-                                    {label}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          )}
+                          ) : formData.phone.trim().length >= 7 ? (
+                            <span>No parent found for this phone.</span>
+                          ) : null}
                         </div>
+                      )}
+                    </div>
+                  </div>
 
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-gray-700">Status</label>
-                          <select
-                            value={formData.status}
-                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          >
-                            <option value="active">Active</option>
-                            <option value="paused">Paused</option>
-                            <option value="finished">Finished</option>
-                          </select>
-                        </div>
-                      </fieldset>
-                    );
-                  })()}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
+                      <option value="active">Active</option>
+                      <option value="paused">Paused</option>
+                      <option value="finished">Finished</option>
+                    </select>
+                  </div>
 
                   <div className="flex gap-2 pt-4">
                     <button
@@ -679,15 +449,11 @@ export default function StudentsPage() {
               firstName: '',
               lastName: '',
               age: '',
+              learningTrack: 'general',
               status: 'active',
               email: '',
               phone: '',
             });
-            setParentLookup(null);
-            setSelectedParentId('');
-            setParentForm({ firstName: '', lastName: '', email: '' });
-            setSelectedCourseGroupIds([]);
-            setPhoneGate('empty');
           },
           icon: <FiPlus className="w-4 h-4" />,
         }}

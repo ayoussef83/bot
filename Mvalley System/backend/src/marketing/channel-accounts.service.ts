@@ -157,7 +157,7 @@ export class ChannelAccountsService {
       );
     }
 
-    const created = await this.prisma.channel_accounts.create({
+    const created = await this.prisma.channelAccount.create({
       data: {
         ...data,
         // status is derived from verification result, do not trust client input
@@ -178,7 +178,7 @@ export class ChannelAccountsService {
   }
 
   async findAll() {
-    const rows = await this.prisma.channel_accounts.findMany({
+    const rows = await this.prisma.channelAccount.findMany({
       include: {
         _count: {
           select: {
@@ -195,7 +195,7 @@ export class ChannelAccountsService {
   }
 
   async findOne(id: string) {
-    const account = await this.prisma.channel_accounts.findUnique({
+    const account = await this.prisma.channelAccount.findUnique({
       where: { id },
       include: {
         _count: {
@@ -216,7 +216,7 @@ export class ChannelAccountsService {
 
   async update(id: string, data: UpdateChannelAccountDto) {
     // If user is changing token or externalId/platform, re-verify before keeping status connected
-    const current = await this.prisma.channel_accounts.findUnique({ where: { id } });
+    const current = await this.prisma.channelAccount.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Channel account not found');
 
     const nextPlatform = (data.platform ?? current.platform) as MarketingPlatform;
@@ -234,7 +234,7 @@ export class ChannelAccountsService {
       );
     }
 
-    const account = await this.prisma.channel_accounts.update({
+    const account = await this.prisma.channelAccount.update({
       where: { id },
       data: {
         ...data,
@@ -257,7 +257,7 @@ export class ChannelAccountsService {
   }
 
   async remove(id: string) {
-    await this.prisma.channel_accounts.delete({
+    await this.prisma.channelAccount.delete({
       where: { id },
     });
 

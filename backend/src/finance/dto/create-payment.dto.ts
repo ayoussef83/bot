@@ -27,7 +27,4 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   notes?: string;
-
-  @IsString()
-  studentId: string;
 }

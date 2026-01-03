@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { CreateStudentDto, UpdateStudentDto, UpdateEnrollmentDto } from './dto';
@@ -8,7 +8,7 @@ export class StudentsService {
   constructor(private prisma: PrismaService) {}
 
   async getUnallocatedPaidInsight() {
-    const count = await this.prisma.students.count({
+    const count = await this.prisma.student.count({
       where: {
         deletedAt: null,
         classId: null,
@@ -19,7 +19,7 @@ export class StudentsService {
     });
 
     // Sum payments for unallocated students (best-effort with current schema naming)
-    const sum = await this.prisma.payments.aggregate({
+    const sum = await this.prisma.payment.aggregate({
       where: {
         status: 'received',
         studentId: { not: null },
@@ -34,14 +34,14 @@ export class StudentsService {
     });
 
     // Provide a small sample list for UI drill-in if needed
-    const sample = await this.prisma.students.findMany({
+    const sample = await this.prisma.student.findMany({
       where: {
         deletedAt: null,
         classId: null,
         payments: { some: { status: 'received' } },
       },
       include: {
-        parents: true,
+        parent: true,
         payments: {
           where: { status: 'received' },
           orderBy: { receivedDate: 'desc' },
@@ -60,17 +60,16 @@ export class StudentsService {
   }
 
   async create(data: CreateStudentDto, createdBy: string) {
-    const student = await this.prisma.students.create({
+    const student = await this.prisma.student.create({
       data: {
         ...data,
-        learningTrack: (data as any).learningTrack || 'general',
       },
       include: {
-        classes: {
+        class: {
           include: {
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -81,18 +80,18 @@ export class StudentsService {
             },
           },
         },
-        parents: true,
+        parent: true,
         enrollments: {
           include: {
-            course_levels: { include: { courses: true } },
-            classes: true,
+            courseLevel: { include: { course: true } },
+            class: true,
           },
         },
       },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -107,7 +106,7 @@ export class StudentsService {
   async findAll(userRole: UserRole, userId?: string) {
     // Instructors only see students in their classes
     if (userRole === 'instructor') {
-      const instructor = await this.prisma.instructors.findUnique({
+      const instructor = await this.prisma.instructor.findUnique({
         where: { userId },
         include: {
           classes: {
@@ -115,14 +114,8 @@ export class StudentsService {
               students: {
                 where: { deletedAt: null },
                 include: {
-                  parents: true,
-                  classes: true,
-                  enrollments: {
-                    include: {
-                      course_levels: { include: { courses: true } },
-                      classes: true,
-                    },
-                  },
+                  parent: true,
+                  class: true,
                 },
               },
             },
@@ -139,14 +132,14 @@ export class StudentsService {
     }
 
     // Other roles see all students
-    return this.prisma.students.findMany({
+    return this.prisma.student.findMany({
       where: { deletedAt: null },
       include: {
-        classes: {
+        class: {
           include: {
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -157,11 +150,11 @@ export class StudentsService {
             },
           },
         },
-        parents: true,
+        parent: true,
         enrollments: {
           include: {
-            course_levels: { include: { courses: true } },
-            classes: true,
+            courseLevel: { include: { course: true } },
+            class: true,
           },
         },
       },
@@ -169,14 +162,14 @@ export class StudentsService {
   }
 
   async findOne(id: string, userRole: UserRole, userId?: string) {
-    const student = await this.prisma.students.findFirst({
+    const student = await this.prisma.student.findFirst({
       where: { id, deletedAt: null },
       include: {
-        classes: {
+        class: {
           include: {
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -187,19 +180,19 @@ export class StudentsService {
             },
           },
         },
-        parents: true,
+        parent: true,
         enrollments: {
           include: {
-            course_levels: { include: { courses: true } },
-            classes: true,
+            courseLevel: { include: { course: true } },
+            class: true,
           },
         },
         payments: userRole !== 'instructor', // Hide payments from instructors
-        session_attendances: {
+        attendances: {
           include: {
             session: {
               include: {
-                classes: true,
+                class: true,
               },
             },
           },
@@ -217,7 +210,7 @@ export class StudentsService {
 
     // Instructors can only see students in their classes
     if (userRole === 'instructor') {
-      const instructor = await this.prisma.instructors.findUnique({
+      const instructor = await this.prisma.instructor.findUnique({
         where: { userId },
       });
 
@@ -230,21 +223,21 @@ export class StudentsService {
   }
 
   async listEnrollments(studentId: string, userRole: UserRole, userId?: string) {
-    // Basic access check for instructors: only if the student is in any of their classes OR any enrollment class is theirs
+    // Basic access check for instructor: only if the student is in any of their classes OR any enrollment class is theirs
     if (userRole === 'instructor') {
-      const instructor = await this.prisma.instructors.findUnique({ where: { userId } });
+      const instructor = await this.prisma.instructor.findUnique({ where: { userId } });
       if (!instructor) return [];
 
-      const student = await this.prisma.students.findFirst({
+      const student = await this.prisma.student.findFirst({
         where: { id: studentId, deletedAt: null },
-        select: { classes: { select: { instructorId: true } } },
+        select: { class: { select: { instructorId: true } } },
       });
       const baseOk = student?.class?.instructorId === instructor.id;
 
-      const enrollmentOk = await this.prisma.studentsEnrollment.findFirst({
+      const enrollmentOk = await this.prisma.studentEnrollment.findFirst({
         where: {
           studentId,
-          classes: { instructorId: instructor.id },
+          class: { instructorId: instructor.id },
         },
         select: { id: true },
       });
@@ -254,126 +247,36 @@ export class StudentsService {
       }
     }
 
-    return this.prisma.studentsEnrollment.findMany({
+    return this.prisma.studentEnrollment.findMany({
       where: { studentId },
       include: {
-        course_levels: { include: { courses: true } },
-        classes: true,
+        courseLevel: { include: { course: true } },
+        class: true,
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async listSessions(studentId: string, userRole: UserRole, userId?: string) {
-    // Get sessions where the student has attendances OR where the student is enrolled in the class
-    const enrollments = await this.prisma.studentsEnrollment.findMany({
-      where: { studentId },
-      select: { classId: true },
-    });
-    const classIds = enrollments.map((e) => e.classId).filter(Boolean) as string[];
-
-    // Also check legacy direct class assignment
-    const student = await this.prisma.students.findFirst({
-      where: { id: studentId, deletedAt: null },
-      select: { classId: true },
-    });
-    if (student?.classId && !classIds.includes(student.classId)) {
-      classIds.push(student.classId);
-    }
-
-    if (classIds.length === 0) {
-      return [];
-    }
-
-    return this.prisma.sessions.findMany({
-      where: {
-        classId: { in: classIds },
-        deletedAt: null,
-      },
-      include: {
-        classes: {
-          include: {
-            instructors: {
-              include: {
-                users: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-        instructors: {
-          include: {
-            users: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        session_attendances: {
-          where: { studentId },
-          include: {
-            students: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        scheduledDate: 'desc',
-      },
-    });
-  }
-
   async addEnrollment(studentId: string, courseLevelId: string, classId: string | undefined, createdBy: string) {
-    const student = await this.prisma.students.findFirst({ where: { id: studentId, deletedAt: null } });
+    const student = await this.prisma.student.findFirst({ where: { id: studentId, deletedAt: null } });
     if (!student) throw new NotFoundException('Student not found');
 
-    const level = await this.prisma.courses_levels.findFirst({ where: { id: courseLevelId, deletedAt: null } });
+    const level = await this.prisma.courseLevel.findFirst({ where: { id: courseLevelId, deletedAt: null } });
     if (!level) throw new NotFoundException('Course level not found');
 
-    // Check if student is already enrolled in this course level
-    const existing = await this.prisma.studentsEnrollment.findFirst({
-      where: {
-        studentId,
-        courseLevelId,
-        deletedAt: null,
-      },
-      include: {
-        course_levels: { include: { courses: true } },
-      },
-    });
-
-    if (existing) {
-      throw new BadRequestException(
-        `Student is already enrolled in ${existing.courseLevel.course.name} - ${existing.courseLevel.name}`,
-      );
-    }
-
-    const created = await this.prisma.studentsEnrollment.create({
+    const created = await this.prisma.studentEnrollment.create({
       data: {
         studentId,
         courseLevelId,
         classId: classId || undefined,
       },
       include: {
-        course_levels: { include: { courses: true } },
-        classes: true,
+        courseLevel: { include: { course: true } },
+        class: true,
       },
     });
 
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -386,22 +289,22 @@ export class StudentsService {
   }
 
   async updateEnrollment(enrollmentId: string, dto: UpdateEnrollmentDto, updatedBy: string) {
-    const existing = await this.prisma.studentsEnrollment.findFirst({ where: { id: enrollmentId } });
+    const existing = await this.prisma.studentEnrollment.findFirst({ where: { id: enrollmentId } });
     if (!existing) throw new NotFoundException('Enrollment not found');
 
-    const updated = await this.prisma.studentsEnrollment.update({
+    const updated = await this.prisma.studentEnrollment.update({
       where: { id: enrollmentId },
       data: {
         ...(dto.classId !== undefined ? { classId: dto.classId as any } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
       include: {
-        course_levels: { include: { courses: true } },
-        classes: true,
+        courseLevel: { include: { course: true } },
+        class: true,
       },
     });
 
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -414,11 +317,11 @@ export class StudentsService {
   }
 
   async removeEnrollment(enrollmentId: string, deletedBy: string) {
-    const existing = await this.prisma.studentsEnrollment.findFirst({ where: { id: enrollmentId } });
+    const existing = await this.prisma.studentEnrollment.findFirst({ where: { id: enrollmentId } });
     if (!existing) throw new NotFoundException('Enrollment not found');
 
-    await this.prisma.studentsEnrollment.delete({ where: { id: enrollmentId } });
-    await this.prisma.audit_logs.create({
+    await this.prisma.studentEnrollment.delete({ where: { id: enrollmentId } });
+    await this.prisma.auditLog.create({
       data: {
         userId: deletedBy,
         action: 'delete',
@@ -430,23 +333,23 @@ export class StudentsService {
   }
 
   async update(id: string, data: UpdateStudentDto, updatedBy: string) {
-    const student = await this.prisma.students.update({
+    const student = await this.prisma.student.update({
       where: { id },
       data,
       include: {
-        classes: true,
-        parents: true,
+        class: true,
+        parent: true,
         enrollments: {
           include: {
-            course_levels: { include: { courses: true } },
-            classes: true,
+            courseLevel: { include: { course: true } },
+            class: true,
           },
         },
       },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -460,13 +363,13 @@ export class StudentsService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const student = await this.prisma.students.update({
+    const student = await this.prisma.student.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: deletedBy,
         action: 'delete',

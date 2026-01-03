@@ -312,14 +312,14 @@ export default function SessionDetailPage() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                   <FiBookOpen className="w-4 h-4" />
-                  Course
+                  Class
                 </h3>
                 <a
-                  href={`/dashboard/courses/details?id=${session.classId}`}
+                  href={`/dashboard/classes/details?id=${session.classId}`}
                   className="text-lg text-indigo-600 hover:text-indigo-900"
                   onClick={(e) => {
                     e.preventDefault();
-                    router.push(`/dashboard/courses/details?id=${session.classId}`);
+                    router.push(`/dashboard/classes/details?id=${session.classId}`);
                   }}
                 >
                   {session.class.name}
@@ -504,10 +504,10 @@ export default function SessionDetailPage() {
             </button>
           )}
           <button
-            onClick={() => router.push(`/dashboard/courses/details?id=${session.classId}`)}
+            onClick={() => router.push(`/dashboard/classes/details?id=${session.classId}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
-            📚 View Course
+            📚 View Class
           </button>
         </div>
       </div>

@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentAllocationDto } from './dto/create-payment-allocation.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('finance/payments')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -19,9 +19,8 @@ export class PaymentsController {
 
   @Get()
   @Roles('super_admin', 'management', 'accounting', 'operations')
-  async findAll(@Query('studentId') studentId?: string) {
-    console.log('[PaymentsController.findAll] Received studentId query param:', studentId);
-    return this.paymentsService.findAll(studentId);
+  async findAll() {
+    return this.paymentsService.findAll();
   }
 
   @Get(':id')

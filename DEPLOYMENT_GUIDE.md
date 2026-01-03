@@ -128,4 +128,3 @@ Your MV-OS system is fully cloud-based and ready to use!
 **Backend Status**: ✅ Running
 **Frontend Status**: ⏳ Ready to deploy
 
-

@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Query, UseGuards, Param } from '@nestjs/common';
 import { ReconciliationService } from './reconciliation.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('finance/reconciliation')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,7 +45,6 @@ export class ReconciliationController {
     return this.reconciliationService.lockPeriod(periodCode);
   }
 }
-
 
 
 

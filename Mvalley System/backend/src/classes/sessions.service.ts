@@ -12,16 +12,16 @@ export class SessionsService {
   ) {}
 
   async create(data: CreateSessionDto, createdBy: string) {
-    const session = await this.prisma.sessionss.create({
+    const session = await this.prisma.session.create({
       data: {
         ...data,
       },
       include: {
-        classes: {
+        class: {
           include: {
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -32,9 +32,9 @@ export class SessionsService {
             },
           },
         },
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -43,16 +43,16 @@ export class SessionsService {
             },
           },
         },
-        session_attendances: {
+        attendances: {
           include: {
-            students: true,
+            student: true,
           },
         },
       },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -65,18 +65,18 @@ export class SessionsService {
   }
 
   async findAll(classId?: string, instructorId?: string) {
-    return this.prisma.sessionss.findMany({
+    return this.prisma.session.findMany({
       where: {
         ...(classId && { classId }),
         ...(instructorId && { instructorId }),
         deletedAt: null,
       },
       include: {
-        classes: {
+        class: {
           include: {
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -87,9 +87,9 @@ export class SessionsService {
             },
           },
         },
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -98,14 +98,14 @@ export class SessionsService {
             },
           },
         },
-        session_attendances: {
+        attendances: {
           include: {
-            students: true,
+            student: true,
           },
         },
         _count: {
           select: {
-            session_attendances: true,
+            attendances: true,
           },
         },
       },
@@ -116,17 +116,17 @@ export class SessionsService {
   }
 
   async findOne(id: string) {
-    const session = await this.prisma.sessionss.findFirst({
+    const session = await this.prisma.session.findFirst({
       where: { id, deletedAt: null },
       include: {
-        classes: {
+        class: {
           include: {
             students: {
               where: { deletedAt: null },
             },
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -137,9 +137,9 @@ export class SessionsService {
             },
           },
         },
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -148,11 +148,11 @@ export class SessionsService {
             },
           },
         },
-        session_attendances: {
+        attendances: {
           include: {
-            students: {
+            student: {
               include: {
-                parents: true,
+                parent: true,
               },
             },
           },
@@ -168,13 +168,13 @@ export class SessionsService {
   }
 
   async update(id: string, data: UpdateSessionDto, updatedBy: string) {
-    const session = await this.prisma.sessionss.update({
+    const session = await this.prisma.session.update({
       where: { id },
       data,
       include: {
-        classes: true,
-        instructors: true,
-        session_attendances: true,
+        class: true,
+        instructor: true,
+        attendances: true,
       },
     });
 
@@ -184,7 +184,7 @@ export class SessionsService {
     }
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -198,13 +198,13 @@ export class SessionsService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const session = await this.prisma.sessionss.update({
+    const session = await this.prisma.session.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
 
     // Log audit
-    await this.prisma.audit_logs.create({
+    await this.prisma.auditLog.create({
       data: {
         userId: deletedBy,
         action: 'delete',
@@ -217,7 +217,7 @@ export class SessionsService {
   }
 
   async confirmAttendance(sessionId: string, instructorId: string) {
-    return this.prisma.sessionss.update({
+    return this.prisma.session.update({
       where: { id: sessionId },
       data: {
         instructorConfirmed: true,

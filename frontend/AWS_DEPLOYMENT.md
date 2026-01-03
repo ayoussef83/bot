@@ -158,4 +158,3 @@ In your NestJS backend, update CORS configuration to allow:
 
 
 
-

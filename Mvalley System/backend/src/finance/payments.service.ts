@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentAllocationDto } from './dto/create-payment-allocation.dto';
@@ -40,11 +41,9 @@ export class PaymentsService {
         paymentNumber,
         receivedDate: createPaymentDto.receivedDate ? new Date(createPaymentDto.receivedDate) : new Date(),
         receivedBy: userId,
-        studentId: createPaymentDto.studentId,
       },
       include: {
         cashAccount: true,
-        Student: true,
         allocations: {
           include: {
             invoice: {
@@ -58,28 +57,11 @@ export class PaymentsService {
     });
   }
 
-  async findAll(studentId?: string) {
-    // Debug logging
-    console.log('[PaymentsService.findAll] Called with studentId:', studentId, typeof studentId);
-    
-    // If studentId is provided, we MUST filter strictly - no null values allowed
-    const whereClause = studentId && studentId.trim() !== ''
-      ? { 
-          AND: [
-            { studentId: studentId.trim() }, // Exact match required
-            { studentId: { not: null } }, // Explicitly exclude null
-          ],
-        } 
-      : undefined;
-
-    console.log('[PaymentsService.findAll] Where clause:', JSON.stringify(whereClause, null, 2));
-
-    const payments = await this.prisma.payment.findMany({
-      where: whereClause,
+  async findAll() {
+    return this.prisma.payment.findMany({
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,
-        Student: true, // Include student directly
         allocations: {
           include: {
             invoice: {
@@ -91,23 +73,6 @@ export class PaymentsService {
         },
       },
     });
-
-    // Debug logging - show what we actually got
-    console.log(`[PaymentsService.findAll] Query returned ${payments.length} payments`);
-    payments.forEach((p, i) => {
-      console.log(`  Payment ${i + 1}: id=${p.id}, studentId=${p.studentId || 'NULL'}, amount=${p.amount}, method=${p.method}`);
-    });
-
-    // Additional safety: filter out any payments with null studentId (defensive programming)
-    const filteredPayments = studentId && studentId.trim() !== ''
-      ? payments.filter(p => p.studentId === studentId.trim())
-      : payments;
-
-    if (filteredPayments.length !== payments.length) {
-      console.warn(`[PaymentsService.findAll] WARNING: Filtered out ${payments.length - filteredPayments.length} payments with mismatched/null studentId`);
-    }
-
-    return filteredPayments;
   }
 
   async findOne(id: string) {
@@ -240,8 +205,10 @@ export class PaymentsService {
         );
         const totalPaid = remainingAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
 
-        let newStatus: 'issued' | 'partially_paid' | 'paid' | 'overdue' = 'issued';
-        if (totalPaid > 0) {
+        let newStatus: InvoiceStatus = 'issued';
+        if (totalPaid >= invoice.totalAmount) {
+          newStatus = 'paid';
+        } else if (totalPaid > 0) {
           newStatus = 'partially_paid';
         }
         if (invoice.dueDate < new Date() && newStatus !== 'paid') {

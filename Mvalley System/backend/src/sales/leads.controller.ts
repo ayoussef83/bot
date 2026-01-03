@@ -25,7 +25,7 @@ export class LeadsController {
 
   @Post()
   @Roles(UserRole.super_admin, UserRole.sales)
-  create(@Body() createLeadDto: CreateLeadDto, @CurrentUser() users: any) {
+  create(@Body() createLeadDto: CreateLeadDto, @CurrentUser() user: any) {
     return this.leadsService.create(createLeadDto, user.id);
   }
 
@@ -46,7 +46,7 @@ export class LeadsController {
   update(
     @Param('id') id: string,
     @Body() updateLeadDto: UpdateLeadDto,
-    @CurrentUser() users: any,
+    @CurrentUser() user: any,
   ) {
     return this.leadsService.update(id, updateLeadDto, user.id);
   }
@@ -56,20 +56,20 @@ export class LeadsController {
   convertToStudent(
     @Param('id') id: string,
     @Body() studentData: any,
-    @CurrentUser() users: any,
+    @CurrentUser() user: any,
   ) {
     return this.leadsService.convertToStudent(id, studentData, user.id);
   }
 
   @Post(':id/convert-to-contact')
   @Roles(UserRole.super_admin, UserRole.sales)
-  convertToContact(@Param('id') id: string, @CurrentUser() users: any) {
+  convertToContact(@Param('id') id: string, @CurrentUser() user: any) {
     return this.leadsService.convertToContact(id, user.id);
   }
 
   @Delete(':id')
   @Roles(UserRole.super_admin, UserRole.sales)
-  remove(@Param('id') id: string, @CurrentUser() users: any) {
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.leadsService.remove(id, user.id);
   }
 }

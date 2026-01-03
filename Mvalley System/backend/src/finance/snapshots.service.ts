@@ -23,39 +23,41 @@ export class SnapshotsService {
     // Get expenses
     const expenses = await this.prisma.expense.findMany({
       where: {
-        paidDate: {
+        expenseDate: {
           gte: startDate,
           lte: endDate,
         },
-        status: 'paid',
       },
-      include: {
-        category: true,
-      },
+      include: { category: true },
     });
 
     // Calculate revenue
     const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-    // Note: Payment model doesn't have a 'type' field, so we can't categorize by type
-    // If needed, this should be derived from invoice allocations or other relations
-    const subscriptionRevenue = 0; // TODO: Calculate from invoice types if needed
-    const campRevenue = 0; // TODO: Calculate from invoice types if needed
-    const b2bRevenue = 0; // TODO: Calculate from invoice types if needed
+    // Payment "type" is not modeled in Prisma; keep breakdowns as 0 for now.
+    const subscriptionRevenue = 0;
+    const campRevenue = 0;
+    const b2bRevenue = 0;
 
     // Calculate expenses
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const rentExpenses = expenses
-      .filter((e) => e.category?.code === 'RENT')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const instructorExpenses = expenses
-      .filter((e) => e.category?.code === 'INSTR')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const marketingExpenses = expenses
-      .filter((e) => e.category?.code === 'MKTG')
-      .reduce((sum, e) => sum + e.amount, 0);
-    const operationsExpenses = expenses
-      .filter((e) => e.category?.code === 'OPS')
-      .reduce((sum, e) => sum + e.amount, 0);
+    // Best-effort bucketization based on expense category name/code.
+    const byBucket = expenses.reduce(
+      (acc, e) => {
+        const key = `${e.category?.code ?? ''} ${e.category?.name ?? ''}`.toLowerCase();
+        if (key.includes('rent')) acc.rent += e.amount;
+        else if (key.includes('instr') || key.includes('instructor')) acc.instructor += e.amount;
+        else if (key.includes('mkt') || key.includes('market')) acc.marketing += e.amount;
+        else if (key.includes('oper')) acc.operations += e.amount;
+        else acc.other += e.amount;
+        return acc;
+      },
+      { rent: 0, instructor: 0, marketing: 0, operations: 0, other: 0 },
+    );
+
+    const rentExpenses = byBucket.rent;
+    const instructorExpenses = byBucket.instructor;
+    const marketingExpenses = byBucket.marketing;
+    const operationsExpenses = byBucket.operations;
 
     // Get active students
     const activeStudents = await this.prisma.student.count({

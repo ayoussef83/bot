@@ -6,11 +6,11 @@ export class ParentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: { firstName: string; lastName: string; phone: string; email?: string; address?: string }) {
-    return this.prisma.parents.create({ data });
+    return this.prisma.parent.create({ data });
   }
 
   async findAll() {
-    return this.prisma.parents.findMany({
+    return this.prisma.parent.findMany({
       where: { deletedAt: null },
       include: { students: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } } },
       orderBy: { createdAt: 'desc' },
@@ -18,7 +18,7 @@ export class ParentsService {
   }
 
   async findOne(id: string) {
-    const parent = await this.prisma.parents.findFirst({
+    const parent = await this.prisma.parent.findFirst({
       where: { id, deletedAt: null },
       include: { students: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } } },
     });
@@ -27,14 +27,14 @@ export class ParentsService {
   }
 
   async update(id: string, data: Partial<{ firstName: string; lastName: string; phone: string; email?: string; address?: string }>) {
-    return this.prisma.parents.update({ where: { id }, data });
+    return this.prisma.parent.update({ where: { id }, data });
   }
 
   async lookupByPhone(phone: string) {
     const p = String(phone || '').trim();
     if (!p) return { found: false };
 
-    const parent = await this.prisma.parents.findFirst({
+    const parent = await this.prisma.parent.findFirst({
       where: { phone: p, deletedAt: null },
       include: { students: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } } },
       orderBy: { createdAt: 'desc' },

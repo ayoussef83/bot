@@ -43,7 +43,3 @@ export class ExpenseCategoriesController {
 
 
 
-
-
-
-

@@ -7,7 +7,7 @@ export class CampaignsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateCampaignDto) {
-    return this.prisma.campaigns.create({
+    return this.prisma.campaign.create({
       data: {
         ...data,
         startDate: new Date(data.startDate),
@@ -15,7 +15,7 @@ export class CampaignsService {
         status: data.status || 'active',
       },
       include: {
-        channel_accounts: true,
+        channelAccount: true,
         _count: {
           select: {
             conversations: true,
@@ -27,9 +27,9 @@ export class CampaignsService {
   }
 
   async findAll() {
-    return this.prisma.campaigns.findMany({
+    return this.prisma.campaign.findMany({
       include: {
-        channel_accounts: true,
+        channelAccount: true,
         _count: {
           select: {
             conversations: true,
@@ -44,15 +44,15 @@ export class CampaignsService {
   }
 
   async findOne(id: string) {
-    const campaign = await this.prisma.campaigns.findUnique({
+    const campaign = await this.prisma.campaign.findUnique({
       where: { id },
       include: {
-        channel_accounts: true,
+        channelAccount: true,
         conversations: {
           take: 10,
           orderBy: { lastMessageAt: 'desc' },
           include: {
-            participants: true,
+            participant: true,
             _count: {
               select: {
                 messages: true,
@@ -86,11 +86,11 @@ export class CampaignsService {
       updateData.endDate = new Date(data.endDate);
     }
 
-    return this.prisma.campaigns.update({
+    return this.prisma.campaign.update({
       where: { id },
       data: updateData,
       include: {
-        channel_accounts: true,
+        channelAccount: true,
         _count: {
           select: {
             conversations: true,
@@ -102,7 +102,7 @@ export class CampaignsService {
   }
 
   async remove(id: string) {
-    await this.prisma.campaigns.delete({
+    await this.prisma.campaign.delete({
       where: { id },
     });
 

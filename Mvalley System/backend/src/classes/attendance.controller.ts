@@ -25,7 +25,7 @@ export class AttendanceController {
   @Roles(UserRole.super_admin, UserRole.operations, UserRole.instructor)
   create(
     @Body() createAttendanceDto: CreateAttendanceDto,
-    @CurrentUser() users: any,
+    @CurrentUser() user: any,
   ) {
     return this.attendanceService.create(createAttendanceDto, user.id);
   }
@@ -34,7 +34,7 @@ export class AttendanceController {
   @Roles(UserRole.super_admin, UserRole.operations, UserRole.instructor)
   bulkUpdate(
     @Body() bulkAttendanceDto: BulkAttendanceDto,
-    @CurrentUser() users: any,
+    @CurrentUser() user: any,
   ) {
     return this.attendanceService.bulkUpdate(
       bulkAttendanceDto.sessionId,
@@ -45,7 +45,7 @@ export class AttendanceController {
 
   @Post('roster')
   @Roles(UserRole.super_admin, UserRole.operations)
-  setRoster(@Body() dto: SetRosterDto, @CurrentUser() users: any) {
+  setRoster(@Body() dto: SetRosterDto, @CurrentUser() user: any) {
     return this.attendanceService.setRoster(dto.sessionId, dto.studentIds, user.id);
   }
 
@@ -54,7 +54,7 @@ export class AttendanceController {
   update(
     @Param('id') id: string,
     @Body() updateAttendanceDto: UpdateAttendanceDto,
-    @CurrentUser() users: any,
+    @CurrentUser() user: any,
   ) {
     return this.attendanceService.update(id, updateAttendanceDto, user.id);
   }

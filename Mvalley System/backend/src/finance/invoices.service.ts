@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 
@@ -104,7 +105,7 @@ export class InvoicesService {
     });
   }
 
-  async updateStatus(id: string, status: string) {
+  async updateStatus(id: string, status: InvoiceStatus) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
     });
@@ -114,7 +115,7 @@ export class InvoicesService {
     }
 
     // Check if overdue
-    let newStatus = status;
+    let newStatus: InvoiceStatus = status;
     if (status === 'issued' && invoice.dueDate < new Date()) {
       newStatus = 'overdue';
     }
@@ -159,10 +160,6 @@ export class InvoicesService {
     });
   }
 }
-
-
-
-
 
 
 

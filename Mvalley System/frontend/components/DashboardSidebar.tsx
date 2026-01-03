@@ -81,9 +81,9 @@ const navigationSections: NavigationSection[] = [
       },
       {
         id: 'classes',
-        label: 'Courses',
+        label: 'Classes',
         icon: <FiBookOpen className="w-4 h-4" />,
-        path: '/dashboard/courses',
+        path: '/dashboard/classes',
         roles: ['super_admin', 'operations', 'management', 'accounting', 'sales', 'instructor'],
       },
       {

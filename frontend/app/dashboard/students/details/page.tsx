@@ -381,7 +381,7 @@ export default function StudentDetailPage() {
             <div className="text-center py-8 text-gray-500">
               <p>No payments recorded</p>
               <button
-                onClick={() => router.push(`/dashboard/finance/cash/payments?studentId=${student.id}&openModal=true`)}
+                onClick={() => router.push('/dashboard/finance')}
                 className="mt-4 text-sm text-indigo-600 hover:text-indigo-900"
               >
                 Add Payment →
@@ -459,7 +459,7 @@ export default function StudentDetailPage() {
         subject: messageChannel === 'email' ? messageSubject : undefined,
         message: messageBody,
         studentId: student.id,
-        parentId: student.parentId || undefined,
+        parentId: student.parentId,
       });
       setShowMessageModal(false);
     } catch (err: any) {
@@ -492,7 +492,7 @@ export default function StudentDetailPage() {
             ✉️ Send Email
           </button>
           <button
-            onClick={() => router.push(`/dashboard/finance/cash/payments?studentId=${student.id}&openModal=true`)}
+            onClick={() => router.push(`/dashboard/finance?student=${student.id}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
             💳 Add Payment

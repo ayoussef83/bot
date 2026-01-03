@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { classesService, Class } from '@/lib/services';
 import { instructorsService, Instructor } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
@@ -14,7 +14,6 @@ import HighlightedText from '@/components/HighlightedText';
 
 export default function ClassesPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [classes, setClasses] = useState<Class[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,35 +39,13 @@ export default function ClassesPage() {
     fetchInstructors();
   }, []);
 
-  // Support deep-link edit: /dashboard/courses?editId=...
-  useEffect(() => {
-    const editId = searchParams?.get('editId');
-    if (!editId) return;
-    const found = classes.find((c) => c.id === editId);
-    if (!found) return;
-    setEditingClass(found);
-    setFormData({
-      name: found.name,
-      location: (found as any).location || 'MOA',
-      capacity: String(found.capacity || ''),
-      instructorId: found.instructorId || '',
-      dayOfWeek: String((found as any).dayOfWeek ?? '0'),
-      startTime: (found as any).startTime || '',
-      endTime: (found as any).endTime || '',
-      startDate: found.startDate ? new Date(found.startDate as any).toISOString().slice(0, 10) : '',
-      endDate: found.endDate ? new Date(found.endDate as any).toISOString().slice(0, 10) : '',
-    });
-    setShowForm(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, classes]);
-
   const fetchClasses = async () => {
     try {
       const response = await classesService.getAll();
       setClasses(response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load courses');
+      setError(err.response?.data?.message || 'Failed to load classes');
     } finally {
       setLoading(false);
     }
@@ -181,12 +158,12 @@ export default function ClassesPage() {
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/courses/details?id=${row.id}`}
+          href={`/dashboard/classes/details?id=${row.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            router.push(`/dashboard/courses/details?id=${row.id}`);
+            router.push(`/dashboard/classes/details?id=${row.id}`);
           }}
         >
           <HighlightedText text={row.name} query={searchTerm} />
@@ -443,10 +420,10 @@ export default function ClassesPage() {
 
       {/* Standard List View */}
       <StandardListView
-        title="Courses"
-        subtitle="Manage course schedules and enrollment"
+        title="Classes"
+        subtitle="Manage class schedules and enrollment"
         primaryAction={{
-          label: 'Add Course',
+          label: 'Add Class',
           onClick: () => {
             setShowForm(true);
             setEditingClass(null);
@@ -462,13 +439,13 @@ export default function ClassesPage() {
         data={filteredClasses}
         loading={loading}
         actions={actions}
-        emptyMessage="No courses found"
+        emptyMessage="No classes found"
         emptyState={
           <EmptyState
-            title="No courses found"
-            message="Get started by creating your first course"
+            title="No classes found"
+            message="Get started by creating your first class"
             action={{
-              label: 'Add Course',
+              label: 'Add Class',
               onClick: () => {
                 setShowForm(true);
                 setEditingClass(null);
@@ -479,7 +456,7 @@ export default function ClassesPage() {
         summaryCards={
           <>
             <SummaryCard
-              title="Total Courses"
+              title="Total Classes"
               value={totalClasses}
               icon={<FiBookOpen className="w-8 h-8" />}
             />
@@ -498,7 +475,7 @@ export default function ClassesPage() {
         }
         getRowId={(row) => row.id}
         onRowClick={(row) => {
-          router.push(`/dashboard/courses/details?id=${row.id}`);
+          router.push(`/dashboard/classes/details?id=${row.id}`);
         }}
       />
 

@@ -40,7 +40,7 @@ export class SchedulerService {
       today.setHours(0, 0, 0, 0);
 
       // Find invoices due in 3 days that are not fully paid/cancelled
-      const invoicesDue = await this.prisma.invoices.findMany({
+      const invoicesDue = await this.prisma.invoice.findMany({
         where: {
           dueDate: {
             gte: today,
@@ -51,9 +51,9 @@ export class SchedulerService {
           },
         },
         include: {
-          students: {
+          student: {
             include: {
-              parents: true,
+              parent: true,
             },
           },
           paymentAllocations: true,
@@ -68,7 +68,7 @@ export class SchedulerService {
         if (remaining <= 0) continue;
 
         // Check if we already sent a reminder for this invoice
-        const existingNotification = await this.prisma.notifications.findFirst({
+        const existingNotification = await this.prisma.notification.findFirst({
           where: {
             template: 'payment_due_reminder',
             payload: JSON.stringify({ invoiceId: invoice.id }),
@@ -94,7 +94,7 @@ export class SchedulerService {
         }
 
         // Get message template
-        let template = await this.prisma.message_templates.findFirst({
+        let template = await this.prisma.messageTemplate.findFirst({
           where: {
             channel: 'sms',
             key: 'payment_due_reminder',
@@ -127,7 +127,7 @@ export class SchedulerService {
           }
 
           if (recipientEmail) {
-            const emailTemplate = await this.prisma.message_templates.findFirst({
+            const emailTemplate = await this.prisma.messageTemplate.findFirst({
               where: {
                 channel: 'email',
                 key: 'payment_due_reminder',
@@ -180,7 +180,7 @@ export class SchedulerService {
           }
 
           if (recipientEmail) {
-            const emailTemplate = await this.prisma.message_templates.findUnique({
+            const emailTemplate = await this.prisma.messageTemplate.findUnique({
               where: {
                 channel_key: {
                   channel: 'email',
@@ -232,7 +232,7 @@ export class SchedulerService {
       today.setHours(23, 59, 59, 999);
 
       // Find overdue invoices that are not fully paid/cancelled
-      const overdueInvoices = await this.prisma.invoices.findMany({
+      const overdueInvoices = await this.prisma.invoice.findMany({
         where: {
           dueDate: {
             lt: today,
@@ -242,9 +242,9 @@ export class SchedulerService {
           },
         },
         include: {
-          students: {
+          student: {
             include: {
-              parents: true,
+              parent: true,
             },
           },
           paymentAllocations: true,
@@ -259,7 +259,7 @@ export class SchedulerService {
         if (remaining <= 0) continue;
 
         // Check if we already sent an overdue reminder today
-        const existingNotification = await this.prisma.notifications.findFirst({
+        const existingNotification = await this.prisma.notification.findFirst({
           where: {
             template: 'payment_overdue',
             payload: JSON.stringify({ invoiceId: invoice.id }),
@@ -286,7 +286,7 @@ export class SchedulerService {
         );
 
         // Get template or use fallback
-        let template = await this.prisma.message_templates.findFirst({
+        let template = await this.prisma.messageTemplate.findFirst({
           where: {
             channel: 'sms',
             key: 'payment_overdue',
@@ -321,7 +321,7 @@ export class SchedulerService {
         }
 
         if (recipientEmail) {
-          const emailTemplate = await this.prisma.message_templates.findFirst({
+          const emailTemplate = await this.prisma.messageTemplate.findFirst({
             where: {
               channel: 'email',
               key: 'payment_overdue',
@@ -376,7 +376,7 @@ export class SchedulerService {
       tomorrowStart.setHours(0, 0, 0, 0);
 
       // Find sessions scheduled for tomorrow
-      const upcomingSessions = await this.prisma.sessions.findMany({
+      const upcomingSessions = await this.prisma.session.findMany({
         where: {
           scheduledDate: {
             gte: tomorrowStart,
@@ -386,18 +386,18 @@ export class SchedulerService {
           deletedAt: null,
         },
         include: {
-          classes: {
+          class: {
             include: {
               students: {
                 include: {
-                  parents: true,
+                  parent: true,
                 },
               },
             },
           },
-          instructors: {
+          instructor: {
             include: {
-              users: true,
+              user: true,
             },
           },
         },
@@ -409,7 +409,7 @@ export class SchedulerService {
         // Send reminder to each student in the class
         for (const student of session.class.students) {
           // Check if reminder already sent
-          const existingNotification = await this.prisma.notifications.findFirst({
+          const existingNotification = await this.prisma.notification.findFirst({
             where: {
               template: 'session_reminder',
               payload: JSON.stringify({ sessionId: session.id, studentId: student.id }),
@@ -432,7 +432,7 @@ export class SchedulerService {
           }
 
           // Get template
-          let template = await this.prisma.message_templates.findFirst({
+          let template = await this.prisma.messageTemplate.findFirst({
             where: {
               channel: 'sms',
               key: 'session_reminder',
@@ -483,7 +483,7 @@ export class SchedulerService {
           }
 
           if (recipientEmail) {
-            const emailTemplate = await this.prisma.message_templates.findFirst({
+            const emailTemplate = await this.prisma.messageTemplate.findFirst({
               where: {
                 channel: 'email',
                 key: 'session_reminder',
@@ -542,7 +542,7 @@ export class SchedulerService {
       // Exclude ones that are already sent or failed
       // Also exclude ones that have been pending for more than 1 hour (likely stuck)
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      const scheduledNotifications = await this.prisma.notifications.findMany({
+      const scheduledNotifications = await this.prisma.notification.findMany({
         where: {
           status: 'pending',
           scheduledAt: {
@@ -561,7 +561,7 @@ export class SchedulerService {
       });
 
       // Clean up old stuck notifications (pending for more than 1 hour)
-      const stuckCount = await this.prisma.notifications.updateMany({
+      const stuckCount = await this.prisma.notification.updateMany({
         where: {
           status: 'pending',
           scheduledAt: {
@@ -590,7 +590,7 @@ export class SchedulerService {
           
           // Mark as sent first to prevent duplicate processing (we'll update to sent after sending)
           // Use a temporary approach: update scheduledAt to null so it won't be picked up again
-          await this.prisma.notifications.update({
+          await this.prisma.notification.update({
             where: { id: notification.id },
             data: { scheduledAt: null }, // Clear scheduledAt so it won't be picked up again
           });
@@ -628,7 +628,7 @@ export class SchedulerService {
           }
 
           // Update notification status to sent
-          await this.prisma.notifications.update({
+          await this.prisma.notification.update({
             where: { id: notification.id },
             data: {
               status: 'sent',
@@ -640,7 +640,7 @@ export class SchedulerService {
         } catch (error: any) {
           this.logger.error(`❌ Failed to send scheduled notification ${notification.id}: ${error.message}`);
           // Update notification status to failed
-          await this.prisma.notifications.update({
+          await this.prisma.notification.update({
             where: { id: notification.id },
             data: {
               status: 'failed',
@@ -674,7 +674,7 @@ export class SchedulerService {
     }
 
     // Create notification with scheduledAt
-    const notification = await this.prisma.notifications.create({
+    const notification = await this.prisma.notification.create({
       data: {
         channel,
         recipient,

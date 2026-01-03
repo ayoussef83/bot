@@ -28,7 +28,7 @@ export class SessionsController {
 
   @Post()
   @Roles(UserRole.super_admin, UserRole.operations)
-  create(@Body() createSessionDto: CreateSessionDto, @CurrentUser() users: any) {
+  create(@Body() createSessionDto: CreateSessionDto, @CurrentUser() user: any) {
     return this.sessionsService.create(createSessionDto, user.id);
   }
 
@@ -47,7 +47,7 @@ export class SessionsController {
     // Instructors only see their own sessions
     if (user?.role === 'instructor' && !instructorId) {
       // Get instructor ID from user
-      const instructor = await this.prisma.instructorss.findUnique({
+      const instructor = await this.prisma.instructor.findUnique({
         where: { userId: user.id },
       });
       return this.sessionsService.findAll(classId, instructor?.id);
@@ -71,15 +71,15 @@ export class SessionsController {
   update(
     @Param('id') id: string,
     @Body() updateSessionDto: UpdateSessionDto,
-    @CurrentUser() users: any,
+    @CurrentUser() user: any,
   ) {
     return this.sessionsService.update(id, updateSessionDto, user.id);
   }
 
   @Post(':id/confirm')
   @Roles(UserRole.instructor, UserRole.operations)
-  async confirmAttendance(@Param('id') id: string, @CurrentUser() users: any) {
-    const instructor = await this.prisma.instructorss.findUnique({
+  async confirmAttendance(@Param('id') id: string, @CurrentUser() user: any) {
+    const instructor = await this.prisma.instructor.findUnique({
       where: { userId: user.id },
     });
     return this.sessionsService.confirmAttendance(id, instructor?.id || '');
@@ -87,7 +87,7 @@ export class SessionsController {
 
   @Delete(':id')
   @Roles(UserRole.super_admin, UserRole.operations)
-  remove(@Param('id') id: string, @CurrentUser() users: any) {
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.sessionsService.remove(id, user.id);
   }
 }

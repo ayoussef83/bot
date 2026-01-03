@@ -61,4 +61,3 @@ echo "   2. Or run: sudo purge (requires admin password)"
 echo "   3. Check System Settings > General > Storage"
 
 
-

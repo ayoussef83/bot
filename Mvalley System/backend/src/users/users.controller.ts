@@ -34,7 +34,7 @@ export class UsersController {
   }
 
   @Get('me')
-  getProfile(@CurrentUser() users: any) {
+  getProfile(@CurrentUser() user: any) {
     return this.usersService.findById(user.id);
   }
 

@@ -164,11 +164,11 @@ export default function InstructorDetailPage() {
       label: 'Class Name',
       render: (value, row) => (
         <a
-          href={`/dashboard/courses/details?id=${row.id}`}
+          href={`/dashboard/classes/details?id=${row.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
-            router.push(`/dashboard/courses/details?id=${row.id}`);
+            router.push(`/dashboard/classes/details?id=${row.id}`);
           }}
         >
           {value}
@@ -228,12 +228,12 @@ export default function InstructorDetailPage() {
       label: 'Class',
       render: (_, row) => (
         <a
-          href={`/dashboard/courses/details?id=${row.class?.id}`}
+          href={`/dashboard/classes/details?id=${row.class?.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
             if (row.class?.id) {
-              router.push(`/dashboard/courses/details?id=${row.class.id}`);
+              router.push(`/dashboard/classes/details?id=${row.class.id}`);
             }
           }}
         >
@@ -306,14 +306,14 @@ export default function InstructorDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Fees Type
+                Cost Type
               </h3>
               <p className="text-lg text-gray-900 capitalize">{instructor.costType}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Fees
+                Cost Amount
               </h3>
               <p className="text-lg text-gray-900">
                 EGP {instructor.costAmount.toLocaleString()}
@@ -327,7 +327,7 @@ export default function InstructorDetailPage() {
     },
     {
       id: 'classes',
-      label: 'Courses',
+      label: 'Classes',
       count: classes.length,
       icon: <FiBookOpen className="w-4 h-4" />,
       content: (
@@ -336,14 +336,14 @@ export default function InstructorDetailPage() {
             <DataTable
               columns={classColumns}
               data={classes}
-              emptyMessage="No courses assigned"
+              emptyMessage="No classes assigned"
               onRowClick={(row) => {
-                router.push(`/dashboard/courses/details?id=${row.id}`);
+                router.push(`/dashboard/classes/details?id=${row.id}`);
               }}
             />
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No courses assigned</p>
+              <p>No classes assigned</p>
             </div>
           )}
         </div>
@@ -413,7 +413,7 @@ export default function InstructorDetailPage() {
             </span>
           </div>
           <div className="flex justify-between pt-2 border-t border-gray-200">
-            <span className="text-gray-500">Fees Type:</span>
+            <span className="text-gray-500">Cost Type:</span>
             <span className="font-medium text-gray-900 capitalize">{instructor.costType}</span>
           </div>
         </div>
