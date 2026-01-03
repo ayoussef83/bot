@@ -87,9 +87,20 @@ export default function StudentDetailPage() {
 
   const fetchPayments = async (studentId: string) => {
     try {
+      console.log('[StudentDetails] Fetching payments for studentId:', studentId);
       const response = await financeService.getPayments({ studentId });
-      setPayments(response.data);
+      console.log('[StudentDetails] Received payments:', response.data);
+      
+      // Additional client-side safety filter - only show payments for this exact student
+      const filteredPayments = (response.data || []).filter((p: Payment) => p.studentId === studentId);
+      
+      if (filteredPayments.length !== (response.data || []).length) {
+        console.warn(`[StudentDetails] WARNING: Filtered out ${(response.data || []).length - filteredPayments.length} payments that don't match studentId`);
+      }
+      
+      setPayments(filteredPayments);
     } catch (err: any) {
+      console.error('[StudentDetails] Failed to load payments:', err);
       // Failed to load payments
     }
   };
