@@ -59,7 +59,11 @@ export class PaymentsService {
 
   async findAll(studentId?: string) {
     return this.prisma.payment.findMany({
-      where: studentId ? { studentId } : undefined,
+      where: studentId 
+        ? { 
+            studentId: studentId, // Only payments directly linked to this specific student
+          } 
+        : undefined,
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,
