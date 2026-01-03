@@ -92,6 +92,28 @@ export class CoursesService {
 
   // For dropdowns
   async listLevels() {
+    // Backfill: ensure courses/levels exist for existing course groups (classes) like "Python", "Lego Mindstorm".
+    // This keeps dropdowns working even if older data was created before the Course/CourseLevel tables existed.
+    const classNames = await this.prisma.class.findMany({
+      where: { deletedAt: null },
+      select: { name: true },
+      distinct: ['name'],
+    });
+    for (const row of classNames) {
+      const name = (row?.name || '').trim();
+      if (!name) continue;
+      const course = await this.prisma.course.upsert({
+        where: { name },
+        update: { deletedAt: null, isActive: true },
+        create: { name, isActive: true },
+      });
+      await this.prisma.courseLevel.upsert({
+        where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
+        update: { deletedAt: null, isActive: true, sortOrder: 1 },
+        create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
+      });
+    }
+
     return this.prisma.courseLevel.findMany({
       where: { deletedAt: null, course: { deletedAt: null } },
       include: { course: true },

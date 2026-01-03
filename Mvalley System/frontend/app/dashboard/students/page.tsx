@@ -13,6 +13,23 @@ import StatusBadge from '@/components/settings/StatusBadge';
 import HighlightedText from '@/components/HighlightedText';
 
 export default function StudentsPage() {
+  const toErrorString = (err: any, fallback: string) => {
+    const msg = err?.response?.data?.message ?? err?.message ?? err;
+    if (typeof msg === 'string') return msg;
+    if (Array.isArray(msg)) return msg.filter(Boolean).join(', ') || fallback;
+    if (msg && typeof msg === 'object') {
+      const nested = (msg as any).message;
+      if (typeof nested === 'string') return nested;
+      if (Array.isArray(nested)) return nested.filter(Boolean).join(', ') || fallback;
+      try {
+        return JSON.stringify(msg);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
@@ -77,7 +94,7 @@ export default function StudentsPage() {
       setStudents(response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load students');
+      setError(toErrorString(err, 'Failed to load students'));
     } finally {
       setLoading(false);
     }
@@ -151,7 +168,7 @@ export default function StudentsPage() {
       setPhoneGate('empty');
       fetchStudents();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save student');
+      setError(toErrorString(err, 'Failed to save student'));
     }
   };
 
@@ -226,7 +243,7 @@ export default function StudentsPage() {
       await studentsService.delete(id);
       fetchStudents();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete student');
+      setError(toErrorString(err, 'Failed to delete student'));
     }
   };
 
@@ -506,7 +523,7 @@ export default function StudentsPage() {
                             </label>
                             <button
                               type="button"
-                              onClick={() => router.push('/dashboard/course-catalog')}
+                              onClick={() => router.push('/dashboard/courses')}
                               className="text-xs text-indigo-600 hover:text-indigo-900"
                             >
                               Manage Courses →
