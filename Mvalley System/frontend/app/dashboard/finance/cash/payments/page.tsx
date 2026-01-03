@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { financeService, Payment, CashAccount, Invoice } from '@/lib/services';
 import { studentsService, Student } from '@/lib/services';
@@ -24,7 +24,7 @@ interface CreatePaymentDto {
   invoiceId?: string; // For immediate allocation
 }
 
-export default function PaymentsPage() {
+function PaymentsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -701,3 +701,4 @@ export default function PaymentsPage() {
   );
 }
 
+export default function PaymentsPage() { return <Suspense fallback={<div>Loading...</div>}><PaymentsPageContent /></Suspense>; }
