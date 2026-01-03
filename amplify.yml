@@ -32,7 +32,7 @@ frontend:
             echo "FRONTEND_DIR=frontend" >> $AMPLIFY_ENV
           fi
   artifacts:
-    baseDirectory: frontend/out
+    baseDirectory: $FRONTEND_DIR/out
     files:
       - '**/*'
   cache:
