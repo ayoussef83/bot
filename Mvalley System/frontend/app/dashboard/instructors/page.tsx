@@ -174,7 +174,7 @@ export default function InstructorsPage() {
     },
     {
       key: 'classes',
-      label: 'Classes',
+      label: 'Courses',
       render: (_, row) => (
         <span className="text-sm text-gray-500">{row.classes?.length || 0}</span>
       ),

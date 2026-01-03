@@ -164,11 +164,11 @@ export default function InstructorDetailPage() {
       label: 'Class Name',
       render: (value, row) => (
         <a
-          href={`/dashboard/classes/details?id=${row.id}`}
+          href={`/dashboard/courses/details?id=${row.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
-            router.push(`/dashboard/classes/details?id=${row.id}`);
+            router.push(`/dashboard/courses/details?id=${row.id}`);
           }}
         >
           {value}
@@ -228,12 +228,12 @@ export default function InstructorDetailPage() {
       label: 'Class',
       render: (_, row) => (
         <a
-          href={`/dashboard/classes/details?id=${row.class?.id}`}
+          href={`/dashboard/courses/details?id=${row.class?.id}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
             if (row.class?.id) {
-              router.push(`/dashboard/classes/details?id=${row.class.id}`);
+              router.push(`/dashboard/courses/details?id=${row.class.id}`);
             }
           }}
         >
@@ -327,7 +327,7 @@ export default function InstructorDetailPage() {
     },
     {
       id: 'classes',
-      label: 'Classes',
+      label: 'Courses',
       count: classes.length,
       icon: <FiBookOpen className="w-4 h-4" />,
       content: (
@@ -336,14 +336,14 @@ export default function InstructorDetailPage() {
             <DataTable
               columns={classColumns}
               data={classes}
-              emptyMessage="No classes assigned"
+              emptyMessage="No courses assigned"
               onRowClick={(row) => {
-                router.push(`/dashboard/classes/details?id=${row.id}`);
+                router.push(`/dashboard/courses/details?id=${row.id}`);
               }}
             />
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No classes assigned</p>
+              <p>No courses assigned</p>
             </div>
           )}
         </div>
