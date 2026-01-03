@@ -258,6 +258,78 @@ export class StudentsService {
     });
   }
 
+  async listSessions(studentId: string, userRole: UserRole, userId?: string) {
+    // Get sessions where the student has attendances OR where the student is enrolled in the class
+    const enrollments = await this.prisma.studentEnrollment.findMany({
+      where: { studentId },
+      select: { classId: true },
+    });
+    const classIds = enrollments.map((e) => e.classId).filter(Boolean) as string[];
+
+    // Also check legacy direct class assignment
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, deletedAt: null },
+      select: { classId: true },
+    });
+    if (student?.classId && !classIds.includes(student.classId)) {
+      classIds.push(student.classId);
+    }
+
+    if (classIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.session.findMany({
+      where: {
+        classId: { in: classIds },
+        deletedAt: null,
+      },
+      include: {
+        class: {
+          include: {
+            instructor: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        attendances: {
+          where: { studentId },
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        scheduledDate: 'desc',
+      },
+    });
+  }
+
   async addEnrollment(studentId: string, courseLevelId: string, classId: string | undefined, createdBy: string) {
     const student = await this.prisma.student.findFirst({ where: { id: studentId, deletedAt: null } });
     if (!student) throw new NotFoundException('Student not found');

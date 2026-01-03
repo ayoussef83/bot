@@ -87,6 +87,19 @@ export class StudentsController {
     return this.studentsService.listEnrollments(id, user.role, user.id);
   }
 
+  @Get(':id/sessions')
+  @Roles(
+    UserRole.super_admin,
+    UserRole.management,
+    UserRole.operations,
+    UserRole.accounting,
+    UserRole.sales,
+    UserRole.instructor,
+  )
+  listSessions(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.studentsService.listSessions(id, user.role, user.id);
+  }
+
   @Post(':id/enrollments')
   @Roles(UserRole.super_admin, UserRole.operations, UserRole.sales)
   addEnrollment(@Param('id') id: string, @Body() body: Omit<CreateEnrollmentDto, 'studentId'>, @CurrentUser() user: any) {
