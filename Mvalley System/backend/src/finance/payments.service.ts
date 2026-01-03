@@ -61,7 +61,10 @@ export class PaymentsService {
     return this.prisma.payment.findMany({
       where: studentId 
         ? { 
-            studentId: studentId, // Only payments directly linked to this specific student
+            studentId: {
+              equals: studentId, // Exact match required
+              not: null, // Explicitly exclude null values
+            },
           } 
         : undefined,
       orderBy: { receivedDate: 'desc' },
