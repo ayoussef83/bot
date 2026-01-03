@@ -8,7 +8,7 @@ import { FiPlus, FiEdit2, FiTrash2, FiX, FiCheck } from 'react-icons/fi';
 
 const entityOptions: { value: CustomFieldEntity; label: string }[] = [
   { value: 'student', label: 'Students' },
-  { value: 'class', label: 'Classes' },
+  { value: 'class', label: 'Courses' },
   { value: 'payment', label: 'Payments' },
   { value: 'lead', label: 'Leads' },
 ];

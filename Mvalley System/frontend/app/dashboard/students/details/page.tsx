@@ -327,14 +327,14 @@ export default function StudentDetailPage() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                   <FiBookOpen className="w-4 h-4" />
-                  Class
+                  Course
                 </h3>
                 <a
-                  href={`/dashboard/classes/${student.classId}`}
+                  href={`/dashboard/courses/details?id=${student.classId}`}
                   className="text-lg text-indigo-600 hover:text-indigo-900"
                   onClick={(e) => {
                     e.preventDefault();
-                    router.push(`/dashboard/classes/${student.classId}`);
+                    router.push(`/dashboard/courses/details?id=${student.classId}`);
                   }}
                 >
                   {student.class.name}
@@ -355,7 +355,7 @@ export default function StudentDetailPage() {
     },
     {
       id: 'classes',
-      label: 'Classes',
+      label: 'Courses',
       count: student.class ? 1 : 0,
       icon: <FiBookOpen className="w-4 h-4" />,
       content: (
@@ -370,16 +370,16 @@ export default function StudentDetailPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => router.push(`/dashboard/classes/${student.classId}`)}
+                  onClick={() => router.push(`/dashboard/courses/details?id=${student.classId}`)}
                   className="text-sm text-indigo-600 hover:text-indigo-900"
                 >
-                  View Class →
+                  View Course →
                 </button>
               </div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No classes enrolled</p>
+              <p>No courses enrolled</p>
             </div>
           )}
         </div>

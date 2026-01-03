@@ -266,11 +266,11 @@ export default function PersonDetailPage() {
             <DataTable
               columns={classColumns}
               data={instructor.classes}
-              emptyMessage="No classes assigned"
+              emptyMessage="No courses assigned"
             />
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No classes assigned</p>
+              <p>No courses assigned</p>
               <p className="text-sm mt-2">Assign classes in Academic Operations</p>
             </div>
           )}

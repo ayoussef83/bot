@@ -134,7 +134,7 @@ export default function AllocationsPage() {
     },
     {
       key: 'class',
-      label: 'Group (Class)',
+      label: 'Course Group',
       render: (_, row) => {
         const isEditing = editingId === row.enrollmentId;
         if (!isEditing) {
@@ -318,7 +318,7 @@ export default function AllocationsPage() {
       )}
       <StandardListView
         title="Allocations"
-        subtitle="Assign each enrollment (Course Level) to a Group (Class) inline—students can have multiple courses."
+        subtitle="Assign each enrollment (Course Level) to a Course Group inline—students can have multiple courses."
         data={rows}
         columns={columns}
         actions={actions}

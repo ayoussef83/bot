@@ -218,7 +218,7 @@ export default function StudentsPage() {
     },
     {
       key: 'class',
-      label: 'Class',
+      label: 'Course',
       render: (_, row) => (
         <span className="text-sm text-gray-500">
           <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
