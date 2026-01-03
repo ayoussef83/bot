@@ -32,7 +32,7 @@ frontend:
             echo "FRONTEND_DIR=frontend" >> $AMPLIFY_ENV
           fi
   artifacts:
-    baseDirectory: Mvalley System/frontend/out
+    baseDirectory: frontend/out
     files:
       - '**/*'
   cache:
