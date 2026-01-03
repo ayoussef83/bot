@@ -12,7 +12,7 @@ export class DashboardService {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     // Revenue
-    const payments = await this.prisma.payments.findMany({
+    const payments = await this.prisma.payment.findMany({
       where: {
         receivedDate: {
           gte: startOfMonth,
@@ -24,7 +24,7 @@ export class DashboardService {
     const monthlyRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
 
     // Active students
-    const activeStudents = await this.prisma.students.count({
+    const activeStudents = await this.prisma.student.count({
       where: {
         status: 'active',
         deletedAt: null,
@@ -32,7 +32,7 @@ export class DashboardService {
     });
 
     // Average students per session
-    const classes = await this.prisma.classes.findMany({
+    const classes = await this.prisma.class.findMany({
       where: { deletedAt: null },
       include: {
         sessions: {
@@ -44,7 +44,7 @@ export class DashboardService {
             status: 'completed',
           },
           include: {
-            session_attendances: {
+            attendances: {
               where: { attended: true },
             },
           },
@@ -61,7 +61,7 @@ export class DashboardService {
       allSessions.length > 0 ? totalAttendances / allSessions.length : 0;
 
     // Instructor utilization
-    const instructors = await this.prisma.instructors.findMany({
+    const instructors = await this.prisma.instructor.findMany({
       where: { deletedAt: null },
       include: {
         sessions: {
@@ -84,13 +84,13 @@ export class DashboardService {
       instructors.length > 0 ? totalInstructorSessions / instructors.length : 0;
 
     // Class fill rate
-    const underfilledClasses = await this.prisma.classes.count({
+    const underfilledClasses = await this.prisma.class.count({
       where: {
         isUnderfilled: true,
         deletedAt: null,
       },
     });
-    const totalClasses = await this.prisma.classes.count({
+    const totalClasses = await this.prisma.class.count({
       where: { deletedAt: null },
     });
     const classFillRate =
@@ -99,12 +99,13 @@ export class DashboardService {
         : 0;
 
     // Cash in/out
-    const expenses = await this.prisma.expenses.findMany({
+    const expenses = await this.prisma.expense.findMany({
       where: {
-        expenseDate: {
+        paidDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
+        status: 'paid',
       },
     });
     const cashOut = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -128,7 +129,7 @@ export class DashboardService {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Daily sessions
-    const dailySessions = await this.prisma.sessions.findMany({
+    const dailySessions = await this.prisma.session.findMany({
       where: {
         scheduledDate: {
           gte: today,
@@ -137,11 +138,11 @@ export class DashboardService {
         deletedAt: null,
       },
       include: {
-        classes: {
+        class: {
           include: {
-            instructors: {
+            instructor: {
               include: {
-                users: {
+                user: {
                   select: {
                     id: true,
                     firstName: true,
@@ -152,24 +153,24 @@ export class DashboardService {
             },
           },
         },
-        session_attendances: {
+        attendances: {
           include: {
-            students: true,
+            student: true,
           },
         },
       },
     });
 
     // Underfilled classes
-    const underfilledClasses = await this.prisma.classes.findMany({
+    const underfilledClasses = await this.prisma.class.findMany({
       where: {
         isUnderfilled: true,
         deletedAt: null,
       },
       include: {
-        instructors: {
+        instructor: {
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
                 firstName: true,
@@ -185,10 +186,10 @@ export class DashboardService {
     });
 
     // Instructor schedule
-    const instructors = await this.prisma.instructors.findMany({
+    const instructors = await this.prisma.instructor.findMany({
       where: { deletedAt: null },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             firstName: true,
@@ -216,7 +217,7 @@ export class DashboardService {
       dailySessions,
       underfilledClasses,
       instructorSchedule: instructors.map((i) => ({
-        instructors: i.user,
+        instructor: i.user,
         classes: i.classes,
         upcomingSessions: i.sessions,
       })),
@@ -229,7 +230,7 @@ export class DashboardService {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     // Payments received
-    const payments = await this.prisma.payments.findMany({
+    const payments = await this.prisma.payment.findMany({
       where: {
         receivedDate: {
           gte: startOfMonth,
@@ -252,52 +253,67 @@ export class DashboardService {
     });
 
     // Outstanding balances
-    const outstanding = await this.prisma.students.findMany({
+    const outstanding = await this.prisma.student.findMany({
       where: { deletedAt: null },
       include: {
         payments: {
           where: {
-            status: 'pending',
+            status: 'received',
+          },
+        },
+        invoices: {
+          where: {
+            status: {
+              not: 'paid',
+            },
           },
         },
       },
     });
 
     const outstandingBalances = outstanding
-      .map((student) => ({
-        studentId: student.id,
-        studentName: `${student.firstName} ${student.lastName}`,
-        outstandingAmount: student.payments.reduce(
-          (sum, p) => sum + p.amount,
-          0,
-        ),
-        pendingPayments: student.payments.length,
-      }))
+      .map((student) => {
+        const totalInvoiced = student.invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+        const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
+        const outstandingAmount = totalInvoiced - totalPaid;
+        return {
+          studentId: student.id,
+          studentName: `${student.firstName} ${student.lastName}`,
+          outstandingAmount,
+          pendingInvoices: student.invoices.length,
+        };
+      })
       .filter((s) => s.outstandingAmount > 0)
       .sort((a, b) => b.outstandingAmount - a.outstandingAmount);
 
     // Expense breakdown
-    const expenses = await this.prisma.expenses.findMany({
+    const expenses = await this.prisma.expense.findMany({
       where: {
-        expenseDate: {
+        paidDate: {
           gte: startOfMonth,
           lte: endOfMonth,
         },
+        status: 'paid',
       },
-      include: { category: true },
+      include: {
+        category: true,
+      },
     });
 
     const expenseBreakdown = expenses.reduce((acc, expense) => {
-      const key = expense.category?.name || expense.categoryId;
-      if (!acc[key]) {
-        acc[key] = 0;
+      const categoryName = expense.category?.name || 'Uncategorized';
+      if (!acc[categoryName]) {
+        acc[categoryName] = 0;
       }
-      acc[key] += expense.amount;
+      acc[categoryName] += expense.amount;
       return acc;
     }, {} as Record<string, number>);
 
     return {
-      paymentsReceived: payments,
+      paymentsReceived: payments.map((p) => ({
+        ...p,
+        student: p.Student,
+      })),
       totalReceived: payments.reduce((sum, p) => sum + p.amount, 0),
       outstandingBalances,
       totalOutstanding: outstandingBalances.reduce(
@@ -310,10 +326,10 @@ export class DashboardService {
   }
 
   async getInstructorDashboard(instructorId: string) {
-    const instructor = await this.prisma.instructors.findUnique({
+    const instructor = await this.prisma.instructor.findUnique({
       where: { id: instructorId },
       include: {
-        users: {
+        user: {
           select: {
             id: true,
             firstName: true,
@@ -338,10 +354,10 @@ export class DashboardService {
             scheduledDate: 'asc',
           },
           include: {
-            classes: true,
-            session_attendances: {
+            class: true,
+            attendances: {
               include: {
-                students: true,
+                student: true,
               },
             },
           },
@@ -354,7 +370,7 @@ export class DashboardService {
     }
 
     // Get recent attendance
-    const recentSessions = await this.prisma.sessions.findMany({
+    const recentSessions = await this.prisma.session.findMany({
       where: {
         instructorId: instructor.id,
         status: 'completed',
@@ -364,17 +380,17 @@ export class DashboardService {
       },
       take: 5,
       include: {
-        classes: true,
-        session_attendances: {
+        class: true,
+        attendances: {
           include: {
-            students: true,
+            student: true,
           },
         },
       },
     });
 
     return {
-      instructors: instructor.user,
+      instructor: instructor.user,
       assignedClasses: instructor.classes,
       upcomingSessions: instructor.sessions,
       recentSessions,

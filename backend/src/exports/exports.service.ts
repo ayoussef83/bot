@@ -179,20 +179,19 @@ export class ExportsService {
 
       case 'payments': {
         const payments = await this.prisma.payment.findMany({
-          where: { deletedAt: null },
-          include: { student: true },
+          include: { Student: true },
           orderBy: { createdAt: 'desc' },
         });
         return {
           sheetName: 'payments',
           rows: payments.map((p) => ({
             id: p.id,
-            studentName: p.student ? `${p.student.firstName} ${p.student.lastName}` : null,
+            studentName: p.Student ? `${p.Student.firstName} ${p.Student.lastName}` : null,
             amount: p.amount,
-            type: p.type,
+            method: p.method,
             status: p.status,
-            paymentDate: p.paymentDate,
-            dueDate: p.dueDate,
+            receivedDate: p.receivedDate,
+            paymentNumber: p.paymentNumber,
             notes: p.notes,
             createdAt: p.createdAt,
           })),
@@ -201,21 +200,27 @@ export class ExportsService {
 
       case 'expenses': {
         const expenses = await this.prisma.expense.findMany({
-          where: { deletedAt: null },
-          include: { instructor: { include: { user: true } } },
-          orderBy: { expenseDate: 'desc' },
+          include: {
+            category: true,
+            instructor: {
+              include: {
+                user: true,
+              },
+            },
+          },
+          orderBy: { paidDate: 'desc' },
         });
         return {
           sheetName: 'expenses',
           rows: expenses.map((e) => ({
             id: e.id,
-            category: e.category,
+            category: e.category?.name || null,
             amount: e.amount,
-            description: e.description,
+            description: e.notes || null,
             instructor: e.instructor?.user
               ? `${e.instructor.user.firstName} ${e.instructor.user.lastName}`
               : null,
-            expenseDate: e.expenseDate,
+            paidDate: e.paidDate,
             createdAt: e.createdAt,
           })),
         };

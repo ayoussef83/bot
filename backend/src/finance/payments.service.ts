@@ -44,12 +44,12 @@ export class PaymentsService {
       },
       include: {
         cashAccount: true,
-        student: true,
+        Student: true,
         allocations: {
           include: {
             invoice: {
               include: {
-                student: true,
+                Student: true,
               },
             },
           },
@@ -79,12 +79,12 @@ export class PaymentsService {
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,
-        student: true, // Include student directly
+        Student: true, // Include student directly
         allocations: {
           include: {
             invoice: {
               include: {
-                student: true,
+                Student: true,
               },
             },
           },
@@ -119,7 +119,7 @@ export class PaymentsService {
           include: {
             invoice: {
               include: {
-                student: true,
+                Student: true,
               },
             },
           },
@@ -158,7 +158,7 @@ export class PaymentsService {
         payment: true,
         invoice: {
           include: {
-            student: true,
+            Student: true,
           },
         },
       },
