@@ -7,8 +7,10 @@ import {
   IsObject,
   Min,
   Max,
+  ValidateIf,
 } from 'class-validator';
 import { StudentStatus, LearningTrack } from '@prisma/client';
+import { Transform } from 'class-transformer';
 
 export class UpdateStudentDto {
   @IsOptional()
@@ -42,12 +44,14 @@ export class UpdateStudentDto {
   phone?: string;
 
   @IsOptional()
-  @IsString()
-  parentId?: string;
+  @Transform(({ value }) => (value === '' ? null : value))
+  @ValidateIf((_, value) => value === null || typeof value === 'string')
+  parentId?: string | null;
 
   @IsOptional()
-  @IsString()
-  classId?: string;
+  @Transform(({ value }) => (value === '' ? null : value))
+  @ValidateIf((_, value) => value === null || typeof value === 'string')
+  classId?: string | null;
 
   @IsOptional()
   @IsObject()

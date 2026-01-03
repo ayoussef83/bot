@@ -9,8 +9,8 @@ export interface Student {
   status: string;
   email?: string;
   phone?: string;
-  parentId?: string;
-  classId?: string;
+  parentId?: string | null;
+  classId?: string | null;
   class?: any;
   parent?: any;
 }

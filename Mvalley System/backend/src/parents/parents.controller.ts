@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -20,6 +20,12 @@ export class ParentsController {
   @Roles(UserRole.super_admin, UserRole.management, UserRole.operations, UserRole.sales)
   findAll() {
     return this.parentsService.findAll();
+  }
+
+  @Get('lookup')
+  @Roles(UserRole.super_admin, UserRole.management, UserRole.operations, UserRole.sales)
+  lookup(@Query('phone') phone?: string) {
+    return this.parentsService.lookupByPhone(phone || '');
   }
 
   @Get(':id')

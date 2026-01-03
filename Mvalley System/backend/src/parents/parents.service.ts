@@ -29,6 +29,20 @@ export class ParentsService {
   async update(id: string, data: Partial<{ firstName: string; lastName: string; phone: string; email?: string; address?: string }>) {
     return this.prisma.parent.update({ where: { id }, data });
   }
+
+  async lookupByPhone(phone: string) {
+    const p = String(phone || '').trim();
+    if (!p) return { found: false };
+
+    const parent = await this.prisma.parent.findFirst({
+      where: { phone: p, deletedAt: null },
+      include: { students: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!parent) return { found: false };
+    return { found: true, parent };
+  }
 }
 
 

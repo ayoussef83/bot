@@ -7,6 +7,7 @@ import EmptyState from '@/components/EmptyState';
 import { studentsService, classesService, parentsService, Student, Class, ParentContact } from '@/lib/services';
 import { FiEdit, FiSave, FiX } from 'react-icons/fi';
 import HighlightedText from '@/components/HighlightedText';
+import { useSearchParams } from 'next/navigation';
 
 type Draft = {
   parentId: string;
@@ -14,6 +15,7 @@ type Draft = {
 };
 
 export default function AllocationsPage() {
+  const searchParams = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [parents, setParents] = useState<ParentContact[]>([]);
@@ -47,6 +49,9 @@ export default function AllocationsPage() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  // If coming from a class quick-action, preselect that class in the row editor when you click "Edit row"
+  const preselectedClassId = searchParams?.get('classId') || '';
 
   const parentLabel = (p: ParentContact) => `${p.firstName} ${p.lastName} (${p.phone})`;
 
@@ -169,7 +174,7 @@ export default function AllocationsPage() {
             setEditingId(row.id);
             setDraft({
               parentId: row.parentId || '',
-              classId: row.classId || '',
+              classId: row.classId || preselectedClassId || '',
             });
           },
         },
@@ -185,8 +190,8 @@ export default function AllocationsPage() {
           setError('');
           try {
             await studentsService.update(row.id, {
-              parentId: draft.parentId || undefined,
-              classId: draft.classId || undefined,
+              parentId: draft.parentId ? draft.parentId : null,
+              classId: draft.classId ? draft.classId : null,
             });
             setEditingId(null);
             await fetchAll();

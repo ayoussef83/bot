@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
-import { FiEdit, FiTrash2, FiCalendar, FiUsers, FiCheckCircle, FiXCircle, FiBookOpen, FiUserCheck, FiClock } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiCalendar, FiUsers, FiCheckCircle, FiXCircle, FiBookOpen, FiUserCheck, FiClock, FiSave } from 'react-icons/fi';
 
 interface Session {
   id: string;
@@ -17,6 +17,8 @@ interface Session {
   endTime: string;
   status: string;
   instructorConfirmed: boolean;
+  room?: string;
+  notes?: string;
   class?: {
     id: string;
     name: string;
@@ -54,6 +56,10 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [attendanceDraft, setAttendanceDraft] = useState<Record<string, { attended: boolean; notes: string }>>({});
+  const [savingAttendance, setSavingAttendance] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -69,11 +75,57 @@ export default function SessionDetailPage() {
     try {
       const response = await api.get(`/sessions/${sessionId}`);
       setSession(response.data);
+      setNotesDraft(String(response.data?.notes || ''));
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load session');
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!session?.attendances) return;
+    const next: Record<string, { attended: boolean; notes: string }> = {};
+    for (const a of session.attendances) {
+      next[a.id] = { attended: !!a.attended, notes: a.notes || '' };
+    }
+    setAttendanceDraft(next);
+  }, [session?.attendances]);
+
+  const saveNotes = async () => {
+    if (!session) return;
+    setSavingNotes(true);
+    setError('');
+    try {
+      await api.patch(`/sessions/${session.id}`, { notes: notesDraft });
+      await fetchSession(session.id);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to save session notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const saveAttendance = async () => {
+    if (!session?.attendances?.length) return;
+    setSavingAttendance(true);
+    setError('');
+    try {
+      // Save each attendance row (does NOT complete the session)
+      await Promise.all(
+        session.attendances.map((a) =>
+          api.patch(`/attendance/${a.id}`, {
+            attended: attendanceDraft[a.id]?.attended ?? false,
+            notes: attendanceDraft[a.id]?.notes ?? '',
+          }),
+        ),
+      );
+      await fetchSession(session.id);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to save attendance');
+    } finally {
+      setSavingAttendance(false);
     }
   };
 
@@ -209,6 +261,13 @@ export default function SessionDetailPage() {
   const absentCount = attendances.filter((a) => !a.attended).length;
   const totalCount = attendances.length;
 
+  const editableAttendanceRows = useMemo(() => {
+    return attendances.map((a) => ({
+      ...a,
+      _draft: attendanceDraft[a.id] || { attended: a.attended, notes: a.notes || '' },
+    }));
+  }, [attendances, attendanceDraft]);
+
   // Tabs
   const tabs: Tab[] = [
     {
@@ -310,6 +369,26 @@ export default function SessionDetailPage() {
                 )}
               </div>
             </div>
+            <div className="col-span-2">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Instructor Notes</h3>
+              <textarea
+                rows={4}
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                className="w-full rounded-md border border-gray-300 p-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                placeholder="Session notes (what was covered, homework, behavior, etc.)"
+              />
+              <div className="mt-2 flex justify-end">
+                <button
+                  onClick={saveNotes}
+                  disabled={savingNotes}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+                >
+                  <FiSave className="w-4 h-4" />
+                  {savingNotes ? 'Saving…' : 'Save Notes'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ),
@@ -337,11 +416,65 @@ export default function SessionDetailPage() {
                   <div className="text-2xl font-bold text-gray-900 mt-1">{totalCount}</div>
                 </div>
               </div>
+              <div className="mb-3 flex justify-end">
+                <button
+                  onClick={saveAttendance}
+                  disabled={savingAttendance}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+                >
+                  <FiSave className="w-4 h-4" />
+                  {savingAttendance ? 'Saving…' : 'Save Attendance'}
+                </button>
+              </div>
+
               <DataTable
-                columns={attendanceColumns}
-                data={attendances}
+                columns={[
+                  attendanceColumns[0],
+                  {
+                    key: 'attended',
+                    label: 'Present',
+                    render: (_, row: any) => (
+                      <input
+                        type="checkbox"
+                        checked={!!attendanceDraft[row.id]?.attended}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAttendanceDraft((d) => ({
+                            ...d,
+                            [row.id]: {
+                              attended: checked,
+                              notes: d[row.id]?.notes ?? row.notes ?? '',
+                            },
+                          }));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'notes',
+                    label: 'Notes',
+                    render: (_, row: any) => (
+                      <input
+                        type="text"
+                        value={attendanceDraft[row.id]?.notes ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setAttendanceDraft((d) => ({
+                            ...d,
+                            [row.id]: { attended: d[row.id]?.attended ?? false, notes: v },
+                          }));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+                        placeholder="Notes…"
+                      />
+                    ),
+                  },
+                ]}
+                data={editableAttendanceRows as any}
                 emptyMessage="No attendance records"
-                onRowClick={(row) => {
+                onRowClick={(row: any) => {
                   router.push(`/dashboard/students/details?id=${row.studentId}`);
                 }}
               />

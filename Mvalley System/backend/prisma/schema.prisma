@@ -291,6 +291,7 @@ model Session {
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
 
   room String?
+  notes String?
 
   // Status
   status              String  @default("scheduled") // scheduled, completed, cancelled

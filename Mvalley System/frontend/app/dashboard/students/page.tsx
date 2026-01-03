@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { studentsService, Student } from '@/lib/services';
+import { studentsService, Student, parentsService } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
@@ -32,6 +32,9 @@ export default function StudentsPage() {
     email: '',
     phone: '',
   });
+  const [parentLookup, setParentLookup] = useState<{ found: boolean; parent?: any } | null>(null);
+  const [selectedParentId, setSelectedParentId] = useState<string>('');
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
   useEffect(() => {
     fetchStudents();
@@ -70,6 +73,7 @@ export default function StudentsPage() {
         await studentsService.create({
           ...formData,
           age: parseInt(formData.age),
+          parentId: selectedParentId || undefined,
         });
       }
       setShowForm(false);
@@ -83,6 +87,8 @@ export default function StudentsPage() {
         email: '',
         phone: '',
       });
+      setParentLookup(null);
+      setSelectedParentId('');
       fetchStudents();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save student');
@@ -100,8 +106,40 @@ export default function StudentsPage() {
       email: student.email || '',
       phone: student.phone || '',
     });
+    setParentLookup(null);
+    setSelectedParentId(student.parentId || '');
     setShowForm(true);
   };
+
+  // Phone lookup (only when creating)
+  useEffect(() => {
+    let t: any;
+    if (!showForm || editingStudent) return;
+    const phone = (formData.phone || '').trim();
+    if (phone.length < 7) {
+      setParentLookup(null);
+      setSelectedParentId('');
+      return;
+    }
+    setCheckingPhone(true);
+    t = setTimeout(() => {
+      parentsService
+        .lookupByPhone(phone)
+        .then((res: any) => {
+          const data = res?.data;
+          setParentLookup(data);
+          if (data?.found && data?.parent?.id) setSelectedParentId(data.parent.id);
+          else setSelectedParentId('');
+        })
+        .catch(() => {
+          setParentLookup(null);
+          setSelectedParentId('');
+        })
+        .finally(() => setCheckingPhone(false));
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.phone, showForm, editingStudent]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this student?')) return;
@@ -326,6 +364,37 @@ export default function StudentsPage() {
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       />
+                      {!editingStudent && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          {checkingPhone ? (
+                            <span>Checking parent by phone…</span>
+                          ) : parentLookup?.found ? (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
+                              <div className="font-medium text-yellow-800">
+                                Existing parent found: {parentLookup.parent?.firstName}{' '}
+                                {parentLookup.parent?.lastName}
+                              </div>
+                              <div className="text-yellow-700">
+                                Kids: {(parentLookup.parent?.students || [])
+                                  .map((s: any) => `${s.firstName} ${s.lastName}`)
+                                  .join(', ') || '—'}
+                              </div>
+                              <label className="mt-2 inline-flex items-center gap-2 text-yellow-900">
+                                <input
+                                  type="checkbox"
+                                  checked={!!selectedParentId}
+                                  onChange={(e) =>
+                                    setSelectedParentId(e.target.checked ? parentLookup.parent?.id : '')
+                                  }
+                                />
+                                Link new student to this parent
+                              </label>
+                            </div>
+                          ) : formData.phone.trim().length >= 7 ? (
+                            <span>No parent found for this phone.</span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   </div>
 

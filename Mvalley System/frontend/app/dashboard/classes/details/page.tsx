@@ -378,13 +378,13 @@ export default function ClassDetailPage() {
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h3>
         <div className="space-y-2">
           <button
-            onClick={() => router.push(`/dashboard/classes/${classItem.id}/add-student`)}
+            onClick={() => router.push(`/dashboard/academics/allocations?classId=${encodeURIComponent(classItem.id)}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
             👥 Add Student
           </button>
           <button
-            onClick={() => router.push(`/dashboard/sessions?class=${classItem.id}`)}
+            onClick={() => router.push(`/dashboard/sessions?classId=${encodeURIComponent(classItem.id)}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
             📅 View Sessions

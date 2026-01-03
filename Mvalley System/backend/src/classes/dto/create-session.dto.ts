@@ -29,6 +29,10 @@ export class CreateSessionDto {
 
   @IsOptional()
   @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()

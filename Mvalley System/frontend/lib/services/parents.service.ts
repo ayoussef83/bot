@@ -17,6 +17,7 @@ export const parentsService = {
   getById: (id: string) => api.get<ParentContact>(`/parents/${id}`),
   create: (data: Partial<ParentContact>) => api.post<ParentContact>('/parents', data),
   update: (id: string, data: Partial<ParentContact>) => api.patch<ParentContact>(`/parents/${id}`, data),
+  lookupByPhone: (phone: string) => api.get(`/parents/lookup?phone=${encodeURIComponent(phone)}`),
 };
 
 
