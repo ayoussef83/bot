@@ -459,7 +459,7 @@ export default function StudentDetailPage() {
         subject: messageChannel === 'email' ? messageSubject : undefined,
         message: messageBody,
         studentId: student.id,
-        parentId: student.parentId,
+        parentId: student.parentId || undefined,
       });
       setShowMessageModal(false);
     } catch (err: any) {
