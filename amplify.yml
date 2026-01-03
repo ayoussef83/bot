@@ -38,7 +38,7 @@ frontend:
         - ls -la out 2>/dev/null && echo "Found out directory" || echo "out directory not found in current location"
         - cd .. && pwd && ls -la frontend/out 2>/dev/null && echo "Found frontend/out from parent" || echo "frontend/out not found from parent"
   artifacts:
-    baseDirectory: frontend/out
+    baseDirectory: Mvalley System/frontend/out
     files:
       - '**/*'
   cache:
