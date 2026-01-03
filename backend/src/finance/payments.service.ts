@@ -40,9 +40,11 @@ export class PaymentsService {
         paymentNumber,
         receivedDate: createPaymentDto.receivedDate ? new Date(createPaymentDto.receivedDate) : new Date(),
         receivedBy: userId,
+        studentId: createPaymentDto.studentId,
       },
       include: {
         cashAccount: true,
+        student: true,
         allocations: {
           include: {
             invoice: {
