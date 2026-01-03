@@ -36,8 +36,9 @@ WHERE "locationName" IS NULL;
 
 -- 4) Backfill courses/levels from existing classes.name (safe, idempotent-ish)
 -- Insert unique courses from class names
+-- NOTE: We avoid uuid extensions in production by using a stable-enough random hash (ids are TEXT).
 INSERT INTO "courses" ("id","name","isActive","createdAt","updatedAt")
-SELECT uuid_generate_v4()::text, c."name", TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+SELECT ('course_' || md5(c."name" || '-' || random()::text || '-' || clock_timestamp()::text)), c."name", TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM (
   SELECT DISTINCT "name" FROM "classes" WHERE "deletedAt" IS NULL
 ) c
@@ -45,7 +46,7 @@ ON CONFLICT ("name") DO NOTHING;
 
 -- Insert default "Level 1" for each course
 INSERT INTO "course_levels" ("id","courseId","name","sortOrder","isActive","createdAt","updatedAt")
-SELECT uuid_generate_v4()::text, co."id", 'Level 1', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+SELECT ('level_' || md5(co."id" || '-level1-' || random()::text || '-' || clock_timestamp()::text)), co."id", 'Level 1', 1, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM "courses" co
 LEFT JOIN "course_levels" cl ON cl."courseId" = co."id" AND cl."name" = 'Level 1'
 WHERE cl."id" IS NULL;
@@ -92,7 +93,7 @@ CREATE INDEX IF NOT EXISTS "student_enrollments_classId_idx" ON "student_enrollm
 -- Backfill enrollments from existing students.classId -> classes.courseLevelId
 INSERT INTO "student_enrollments" ("id","studentId","courseLevelId","classId","status","createdAt","updatedAt")
 SELECT
-  uuid_generate_v4()::text,
+  ('enr_' || md5(s."id" || '-' || c."courseLevelId" || '-' || random()::text || '-' || clock_timestamp()::text)),
   s."id",
   c."courseLevelId",
   s."classId",
