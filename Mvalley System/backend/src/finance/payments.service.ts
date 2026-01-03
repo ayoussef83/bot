@@ -61,10 +61,10 @@ export class PaymentsService {
     return this.prisma.payment.findMany({
       where: studentId 
         ? { 
-            studentId: {
-              equals: studentId, // Exact match required
-              not: null, // Explicitly exclude null values
-            },
+            AND: [
+              { studentId: studentId }, // Exact match
+              { studentId: { not: null } }, // Explicitly exclude null
+            ],
           } 
         : undefined,
       orderBy: { receivedDate: 'desc' },
