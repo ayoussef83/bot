@@ -132,6 +132,74 @@ export default function StudentDetailPage() {
     }
   };
 
+  // Session columns (memoized - MUST be before early returns to avoid React error #310)
+  const sessionColumns: Column<Session>[] = useMemo(() => {
+    if (!student) return [];
+    return [
+      {
+        key: 'date',
+        label: 'Date',
+        render: (_, row) => (
+          <span className="text-sm text-gray-900">
+            {new Date(row.scheduledDate).toLocaleDateString()}
+          </span>
+        ),
+      },
+      {
+        key: 'class',
+        label: 'Class',
+        render: (_, row) => (
+          <span className="text-sm text-gray-900">{row.class?.name || '-'}</span>
+        ),
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        render: (_, row) => (
+          <span className="text-sm text-gray-500">
+            {new Date(row.startTime).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}{' '}
+            -{' '}
+            {new Date(row.endTime).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        ),
+      },
+      {
+        key: 'attendance',
+        label: 'Attendance',
+        render: (_, row) => {
+          const attendance = row.attendances?.find((a: any) => a.studentId === student?.id);
+          return (
+            <span className="text-sm text-gray-500">
+              {attendance?.attended ? (
+                <span className="text-green-600">Present</span>
+              ) : (
+                <span className="text-red-600">Absent</span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        render: (value) => {
+          const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' } = {
+            completed: 'active',
+            scheduled: 'warning',
+            cancelled: 'inactive',
+          };
+          return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
+        },
+      },
+    ];
+  }, [student]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -223,74 +291,6 @@ export default function StudentDetailPage() {
       ),
     },
   ];
-
-  // Session columns (memoized to avoid React error #310)
-  const sessionColumns: Column<Session>[] = useMemo(() => {
-    if (!student) return [];
-    return [
-      {
-        key: 'date',
-        label: 'Date',
-        render: (_, row) => (
-          <span className="text-sm text-gray-900">
-            {new Date(row.scheduledDate).toLocaleDateString()}
-          </span>
-        ),
-      },
-      {
-        key: 'class',
-        label: 'Class',
-        render: (_, row) => (
-          <span className="text-sm text-gray-900">{row.class?.name || '-'}</span>
-        ),
-      },
-      {
-        key: 'time',
-        label: 'Time',
-        render: (_, row) => (
-          <span className="text-sm text-gray-500">
-            {new Date(row.startTime).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}{' '}
-            -{' '}
-            {new Date(row.endTime).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        ),
-      },
-      {
-        key: 'attendance',
-        label: 'Attendance',
-        render: (_, row) => {
-          const attendance = row.attendances?.find((a: any) => a.studentId === student.id);
-          return (
-            <span className="text-sm text-gray-500">
-              {attendance?.attended ? (
-                <span className="text-green-600">Present</span>
-              ) : (
-                <span className="text-red-600">Absent</span>
-              )}
-            </span>
-          );
-        },
-      },
-      {
-        key: 'status',
-        label: 'Status',
-        render: (value) => {
-          const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' } = {
-            completed: 'active',
-            scheduled: 'warning',
-            cancelled: 'inactive',
-          };
-          return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
-        },
-      },
-    ];
-  }, [student]);
 
   // Tabs
   const tabs: Tab[] = [
