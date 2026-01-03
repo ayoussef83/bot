@@ -217,7 +217,17 @@ function PaymentsPageContent() {
       await fetchPayments();
     } catch (err: any) {
       console.error('Error creating payment:', err);
-      setFormErrors({ submit: err.response?.data?.message || 'Failed to record payment' });
+      
+      let errorMessage = 'Failed to record payment';
+      if (err.response?.data?.message) {
+        if (Array.isArray(err.response.data.message)) {
+          errorMessage = err.response.data.message.join(', ');
+        } else if (typeof err.response.data.message === 'string') {
+          errorMessage = err.response.data.message;
+        }
+      }
+      
+      setFormErrors({ submit: errorMessage });
     }
   };
 
