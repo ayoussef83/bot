@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { coursesService, studentsService, Student, parentsService } from '@/lib/services';
+import { coursesService, studentsService, Student, parentsService, classesService, type Class } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
@@ -54,7 +54,8 @@ export default function StudentsPage() {
   const [parentForm, setParentForm] = useState({ firstName: '', lastName: '', email: '' });
 
   const [levels, setLevels] = useState<any[]>([]);
-  const [selectedLevelIds, setSelectedLevelIds] = useState<string[]>([]);
+  const [courseGroups, setCourseGroups] = useState<Class[]>([]);
+  const [selectedCourseGroupIds, setSelectedCourseGroupIds] = useState<string[]>([]);
   const [phoneGate, setPhoneGate] = useState<'empty' | 'checking' | 'found' | 'new'>('empty');
 
   useEffect(() => {
@@ -86,6 +87,14 @@ export default function StudentsPage() {
       .listLevels()
       .then((res: any) => setLevels(res.data || []))
       .catch(() => setLevels([]));
+  }, []);
+
+  useEffect(() => {
+    // Load actual course groups (what you see in /dashboard/courses)
+    classesService
+      .getAll()
+      .then((res: any) => setCourseGroups(res.data || []))
+      .catch(() => setCourseGroups([]));
   }, []);
 
   const fetchStudents = async () => {
@@ -143,12 +152,35 @@ export default function StudentsPage() {
         });
 
         const createdStudentId = (created as any)?.data?.id;
-        if (createdStudentId && selectedLevelIds.length > 0) {
-          await Promise.all(
-            selectedLevelIds.map((courseLevelId) =>
-              studentsService.addEnrollment(createdStudentId, { courseLevelId }),
-            ),
-          );
+        if (createdStudentId && selectedCourseGroupIds.length > 0) {
+          // Map each selected course-group (class) to a matching CourseLevel (by name). If missing, create Course + Level 1.
+          for (const classId of selectedCourseGroupIds) {
+            const courseGroup = courseGroups.find((c) => c.id === classId);
+            if (!courseGroup?.name) continue;
+
+            let level = levels.find(
+              (l: any) => String(l?.course?.name || '').trim() === courseGroup.name.trim(),
+            );
+            if (!level) {
+              const createdCourse = await coursesService.create({
+                name: courseGroup.name.trim(),
+                isActive: true,
+              });
+              const createdLevel = await coursesService.createLevel({
+                courseId: createdCourse.data.id,
+                name: 'Level 1',
+                sortOrder: 1,
+                isActive: true,
+              });
+              level = { ...createdLevel.data, course: createdCourse.data };
+              setLevels((prev) => [...prev, level]);
+            }
+
+            await studentsService.addEnrollment(createdStudentId, {
+              courseLevelId: level.id,
+              classId: courseGroup.id,
+            });
+          }
         }
       }
       setShowForm(false);
@@ -164,7 +196,7 @@ export default function StudentsPage() {
       setParentLookup(null);
       setSelectedParentId('');
       setParentForm({ firstName: '', lastName: '', email: '' });
-      setSelectedLevelIds([]);
+      setSelectedCourseGroupIds([]);
       setPhoneGate('empty');
       fetchStudents();
     } catch (err: any) {
@@ -189,7 +221,9 @@ export default function StudentsPage() {
       lastName: student.parent?.lastName || '',
       email: student.parent?.email || '',
     });
-    setSelectedLevelIds((student.enrollments || []).map((e: any) => e.courseLevelId).filter(Boolean));
+    setSelectedCourseGroupIds(
+      (student.enrollments || []).map((e: any) => e.classId).filter(Boolean),
+    );
     setShowForm(true);
   };
 
@@ -529,26 +563,25 @@ export default function StudentsPage() {
                               Manage Courses →
                             </button>
                           </div>
-                          {levels.length === 0 ? (
+                          {courseGroups.length === 0 ? (
                             <div className="mt-2 text-sm text-gray-500">
-                              No courses found yet. Create a course group (e.g. Python) and it will appear here.
+                              No courses found yet. Add a course in /dashboard/courses and it will appear here.
                             </div>
                           ) : (
                             <div className="mt-2 max-h-40 overflow-auto rounded-md border border-gray-200 bg-white p-2 space-y-2">
-                              {levels.map((lvl: any) => {
-                                const courseName = lvl?.course?.name || 'Course';
-                                const label = `${courseName} - ${lvl?.name || 'Level'}`;
-                                const checked = selectedLevelIds.includes(lvl.id);
+                              {courseGroups.map((cg: any) => {
+                                const label = `${cg?.name || 'Course'}${cg?.location ? ` (${cg.location})` : ''}`;
+                                const checked = selectedCourseGroupIds.includes(cg.id);
                                 return (
-                                  <label key={lvl.id} className="flex items-center gap-2 text-sm text-gray-700">
+                                  <label key={cg.id} className="flex items-center gap-2 text-sm text-gray-700">
                                     <input
                                       type="checkbox"
                                       checked={checked}
                                       onChange={(e) => {
                                         const next = e.target.checked
-                                          ? Array.from(new Set([...selectedLevelIds, lvl.id]))
-                                          : selectedLevelIds.filter((x) => x !== lvl.id);
-                                        setSelectedLevelIds(next);
+                                          ? Array.from(new Set([...selectedCourseGroupIds, cg.id]))
+                                          : selectedCourseGroupIds.filter((x) => x !== cg.id);
+                                        setSelectedCourseGroupIds(next);
                                       }}
                                     />
                                     {label}
@@ -620,7 +653,7 @@ export default function StudentsPage() {
             setParentLookup(null);
             setSelectedParentId('');
             setParentForm({ firstName: '', lastName: '', email: '' });
-            setSelectedLevelIds([]);
+            setSelectedCourseGroupIds([]);
             setPhoneGate('empty');
           },
           icon: <FiPlus className="w-4 h-4" />,
