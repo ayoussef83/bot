@@ -6,7 +6,7 @@ export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
   async getProfitAndLoss(periodCode: string, location?: string, program?: string) {
-    const period = await this.prisma.financialPeriod.findUnique({
+    const period = await this.prisma.financial_periods.findUnique({
       where: { periodCode },
     });
 
@@ -25,7 +25,7 @@ export class ReportsService {
       },
     };
 
-    const invoices = await this.prisma.invoice.findMany({
+    const invoices = await this.prisma.invoices.findMany({
       where: revenueQuery,
       include: {
         student: {
@@ -61,7 +61,7 @@ export class ReportsService {
       periodId: period.id,
     };
 
-    const expenses = await this.prisma.expense.findMany({
+    const expenses = await this.prisma.expenses.findMany({
       where: expensesQuery,
       include: {
         category: true,
@@ -120,7 +120,7 @@ export class ReportsService {
   }
 
   async getCashFlow(periodCode: string, cashAccountId?: string) {
-    const period = await this.prisma.financialPeriod.findUnique({
+    const period = await this.prisma.financial_periods.findUnique({
       where: { periodCode },
     });
 
@@ -141,7 +141,7 @@ export class ReportsService {
       paymentsQuery.cashAccountId = cashAccountId;
     }
 
-    const payments = await this.prisma.payment.findMany({
+    const payments = await this.prisma.payments.findMany({
       where: paymentsQuery,
       include: {
         cashAccount: true,
@@ -167,7 +167,7 @@ export class ReportsService {
       expensesQuery.cashAccountId = cashAccountId;
     }
 
-    const expenses = await this.prisma.expense.findMany({
+    const expenses = await this.prisma.expenses.findMany({
       where: expensesQuery,
     });
 
@@ -178,7 +178,7 @@ export class ReportsService {
     const otherOutflows = totalOutflows - instructorPayouts;
 
     // Get opening balance (previous period closing balance or sum of account balances)
-    const previousPeriod = await this.prisma.financialPeriod.findFirst({
+    const previousPeriod = await this.prisma.financial_periods.findFirst({
       where: {
         periodCode: {
           lt: periodCode,
@@ -197,7 +197,7 @@ export class ReportsService {
       const prevEndDate = previousPeriod.endDate;
       
       // Get all payments before current period start
-      const prevPayments = await this.prisma.payment.aggregate({
+      const prevPayments = await this.prisma.paymentss.aggregate({
         where: {
           receivedDate: {
             lt: period.startDate,
@@ -210,7 +210,7 @@ export class ReportsService {
       });
       
       // Get all expenses before current period start
-      const prevExpenses = await this.prisma.expense.aggregate({
+      const prevExpenses = await this.prisma.expensess.aggregate({
         where: {
           expenseDate: {
             lt: period.startDate,
@@ -223,7 +223,7 @@ export class ReportsService {
       });
       
       // Opening balance = sum of all account initial balances + net flow before period
-      const allAccounts = await this.prisma.cashAccount.findMany({
+      const allAccounts = await this.prisma.cash_accounts.findMany({
         where: { isActive: true },
       });
       const initialBalances = allAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
@@ -232,13 +232,13 @@ export class ReportsService {
       openingBalance = initialBalances + prevNetFlow;
     } else {
       // First period: use sum of all account balances
-      const allAccounts = await this.prisma.cashAccount.findMany({
+      const allAccounts = await this.prisma.cash_accounts.findMany({
         where: { isActive: true },
       });
       openingBalance = allAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
       
       // Subtract transactions that occurred before period start
-      const prePeriodPayments = await this.prisma.payment.aggregate({
+      const prePeriodPayments = await this.prisma.paymentss.aggregate({
         where: {
           receivedDate: {
             lt: period.startDate,
@@ -250,7 +250,7 @@ export class ReportsService {
         },
       });
       
-      const prePeriodExpenses = await this.prisma.expense.aggregate({
+      const prePeriodExpenses = await this.prisma.expensess.aggregate({
         where: {
           expenseDate: {
             lt: period.startDate,
@@ -297,7 +297,7 @@ export class ReportsService {
   }
 
   async getClassProfitability(periodCode: string, location?: string, program?: string) {
-    const period = await this.prisma.financialPeriod.findUnique({
+    const period = await this.prisma.financial_periods.findUnique({
       where: { periodCode },
     });
 
@@ -306,7 +306,7 @@ export class ReportsService {
     }
 
     // Get invoices for the period (needed for revenue calculation)
-    const invoices = await this.prisma.invoice.findMany({
+    const invoices = await this.prisma.invoices.findMany({
       where: {
         issueDate: {
           gte: period.startDate,
@@ -319,7 +319,7 @@ export class ReportsService {
     });
 
     // Get all classes with revenue and costs
-    const classes = await this.prisma.class.findMany({
+    const classes = await this.prisma.classes.findMany({
       where: {
         ...(location && { location: location as any }),
       },
@@ -406,7 +406,7 @@ export class ReportsService {
   }
 
   async getInstructorCosts(periodCode: string, instructorId?: string) {
-    const period = await this.prisma.financialPeriod.findUnique({
+    const period = await this.prisma.financial_periods.findUnique({
       where: { periodCode },
     });
 
@@ -425,7 +425,7 @@ export class ReportsService {
       instructorId: instructorId || undefined,
     };
 
-    const expenses = await this.prisma.expense.findMany({
+    const expenses = await this.prisma.expenses.findMany({
       where: expensesQuery,
       include: {
         instructor: {
@@ -484,7 +484,7 @@ export class ReportsService {
     });
 
     // Calculate revenue generated (from invoices for classes taught by instructor)
-    const instructorClasses = await this.prisma.class.findMany({
+    const instructorClasses = await this.prisma.classes.findMany({
       where: {
         instructorId: instructorId || undefined,
       },
@@ -494,7 +494,7 @@ export class ReportsService {
     });
 
     const classIds = instructorClasses.map((c) => c.id);
-    const invoices = await this.prisma.invoice.findMany({
+    const invoices = await this.prisma.invoices.findMany({
       where: {
         classId: {
           in: classIds,

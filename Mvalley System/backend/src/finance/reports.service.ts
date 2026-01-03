@@ -28,9 +28,9 @@ export class ReportsService {
     const invoices = await this.prisma.invoices.findMany({
       where: revenueQuery,
       include: {
-        students: {
+        student: {
           include: {
-            classes: true,
+            class: true,
           },
         },
       },
@@ -106,7 +106,7 @@ export class ReportsService {
       expenses: {
         total: totalExpenses,
         breakdown: {
-          instructors: instructorCosts,
+          instructor: instructorCosts,
           rent: rentExpenses,
           marketing: marketingExpenses,
           utilities: utilitiesExpenses,
@@ -144,7 +144,7 @@ export class ReportsService {
     const payments = await this.prisma.payments.findMany({
       where: paymentsQuery,
       include: {
-        cash_accounts: true,
+        cashAccount: true,
       },
     });
 
@@ -197,7 +197,7 @@ export class ReportsService {
       const prevEndDate = previousPeriod.endDate;
       
       // Get all payments before current period start
-      const prevPayments = await this.prisma.payments.aggregate({
+      const prevPayments = await this.prisma.paymentss.aggregate({
         where: {
           receivedDate: {
             lt: period.startDate,
@@ -210,7 +210,7 @@ export class ReportsService {
       });
       
       // Get all expenses before current period start
-      const prevExpenses = await this.prisma.expenses.aggregate({
+      const prevExpenses = await this.prisma.expensess.aggregate({
         where: {
           expenseDate: {
             lt: period.startDate,
@@ -238,7 +238,7 @@ export class ReportsService {
       openingBalance = allAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
       
       // Subtract transactions that occurred before period start
-      const prePeriodPayments = await this.prisma.payments.aggregate({
+      const prePeriodPayments = await this.prisma.paymentss.aggregate({
         where: {
           receivedDate: {
             lt: period.startDate,
@@ -250,7 +250,7 @@ export class ReportsService {
         },
       });
       
-      const prePeriodExpenses = await this.prisma.expenses.aggregate({
+      const prePeriodExpenses = await this.prisma.expensess.aggregate({
         where: {
           expenseDate: {
             lt: period.startDate,
@@ -337,7 +337,7 @@ export class ReportsService {
             },
           },
           include: {
-            instructors: true,
+            instructor: true,
           },
         },
       },
@@ -428,16 +428,16 @@ export class ReportsService {
     const expenses = await this.prisma.expenses.findMany({
       where: expensesQuery,
       include: {
-        instructors: {
+        instructor: {
           include: {
-            users: true,
+            user: true,
           },
         },
       },
     });
 
     // Get sessions for revenue calculation
-    const sessions = await this.prisma.sessions.findMany({
+    const sessions = await this.prisma.session.findMany({
       where: {
         scheduledDate: {
           gte: period.startDate,
@@ -447,7 +447,7 @@ export class ReportsService {
         status: 'completed',
       },
       include: {
-        classes: true,
+        class: true,
       },
     });
 
