@@ -22,6 +22,22 @@ interface Session {
 }
 
 export default function StudentDetailPage() {
+  const toErrorString = (err: any, fallback: string) => {
+    const msg = err?.response?.data?.message ?? err?.message ?? err;
+    if (typeof msg === 'string') return msg;
+    if (Array.isArray(msg)) return msg.filter(Boolean).join(', ') || fallback;
+    if (msg && typeof msg === 'object') {
+      const nested = (msg as any).message;
+      if (typeof nested === 'string') return nested;
+      if (Array.isArray(nested)) return nested.filter(Boolean).join(', ') || fallback;
+      try {
+        return JSON.stringify(msg);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -63,7 +79,7 @@ export default function StudentDetailPage() {
       setStudent(response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load student');
+      setError(toErrorString(err, 'Failed to load student'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +128,7 @@ export default function StudentDetailPage() {
       await studentsService.delete(student.id);
       router.push('/dashboard/students');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete student');
+      setError(toErrorString(err, 'Failed to delete student'));
     }
   };
 
@@ -349,6 +365,10 @@ export default function StudentDetailPage() {
                 <p className="text-lg text-gray-900">
                   {student.parent.firstName} {student.parent.lastName}
                 </p>
+                <div className="mt-1 text-sm text-gray-600">
+                  {student.parent.phone ? <div>Phone: {student.parent.phone}</div> : null}
+                  {student.parent.email ? <div>Email: {student.parent.email}</div> : null}
+                </div>
               </div>
             )}
           </div>
@@ -390,7 +410,7 @@ export default function StudentDetailPage() {
                     setNewLevelId('');
                     await fetchEnrollments(id);
                   } catch (err: any) {
-                    setError(err?.response?.data?.message || 'Failed to add enrollment');
+                    setError(toErrorString(err, 'Failed to add enrollment'));
                   } finally {
                     setAddingEnrollment(false);
                   }
@@ -422,7 +442,7 @@ export default function StudentDetailPage() {
                         await studentsService.removeEnrollment(enr.id);
                         if (id) await fetchEnrollments(id);
                       } catch (err: any) {
-                        setError(err?.response?.data?.message || 'Failed to remove enrollment');
+                        setError(toErrorString(err, 'Failed to remove enrollment'));
                       }
                     }}
                   >
@@ -540,7 +560,7 @@ export default function StudentDetailPage() {
       });
       setShowMessageModal(false);
     } catch (err: any) {
-      setMessageError(err.response?.data?.message || 'Failed to send message');
+        setMessageError(toErrorString(err, 'Failed to send message'));
     } finally {
       setSendingMessage(false);
     }
