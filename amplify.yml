@@ -31,8 +31,14 @@ frontend:
           elif [ -d "frontend" ]; then
             echo "FRONTEND_DIR=frontend" >> $AMPLIFY_ENV
           fi
+    postBuild:
+      commands:
+        - echo "Verifying artifacts location..."
+        - pwd
+        - ls -la out 2>/dev/null && echo "Found out directory" || echo "out directory not found in current location"
+        - cd .. && pwd && ls -la frontend/out 2>/dev/null && echo "Found frontend/out from parent" || echo "frontend/out not found from parent"
   artifacts:
-    baseDirectory: $FRONTEND_DIR/out
+    baseDirectory: frontend/out
     files:
       - '**/*'
   cache:
