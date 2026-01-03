@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { CreateStudentDto, UpdateStudentDto, UpdateEnrollmentDto } from './dto';
@@ -117,6 +117,12 @@ export class StudentsService {
                 include: {
                   parent: true,
                   class: true,
+                  enrollments: {
+                    include: {
+                      courseLevel: { include: { course: true } },
+                      class: true,
+                    },
+                  },
                 },
               },
             },
@@ -336,6 +342,24 @@ export class StudentsService {
 
     const level = await this.prisma.courseLevel.findFirst({ where: { id: courseLevelId, deletedAt: null } });
     if (!level) throw new NotFoundException('Course level not found');
+
+    // Check if student is already enrolled in this course level
+    const existing = await this.prisma.studentEnrollment.findFirst({
+      where: {
+        studentId,
+        courseLevelId,
+        deletedAt: null,
+      },
+      include: {
+        courseLevel: { include: { course: true } },
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        `Student is already enrolled in ${existing.courseLevel.course.name} - ${existing.courseLevel.name}`,
+      );
+    }
 
     const created = await this.prisma.studentEnrollment.create({
       data: {

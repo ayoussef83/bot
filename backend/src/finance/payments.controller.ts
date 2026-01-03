@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentAllocationDto } from './dto/create-payment-allocation.dto';
@@ -19,8 +19,8 @@ export class PaymentsController {
 
   @Get()
   @Roles('super_admin', 'management', 'accounting', 'operations')
-  async findAll() {
-    return this.paymentsService.findAll();
+  async findAll(@Query('studentId') studentId?: string) {
+    return this.paymentsService.findAll(studentId);
   }
 
   @Get(':id')

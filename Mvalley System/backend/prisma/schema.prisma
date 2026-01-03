@@ -1,84 +1,757 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
-
-// Seed script configuration
-// Run with: npm run prisma:seed
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// AUTH & USERS
-// ============================================
+model attributions {
+  id             String        @id
+  conversationId String
+  campaignId     String?
+  source         String?
+  medium         String?
+  campaignName   String?
+  content        String?
+  term           String?
+  firstTouchAt   DateTime      @default(now())
+  lastTouchAt    DateTime      @default(now())
+  touchpoints    Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime
+  campaigns      campaigns?    @relation(fields: [campaignId], references: [id])
+  conversations  conversations @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-enum UserRole {
-  super_admin
-  management
-  operations
-  accounting
-  sales
-  instructor
-  student
-  parent
-  school_admin
+  @@index([campaignId])
+  @@index([conversationId])
+  @@index([source, medium])
 }
 
-enum UserStatus {
-  active
-  inactive
-  suspended
+model audit_logs {
+  id         String      @id
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
 }
 
-model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String // hashed
+model bank_sync_runs {
+  id            String         @id
+  cashAccountId String
+  source        BankSyncSource
+  asOfDate      DateTime
+  endingBalance Float
+  fileName      String?
+  rowCount      Int?
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime       @default(now())
+  cash_accounts cash_accounts  @relation(fields: [cashAccountId], references: [id])
+
+  @@index([asOfDate])
+  @@index([cashAccountId])
+}
+
+model campaigns {
+  id               String           @id
+  name             String
+  description      String?
+  type             CampaignType
+  status           CampaignStatus   @default(active)
+  startDate        DateTime
+  endDate          DateTime?
+  budget           Float?
+  channelAccountId String
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmTerm          String?
+  utmContent       String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  spend            Float?           @default(0)
+  attributions     attributions[]
+  channel_accounts channel_accounts @relation(fields: [channelAccountId], references: [id])
+  conversations    conversations[]
+
+  @@index([channelAccountId])
+  @@index([status, startDate])
+}
+
+model cash_accounts {
+  id             String           @id
+  name           String
+  type           CashAccountType
+  accountNumber  String?
+  bankName       String?
+  balance        Float            @default(0)
+  currency       String           @default("EGP")
+  isActive       Boolean          @default(true)
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  bank_sync_runs bank_sync_runs[]
+  expenses       expenses[]
+  payments       payments[]
+
+  @@index([isActive])
+  @@index([type])
+}
+
+model channel_accounts {
+  id            String               @id
+  platform      MarketingPlatform
+  externalId    String
+  name          String
+  accessToken   String
+  refreshToken  String?
+  status        ChannelAccountStatus @default(connected)
+  connectedAt   DateTime             @default(now())
+  lastSyncAt    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime
+  settings      Json?
+  campaigns     campaigns[]
+  conversations conversations[]
+
+  @@unique([platform, externalId])
+  @@index([platform, status])
+}
+
+model classes {
+  id                    String                @id
+  name                  String
+  capacity              Int
+  instructorId          String?
+  dayOfWeek             Int
+  startTime             String
+  endTime               String
+  startDate             DateTime
+  endDate               DateTime?
+  customData            Json?
+  avgStudentsPerSession Float?                @default(0)
+  utilizationPercentage Float?                @default(0)
+  isUnderfilled         Boolean               @default(false)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime
+  deletedAt             DateTime?
+  courseLevelId         String?
+  locationName          String?
+  location              Location
+  course_levels         course_levels?        @relation(fields: [courseLevelId], references: [id])
+  instructors           instructors?          @relation(fields: [instructorId], references: [id])
+  sessions              sessions[]
+  student_enrollments   student_enrollments[]
+  students              students[]
+
+  @@index([instructorId])
+  @@index([location])
+}
+
+model conversations {
+  id                 String               @id
+  platform           MarketingPlatform
+  status             ConversationStatus   @default(new)
+  channelAccountId   String
+  participantId      String
+  campaignId         String?
+  assignedTo         String?
+  lastMessageAt      DateTime             @default(now())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  externalThreadId   String
+  firstMessageAt     DateTime             @default(now())
+  lastReadAt         DateTime?
+  leadId             String?
+  metadata           Json?
+  source             String?
+  attributions       attributions[]
+  campaigns          campaigns?           @relation(fields: [campaignId], references: [id])
+  channel_accounts   channel_accounts     @relation(fields: [channelAccountId], references: [id])
+  participants       participants         @relation(fields: [participantId], references: [id])
+  leads              leads?
+  marketing_messages marketing_messages[]
+
+  @@unique([platform, externalThreadId])
+  @@index([assignedTo])
+  @@index([campaignId])
+  @@index([channelAccountId])
+  @@index([leadId])
+  @@index([participantId])
+  @@index([status, lastMessageAt])
+}
+
+model course_levels {
+  id                  String                @id
+  courseId            String
+  name                String
+  sortOrder           Int                   @default(1)
+  isActive            Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  classes             classes[]
+  courses             courses               @relation(fields: [courseId], references: [id])
+  student_enrollments student_enrollments[]
+
+  @@unique([courseId, name])
+  @@index([courseId])
+  @@index([isActive])
+}
+
+model courses {
+  id            String          @id
+  name          String          @unique
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  deletedAt     DateTime?
+  course_levels course_levels[]
+
+  @@index([isActive])
+}
+
+model custom_field_definitions {
+  id        String            @id
+  entity    CustomFieldEntity
+  key       String
+  label     String
+  type      CustomFieldType
+  required  Boolean           @default(false)
+  options   Json?
+  order     Int               @default(0)
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime
+  deletedAt DateTime?
+  createdBy String?
+
+  @@unique([entity, key])
+  @@index([entity, isActive])
+}
+
+model expense_categories {
+  id          String     @id
+  name        String
+  code        String     @unique
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime
+  expenses    expenses[]
+
+  @@index([isActive])
+}
+
+model expenses {
+  id                 String             @id
+  expenseNumber      String             @unique
+  expenseDate        DateTime
+  paidDate           DateTime?
+  amount             Float
+  categoryId         String
+  vendor             String?
+  description        String
+  cashAccountId      String?
+  status             ExpenseStatus      @default(draft)
+  approvedBy         String?
+  approvedAt         DateTime?
+  instructorId       String?
+  periodId           String?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
+  paidBy             String?
+  receiptUrl         String?
+  sessionId          String?
+  paymentMethod      PaymentMethod?
+  cash_accounts      cash_accounts?     @relation(fields: [cashAccountId], references: [id])
+  expense_categories expense_categories @relation(fields: [categoryId], references: [id])
+  instructors        instructors?       @relation(fields: [instructorId], references: [id])
+  financial_periods  financial_periods? @relation(fields: [periodId], references: [id])
+
+  @@index([categoryId])
+  @@index([expenseDate])
+  @@index([expenseNumber])
+  @@index([instructorId])
+  @@index([periodId])
+  @@index([status])
+}
+
+model financial_periods {
+  id                     String                   @id
+  periodCode             String                   @unique
+  startDate              DateTime
+  endDate                DateTime
+  status                 FinancialPeriodStatus    @default(open)
+  closedAt               DateTime?
+  closedBy               String?
+  lockedAt               DateTime?
+  lockedBy               String?
+  notes                  String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime
+  expenses               expenses[]
+  reconciliation_records reconciliation_records[]
+
+  @@index([periodCode])
+  @@index([status])
+}
+
+model instructors {
+  id         String             @id
+  userId     String             @unique
+  costType   InstructorCostType
+  costAmount Float
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime
+  deletedAt  DateTime?
+  classes    classes[]
+  expenses   expenses[]
+  users      users              @relation(fields: [userId], references: [id])
+  sessions   sessions[]
+}
+
+model integration_configs {
+  id        String              @id
+  provider  IntegrationProvider @unique
+  isActive  Boolean             @default(true)
+  config    Json?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime
+  secrets   Json?
+}
+
+model invoices {
+  id                  String                @id
+  invoiceNumber       String                @unique
+  studentId           String?
+  classId             String?
+  subscriptionId      String?
+  issueDate           DateTime              @default(now())
+  dueDate             DateTime
+  subtotal            Float                 @default(0)
+  discountAmount      Float                 @default(0)
+  taxAmount           Float                 @default(0)
+  totalAmount         Float
+  status              InvoiceStatus         @default(issued)
+  installmentPlanId   String?
+  notes               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  students            students?             @relation(fields: [studentId], references: [id])
+  payment_allocations payment_allocations[]
+
+  @@index([dueDate])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([studentId])
+}
+
+model lead_follow_ups {
+  id             String    @id
+  leadId         String
+  notes          String
+  nextAction     String?
+  nextActionDate DateTime?
+  createdAt      DateTime  @default(now())
+  createdBy      String?
+  leads          leads     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+model leads {
+  id                      String            @id
+  firstName               String
+  lastName                String
+  email                   String?
+  phone                   String
+  source                  LeadSource
+  status                  LeadStatus        @default(new)
+  notes                   String?
+  interestedIn            LearningTrack?
+  customData              Json?
+  convertedToStudentId    String?
+  convertedAt             DateTime?
+  marketingConversationId String?           @unique
+  marketingParticipantId  String?           @unique
+  marketingCampaignId     String?
+  marketingSource         String?
+  marketingMedium         String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime
+  deletedAt               DateTime?
+  createdBy               String?
+  convertedToParentId     String?
+  lead_follow_ups         lead_follow_ups[]
+  parents                 parents?          @relation(fields: [convertedToParentId], references: [id])
+  conversations           conversations?    @relation(fields: [marketingConversationId], references: [id])
+  participants            participants?     @relation(fields: [marketingParticipantId], references: [id])
+
+  @@index([convertedToParentId])
+  @@index([phone])
+  @@index([source])
+  @@index([status])
+}
+
+model marketing_messages {
+  id                String           @id
+  conversationId    String
+  externalMessageId String
+  direction         MessageDirection
+  type              MessageType      @default(text)
+  content           String?
+  mediaUrl          String?
+  sentAt            DateTime         @default(now())
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  senderId          String?
+  metadata          Json?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime
+  conversations     conversations    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, sentAt])
+  @@index([direction, sentAt])
+  @@index([externalMessageId])
+}
+
+model message_templates {
+  id        String         @id
+  channel   MessageChannel
+  key       String
+  name      String
+  subject   String?
+  body      String
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime
+  deletedAt DateTime?
+  createdBy String?
+
+  @@unique([channel, key])
+  @@index([channel, isActive])
+}
+
+model monthly_snapshots {
+  id                    String   @id
+  year                  Int
+  month                 Int
+  totalRevenue          Float    @default(0)
+  subscriptionRevenue   Float    @default(0)
+  campRevenue           Float    @default(0)
+  b2bRevenue            Float    @default(0)
+  totalExpenses         Float    @default(0)
+  rentExpenses          Float    @default(0)
+  instructorExpenses    Float    @default(0)
+  marketingExpenses     Float    @default(0)
+  operationsExpenses    Float    @default(0)
+  activeStudents        Int      @default(0)
+  avgStudentsPerSession Float    @default(0)
+  instructorUtilization Float    @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime
+
+  @@unique([year, month])
+  @@index([year, month])
+}
+
+model notifications {
+  id           String              @id
+  channel      NotificationChannel
+  recipient    String
+  template     String?
+  subject      String?
+  message      String
+  payload      String?
+  status       NotificationStatus  @default(pending)
+  sentAt       DateTime?
+  errorMessage String?
+  scheduledAt  DateTime?
+  studentId    String?
+  leadId       String?
+  parentId     String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime
+
+  @@index([channel])
+  @@index([leadId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([studentId])
+}
+
+model parents {
+  id        String     @id
   firstName String
   lastName  String
-  role      UserRole
-  status    UserStatus @default(active)
+  email     String?
+  phone     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  deletedAt DateTime?
+  address   String?
+  userId    String?    @unique
+  leads     leads[]
+  users     users?     @relation(fields: [userId], references: [id])
+  students  students[]
 
-  // Relations
-  instructorProfile Instructor?
-  studentProfile    Student?
-  parentProfile     Parent?
+  @@index([phone])
+}
 
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // Soft delete
+model participants {
+  id                String          @id
+  name              String?
+  phone             String?
+  email             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime
+  firstSeenAt       DateTime        @default(now())
+  lastSeenAt        DateTime        @default(now())
+  leadId            String?
+  platformUserId    String?
+  profilePictureUrl String?
+  type              ParticipantType @default(unknown)
+  conversations     conversations[]
+  leads             leads?
+
+  @@index([email])
+  @@index([phone])
+  @@index([platformUserId])
+  @@index([type, leadId])
+}
+
+model payment_allocations {
+  id          String   @id
+  paymentId   String
+  invoiceId   String
+  amount      Float
+  allocatedAt DateTime @default(now())
+  allocatedBy String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  invoices    invoices @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payments    payments @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([paymentId])
+}
+
+model payments {
+  id                  String                @id
+  paymentNumber       String                @unique
+  receivedDate        DateTime              @default(now())
+  amount              Float
+  method              PaymentMethod
+  cashAccountId       String
+  referenceNumber     String?
+  receivedBy          String?
+  status              PaymentStatus         @default(received)
+  reversedAt          DateTime?
+  reversalReason      String?
+  notes               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  studentId           String?
+  payment_allocations payment_allocations[]
+  cash_accounts       cash_accounts         @relation(fields: [cashAccountId], references: [id])
+  students            students?             @relation(fields: [studentId], references: [id])
+
+  @@index([cashAccountId])
+  @@index([paymentNumber])
+  @@index([receivedDate])
+  @@index([status])
+}
+
+model reconciliation_records {
+  id                   String             @id
+  reconciliationNumber String             @unique
+  periodId             String
+  reconciliationDate   DateTime
+  type                 ReconciliationType
+  amount               Float
+  description          String
+  reconciledBy         String?
+  approvedBy           String?
+  approvedAt           DateTime?
+  relatedInvoiceId     String?
+  relatedPaymentId     String?
+  relatedExpenseId     String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime
+  notes                String?
+  financial_periods    financial_periods  @relation(fields: [periodId], references: [id])
+
+  @@index([periodId])
+  @@index([reconciliationDate])
+  @@index([reconciliationNumber])
+  @@index([type])
+}
+
+model session_attendances {
+  id        String   @id
+  sessionId String
+  studentId String
+  attended  Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  sessions  sessions @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  students  students @relation(fields: [studentId], references: [id])
+
+  @@unique([sessionId, studentId])
+  @@index([sessionId])
+  @@index([studentId])
+}
+
+model sessions {
+  id                  String                @id
+  classId             String
+  scheduledDate       DateTime
+  startTime           DateTime
+  endTime             DateTime
+  instructorId        String?
+  status              String                @default("scheduled")
+  instructorConfirmed Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  notes               String?
+  room                String?
+  session_attendances session_attendances[]
+  classes             classes               @relation(fields: [classId], references: [id])
+  instructors         instructors?          @relation(fields: [instructorId], references: [id])
+
+  @@index([classId])
+  @@index([instructorId])
+  @@index([scheduledDate])
+}
+
+model student_enrollments {
+  id            String        @id
+  studentId     String
+  courseLevelId String
+  classId       String?
+  status        String        @default("active")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  classes       classes?      @relation(fields: [classId], references: [id])
+  course_levels course_levels @relation(fields: [courseLevelId], references: [id])
+  students      students      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseLevelId])
+  @@index([classId])
+  @@index([courseLevelId])
+  @@index([studentId])
+}
+
+model students {
+  id                  String                @id
+  userId              String?               @unique
+  firstName           String
+  lastName            String
+  age                 Int
+  learningTrack       LearningTrack
+  status              StudentStatus         @default(active)
+  email               String?
+  phone               String?
+  parentId            String?
+  classId             String?
+  customData          Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  invoices            invoices[]
+  payments            payments[]
+  session_attendances session_attendances[]
+  student_enrollments student_enrollments[]
+  classes             classes?              @relation(fields: [classId], references: [id])
+  parents             parents?              @relation(fields: [parentId], references: [id])
+  users               users?                @relation(fields: [userId], references: [id])
+
+  @@index([classId])
+  @@index([parentId])
+  @@index([status])
+}
+
+model users {
+  id          String       @id
+  email       String       @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        UserRole
+  status      UserStatus   @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  deletedAt   DateTime?
+  instructors instructors?
+  parents     parents?
+  students    students?
 
   @@index([email])
   @@index([role])
-  @@map("users")
 }
 
-// ============================================
-// STUDENTS
-// ============================================
+enum AuditAction {
+  create
+  update
+  delete
+  view
+  login
+  logout
+}
 
-enum StudentStatus {
+enum BankSyncSource {
+  manual
+  csv_upload
+}
+
+enum CampaignStatus {
   active
   paused
-  finished
+  completed
 }
 
-enum LearningTrack {
-  AI
-  robotics
-  coding
-  general
+enum CampaignType {
+  organic_post
+  paid_ad
+  story
+  reel
+  whatsapp_broadcast
 }
 
-// ============================================
-// SYSTEM SETTINGS (Custom Fields)
-// ============================================
+enum CashAccountType {
+  bank
+  cash
+  wallet
+}
+
+enum ChannelAccountStatus {
+  connected
+  disconnected
+  error
+}
+
+enum ConversationStatus {
+  new
+  in_progress
+  waiting_reply
+  converted
+  archived
+}
 
 enum CustomFieldEntity {
   student
@@ -95,368 +768,13 @@ enum CustomFieldType {
   select
 }
 
-// ============================================
-// COMMUNICATION SETTINGS (Email/SMS) + TEMPLATES
-// ============================================
-
-enum IntegrationProvider {
-  zoho_email
-  smsmisr
-}
-
-enum MessageChannel {
-  email
-  sms
-}
-
-model IntegrationConfig {
-  id       String              @id @default(uuid())
-  provider IntegrationProvider @unique
-  isActive Boolean             @default(true)
-
-  // Non-secret config (safe to return to UI)
-  config Json?
-
-  // Secret config (passwords / tokens). We will NOT return this to UI.
-  secrets Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("integration_configs")
-}
-
-model MessageTemplate {
-  id       String         @id @default(uuid())
-  channel  MessageChannel
-  key      String // unique per channel, e.g. "payment_due_reminder"
-  name     String
-  subject  String? // email only
-  body     String // template string
-  isActive Boolean        @default(true)
-
-  createdBy String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@unique([channel, key])
-  @@index([channel, isActive])
-  @@map("message_templates")
-}
-
-model CustomFieldDefinition {
-  id       String            @id @default(uuid())
-  entity   CustomFieldEntity
-  key      String // machine key (unique per entity)
-  label    String
-  type     CustomFieldType
-  required Boolean           @default(false)
-  options  Json? // for select: { choices: ["A","B"] }
-  order    Int               @default(0)
-  isActive Boolean           @default(true)
-
-  createdBy String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@unique([entity, key])
-  @@index([entity, isActive])
-  @@map("custom_field_definitions")
-}
-
-model Student {
-  id            String        @id @default(uuid())
-  userId        String?       @unique // Link to User if they have account
-  firstName     String
-  lastName      String
-  age           Int
-  learningTrack LearningTrack
-  status        StudentStatus @default(active)
-
-  // Contact
-  email String?
-  phone String?
-
-  // Custom attributes (admin-defined)
-  customData Json?
-
-  // Parent info
-  parentId String?
-  parent   Parent? @relation(fields: [parentId], references: [id])
-
-  // Class assignment
-  classId String?
-  class   Class?  @relation(fields: [classId], references: [id])
-
-  // Relations
-  user        User?               @relation(fields: [userId], references: [id])
-  payments    Payment[]
-  invoices    Invoice[]
-  attendances SessionAttendance[]
-  enrollments StudentEnrollment[]
-
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@index([classId])
-  @@index([parentId])
-  @@index([status])
-  @@map("students")
-}
-
-model Parent {
-  id        String  @id @default(uuid())
-  userId    String? @unique
-  firstName String
-  lastName  String
-  email     String?
-  phone     String
-  address   String?
-
-  // Relations
-  user     User?     @relation(fields: [userId], references: [id])
-  students Student[]
-  convertedLeads Lead[] @relation("LeadConvertedParent")
-
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@index([phone])
-  @@map("parents")
-}
-
-// ============================================
-// CLASSES & SESSIONS
-// ============================================
-
-enum Location {
-  MOA
-  Espace
-  SODIC
-  PalmHills
-}
-
-model Course {
-  id       String @id @default(uuid())
-  name     String @unique
-  isActive Boolean @default(true)
-
-  levels CourseLevel[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  @@index([isActive])
-  @@map("courses")
-}
-
-model CourseLevel {
-  id       String @id @default(uuid())
-  courseId String
-  course   Course  @relation(fields: [courseId], references: [id])
-
-  name      String // e.g. "Level 1", "Beginner"
-  sortOrder Int    @default(1)
-  isActive  Boolean @default(true)
-
-  // Relations
-  classes      Class[]
-  enrollments  StudentEnrollment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  @@unique([courseId, name])
-  @@index([courseId])
-  @@index([isActive])
-  @@map("course_levels")
-}
-
-model StudentEnrollment {
-  id           String @id @default(uuid())
-  studentId    String
-  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  courseLevelId String
-  courseLevel  CourseLevel @relation(fields: [courseLevelId], references: [id])
-
-  // Allocation to a specific scheduled group (Class)
-  classId String?
-  class   Class? @relation(fields: [classId], references: [id])
-
-  status String @default("active") // active, paused, completed
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([studentId, courseLevelId])
-  @@index([studentId])
-  @@index([courseLevelId])
-  @@index([classId])
-  @@map("student_enrollments")
-}
-
-model Class {
-  id           String      @id @default(uuid())
-  name         String
-  location     Location
-  // Dynamic location (user-managed). Backfilled from enum `location`.
-  locationName String?
-  capacity     Int
-  instructorId String?
-  instructor   Instructor? @relation(fields: [instructorId], references: [id])
-
-  // Link to Course Level (Course -> Level -> Class group)
-  courseLevelId String?
-  courseLevel   CourseLevel? @relation(fields: [courseLevelId], references: [id])
-
-  // Schedule (recurring pattern)
-  dayOfWeek Int // 0 = Sunday, 1 = Monday, etc.
-  startTime String // HH:mm format
-  endTime   String // HH:mm format
-  startDate DateTime
-  endDate   DateTime?
-
-  // Custom attributes (admin-defined)
-  customData Json?
-
-  // Relations
-  students Student[]
-  sessions Session[]
-  enrollments StudentEnrollment[]
-
-  // Auto-calculated (cached)
-  avgStudentsPerSession Float?  @default(0)
-  utilizationPercentage Float?  @default(0)
-  isUnderfilled         Boolean @default(false)
-
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@index([instructorId])
-  @@index([location])
-  @@map("classes")
-}
-
-model Session {
-  id      String @id @default(uuid())
-  classId String
-  class   Class  @relation(fields: [classId], references: [id])
-
-  scheduledDate DateTime
-  startTime     DateTime
-  endTime       DateTime
-
-  instructorId String?
-  instructor   Instructor? @relation(fields: [instructorId], references: [id])
-
-  room String?
-  notes String?
-
-  // Status
-  status              String  @default("scheduled") // scheduled, completed, cancelled
-  instructorConfirmed Boolean @default(false)
-
-  // Relations
-  attendances SessionAttendance[]
-
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@index([classId])
-  @@index([instructorId])
-  @@index([scheduledDate])
-  @@map("sessions")
-}
-
-model SessionAttendance {
-  id        String  @id @default(uuid())
-  sessionId String
-  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  studentId String
-  student   Student @relation(fields: [studentId], references: [id])
-
-  attended Boolean @default(false)
-  notes    String?
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([sessionId, studentId])
-  @@index([sessionId])
-  @@index([studentId])
-  @@map("session_attendances")
-}
-
-// ============================================
-// INSTRUCTORS
-// ============================================
-
-enum InstructorCostType {
-  hourly
-  monthly
-}
-
-model Instructor {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
-
-  // Cost
-  costType   InstructorCostType
-  costAmount Float // hourly rate or monthly salary
-
-  // Relations
-  classes  Class[]
-  sessions Session[]
-  expenses Expense[]
-
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  @@map("instructors")
-}
-
-// ============================================
-// FINANCE
-// ============================================
-
-enum InvoiceStatus {
-  draft
-  issued
-  partially_paid
-  paid
-  overdue
-  cancelled
-}
-
-enum PaymentMethod {
-  cash
-  bank_transfer
-  vodafone_cash
-  instapay
-  pos
-}
-
-enum PaymentStatus {
-  pending
-  received
-  reversed
-  failed
+enum ExpenseCategoryType {
+  instructor_payouts
+  rent
+  marketing
+  utilities
+  operations
+  other
 }
 
 enum ExpenseStatus {
@@ -467,602 +785,30 @@ enum ExpenseStatus {
   reversed
 }
 
-enum ExpenseCategoryType {
-  instructor_payouts
-  rent
-  marketing
-  utilities
-  operations
-  other
-}
-
-enum CashAccountType {
-  bank
-  cash
-  wallet
-}
-
 enum FinancialPeriodStatus {
   open
   closed
   locked
 }
 
-enum ReconciliationType {
-  adjustment
-  correction
-  write_off
-  reversal
+enum InstructorCostType {
+  hourly
+  monthly
 }
 
-enum BankSyncSource {
-  manual
-  csv_upload
+enum IntegrationProvider {
+  zoho_email
+  smsmisr
 }
 
-// Invoice (Logical, Internal) - Expected Revenue
-model Invoice {
-  id             String   @id @default(uuid())
-  invoiceNumber  String   @unique // Auto-generated: INV-YYYY-MM-####
-  studentId      String?
-  student        Student? @relation(fields: [studentId], references: [id])
-  classId        String? // Optional, for class-based invoices
-  subscriptionId String? // Optional, for recurring invoices
-
-  issueDate DateTime @default(now())
-  dueDate   DateTime
-
-  subtotal       Float @default(0)
-  discountAmount Float @default(0)
-  taxAmount      Float @default(0)
-  totalAmount    Float
-
-  status InvoiceStatus @default(issued)
-
-  installmentPlanId String? // Optional, for installment plans (future)
-
-  notes String?
-
-  // Relations
-  paymentAllocations PaymentAllocation[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([studentId])
-  @@index([status])
-  @@index([dueDate])
-  @@index([invoiceNumber])
-  @@map("invoices")
+enum InvoiceStatus {
+  draft
+  issued
+  partially_paid
+  paid
+  overdue
+  cancelled
 }
-
-// Payment (Actual Cash Received)
-model Payment {
-  id            String        @id @default(uuid())
-  paymentNumber String        @unique // Auto-generated: PAY-YYYY-MM-####
-  receivedDate  DateTime      @default(now())
-  amount        Float
-  method        PaymentMethod
-  cashAccountId String
-  cashAccount   CashAccount   @relation(fields: [cashAccountId], references: [id])
-
-  referenceNumber String? // Bank reference, transaction ID, receipt number
-  receivedBy      String? // User ID who recorded the payment
-  status          PaymentStatus @default(received)
-
-  reversedAt     DateTime?
-  reversalReason String?
-
-  notes String?
-
-  // Relations
-  allocations PaymentAllocation[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Student   Student? @relation(fields: [studentId], references: [id])
-  studentId String?
-
-  @@index([cashAccountId])
-  @@index([status])
-  @@index([receivedDate])
-  @@index([paymentNumber])
-  @@map("payments")
-}
-
-// Payment Allocation (Links Payments to Invoices)
-model PaymentAllocation {
-  id        String  @id @default(uuid())
-  paymentId String
-  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  amount      Float
-  allocatedAt DateTime @default(now())
-  allocatedBy String? // User ID who created allocation
-  notes       String?
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([paymentId])
-  @@index([invoiceId])
-  @@map("payment_allocations")
-}
-
-// Expense Category
-model ExpenseCategory {
-  id          String  @id @default(uuid())
-  name        String
-  code        String  @unique // e.g., "INSTR", "RENT", "MKTG"
-  description String?
-  isActive    Boolean @default(true)
-
-  // Relations
-  expenses Expense[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@map("expense_categories")
-}
-
-// Expense (Actual Cash Paid Out)
-model Expense {
-  id            String          @id @default(uuid())
-  expenseNumber String          @unique // Auto-generated: EXP-YYYY-MM-####
-  expenseDate   DateTime
-  paidDate      DateTime? // Null if unpaid
-  amount        Float
-  categoryId    String
-  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
-
-  description   String
-  vendor        String? // Vendor/payee name
-  paymentMethod PaymentMethod?
-
-  cashAccountId String? // Where money was paid from
-  cashAccount   CashAccount? @relation(fields: [cashAccountId], references: [id])
-
-  paidBy String? // User ID who recorded payment
-
-  status ExpenseStatus @default(draft)
-
-  approvedBy String? // User ID who approved
-  approvedAt DateTime?
-
-  instructorId String? // If instructor payout
-  instructor   Instructor? @relation(fields: [instructorId], references: [id])
-  sessionId    String? // If session-based instructor payout
-
-  periodId String? // Financial Period
-  period   FinancialPeriod? @relation(fields: [periodId], references: [id])
-
-  notes      String?
-  receiptUrl String? // Receipt/document URL (future)
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([categoryId])
-  @@index([status])
-  @@index([expenseDate])
-  @@index([periodId])
-  @@index([instructorId])
-  @@index([expenseNumber])
-  @@map("expenses")
-}
-
-// Cash Account (Bank, Cash Register, Wallet)
-model CashAccount {
-  id            String          @id @default(uuid())
-  name          String
-  type          CashAccountType
-  accountNumber String? // Bank account number or identifier
-  bankName      String? // Bank name (if type is bank)
-  balance       Float           @default(0) // Calculated from payments and expenses
-  currency      String          @default("EGP")
-  isActive      Boolean         @default(true)
-
-  notes String?
-
-  // Relations
-  payments Payment[]
-  expenses Expense[]
-  bankSyncRuns BankSyncRun[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([type])
-  @@index([isActive])
-  @@map("cash_accounts")
-}
-
-model BankSyncRun {
-  id            String         @id @default(uuid())
-  cashAccountId String
-  cashAccount   CashAccount    @relation(fields: [cashAccountId], references: [id])
-
-  source        BankSyncSource
-  asOfDate      DateTime
-  endingBalance Float
-
-  fileName String?
-  rowCount Int?
-  notes    String?
-  createdBy String?
-
-  createdAt DateTime @default(now())
-
-  @@index([cashAccountId])
-  @@index([asOfDate])
-  @@map("bank_sync_runs")
-}
-
-// Financial Period (Monthly)
-model FinancialPeriod {
-  id         String                @id @default(uuid())
-  periodCode String                @unique // Format: "YYYY-MM"
-  startDate  DateTime
-  endDate    DateTime
-  status     FinancialPeriodStatus @default(open)
-
-  closedAt DateTime?
-  closedBy String? // User ID who closed the period
-
-  lockedAt DateTime?
-  lockedBy String? // User ID who locked the period
-
-  notes String?
-
-  // Relations
-  expenses        Expense[]
-  reconciliations ReconciliationRecord[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([periodCode])
-  @@index([status])
-  @@map("financial_periods")
-}
-
-// Reconciliation Record
-model ReconciliationRecord {
-  id                   String          @id @default(uuid())
-  reconciliationNumber String          @unique // Auto-generated: REC-YYYY-MM-####
-  periodId             String
-  period               FinancialPeriod @relation(fields: [periodId], references: [id])
-
-  reconciliationDate DateTime
-  type               ReconciliationType
-  amount             Float // Positive or negative
-  description        String
-
-  reconciledBy String? // User ID who performed reconciliation
-  approvedBy   String? // User ID who approved reconciliation
-  approvedAt   DateTime?
-
-  relatedInvoiceId String? // Optional link to Invoice
-  relatedPaymentId String? // Optional link to Payment
-  relatedExpenseId String? // Optional link to Expense
-
-  notes String?
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([periodId])
-  @@index([type])
-  @@index([reconciliationDate])
-  @@index([reconciliationNumber])
-  @@map("reconciliation_records")
-}
-
-model MonthlySnapshot {
-  id    String @id @default(uuid())
-  year  Int
-  month Int // 1-12
-
-  // Revenue
-  totalRevenue        Float @default(0)
-  subscriptionRevenue Float @default(0)
-  campRevenue         Float @default(0)
-  b2bRevenue          Float @default(0)
-
-  // Expenses
-  totalExpenses      Float @default(0)
-  rentExpenses       Float @default(0)
-  instructorExpenses Float @default(0)
-  marketingExpenses  Float @default(0)
-  operationsExpenses Float @default(0)
-
-  // Metrics
-  activeStudents        Int   @default(0)
-  avgStudentsPerSession Float @default(0)
-  instructorUtilization Float @default(0)
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([year, month], name: "year_month")
-  @@index([year, month])
-  @@map("monthly_snapshots")
-}
-
-// ============================================
-// MARKETING
-// ============================================
-
-enum MarketingPlatform {
-  facebook_page
-  instagram_business
-  whatsapp_business
-}
-
-enum ChannelAccountStatus {
-  connected
-  disconnected
-  error
-}
-
-model ChannelAccount {
-  id           String               @id @default(uuid())
-  platform     MarketingPlatform
-  externalId   String // Meta Page ID, WhatsApp Business Number
-  name         String
-  accessToken  String               @db.Text // Encrypted
-  refreshToken String?              @db.Text // Encrypted
-  status       ChannelAccountStatus @default(connected)
-
-  // Settings
-  settings Json? // Auto-reply, business hours, etc.
-
-  // Relations
-  conversations Conversation[]
-  campaigns     Campaign[]
-
-  // Audit
-  connectedAt DateTime  @default(now())
-  lastSyncAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@unique([platform, externalId])
-  @@index([platform, status])
-  @@map("channel_accounts")
-}
-
-enum CampaignType {
-  organic_post
-  paid_ad
-  story
-  reel
-  whatsapp_broadcast
-}
-
-enum CampaignStatus {
-  active
-  paused
-  completed
-}
-
-model Campaign {
-  id          String         @id @default(uuid())
-  name        String
-  description String?
-  type        CampaignType
-  status      CampaignStatus @default(active)
-
-  // Dates
-  startDate DateTime
-  endDate   DateTime?
-
-  // Budget (if paid)
-  budget Float?
-  spend  Float? @default(0)
-
-  // Attribution
-  channelAccountId String
-  channelAccount   ChannelAccount @relation(fields: [channelAccountId], references: [id])
-
-  // UTM Parameters
-  utmSource   String?
-  utmMedium   String?
-  utmCampaign String?
-  utmContent  String?
-  utmTerm     String?
-
-  // Relations
-  conversations Conversation[]
-  attributions  Attribution[]
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status, startDate])
-  @@index([channelAccountId])
-  @@map("campaigns")
-}
-
-enum ParticipantType {
-  unknown
-  lead
-  parent
-  school
-}
-
-model Participant {
-  id                String          @id @default(uuid())
-  type              ParticipantType @default(unknown)
-  platformUserId    String? // Meta user ID, WhatsApp number
-  name              String?
-  profilePictureUrl String?
-  phone             String?
-  email             String?
-
-  // Relations
-  conversations Conversation[]
-  leadId        String? // After conversion
-  lead          Lead?          @relation("LeadMarketingParticipant")
-
-  // Audit
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([type, leadId])
-  @@index([platformUserId])
-  @@index([phone])
-  @@index([email])
-  @@map("participants")
-}
-
-enum ConversationStatus {
-  new
-  in_progress
-  waiting_reply
-  converted
-  archived
-}
-
-model Conversation {
-  id               String            @id @default(uuid())
-  channelAccountId String
-  channelAccount   ChannelAccount    @relation(fields: [channelAccountId], references: [id])
-  platform         MarketingPlatform
-  externalThreadId String // Meta thread ID, WhatsApp conversation ID
-  participantId    String
-  participant      Participant       @relation(fields: [participantId], references: [id])
-
-  status     ConversationStatus @default(new)
-  assignedTo String? // User ID
-  campaignId String? // Attribution
-  campaign   Campaign?          @relation(fields: [campaignId], references: [id])
-
-  // Source tracking
-  source String? // page_comment, dm, messenger, story_reply, etc.
-
-  // Lead link (after conversion)
-  leadId String?
-  lead   Lead?   @relation("ConversationLead")
-
-  // Metadata
-  metadata Json? // Post URL, story ID, ad ID, etc.
-
-  // Relations
-  messages     Message[]
-  attributions Attribution[]
-
-  // Timestamps
-  firstMessageAt DateTime  @default(now())
-  lastMessageAt  DateTime  @default(now())
-  lastReadAt     DateTime?
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([platform, externalThreadId])
-  @@index([status, lastMessageAt])
-  @@index([participantId])
-  @@index([channelAccountId])
-  @@index([campaignId])
-  @@index([leadId])
-  @@index([assignedTo])
-  @@map("conversations")
-}
-
-enum MessageDirection {
-  inbound
-  outbound
-}
-
-enum MessageType {
-  text
-  image
-  video
-  audio
-  file
-  sticker
-  location
-}
-
-model Message {
-  id                String           @id @default(uuid())
-  conversationId    String
-  conversation      Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  externalMessageId String // Meta message ID, WhatsApp message ID
-  direction         MessageDirection
-  type              MessageType      @default(text)
-  content           String?          @db.Text
-  mediaUrl          String?
-  sentAt            DateTime         @default(now())
-  deliveredAt       DateTime?
-  readAt            DateTime?
-
-  // Sender
-  senderId String? // Participant ID if inbound, User ID if outbound
-
-  // Metadata
-  metadata Json? // Read receipts, delivery status, etc.
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([conversationId, sentAt])
-  @@index([externalMessageId])
-  @@index([direction, sentAt])
-  @@map("marketing_messages")
-}
-
-model Attribution {
-  id             String       @id @default(uuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  campaignId     String?
-  campaign       Campaign?    @relation(fields: [campaignId], references: [id])
-
-  // Attribution data
-  source       String? // facebook_page, instagram_post, whatsapp_broadcast, organic_search, referral
-  medium       String? // social, messaging, paid_ad, organic
-  campaignName String? // Campaign name (for non-campaign sources)
-  content      String? // Post ID, ad ID, story ID
-  term         String? // Keyword if applicable
-
-  // Touchpoints
-  firstTouchAt DateTime @default(now())
-  lastTouchAt  DateTime @default(now())
-  touchpoints  Json? // Array of touchpoints before conversion
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([conversationId])
-  @@index([campaignId])
-  @@index([source, medium])
-  @@map("attributions")
-}
-
-// ============================================
-// SALES (CRM)
-// ============================================
 
 enum LeadSource {
   website
@@ -1081,72 +827,45 @@ enum LeadStatus {
   lost
 }
 
-model Lead {
-  id        String     @id @default(uuid())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String
-  source    LeadSource
-  status    LeadStatus @default(new)
-
-  // Details
-  notes        String?
-  interestedIn LearningTrack?
-  // Custom attributes (admin-defined)
-  customData   Json?
-
-  // Conversion
-  convertedToStudentId String?
-  convertedToParentId  String?
-  convertedParent      Parent?    @relation("LeadConvertedParent", fields: [convertedToParentId], references: [id])
-  convertedAt          DateTime?
-
-  // Marketing Attribution (from Marketing module)
-  marketingConversationId String? @unique // Link to Marketing conversation
-  marketingParticipantId  String? @unique // Link to Marketing participant
-  marketingCampaignId     String? // Link to Marketing campaign
-  marketingSource         String? // Source from Marketing (facebook_page, instagram, etc.)
-  marketingMedium         String? // Medium from Marketing (social, messaging, etc.)
-
-  // Relations
-  followUps             LeadFollowUp[]
-  marketingConversation Conversation?  @relation("ConversationLead", fields: [marketingConversationId], references: [id])
-  marketingParticipant  Participant?   @relation("LeadMarketingParticipant", fields: [marketingParticipantId], references: [id])
-
-  // Audit
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  createdBy String? // User ID (sales person)
-
-  @@index([status])
-  @@index([source])
-  @@index([phone])
-  @@index([convertedToParentId])
-  @@map("leads")
+enum LearningTrack {
+  AI
+  robotics
+  coding
+  general
 }
 
-model LeadFollowUp {
-  id     String @id @default(uuid())
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  notes          String
-  nextAction     String?
-  nextActionDate DateTime?
-
-  // Audit
-  createdAt DateTime @default(now())
-  createdBy String? // User ID
-
-  @@index([leadId])
-  @@map("lead_follow_ups")
+enum Location {
+  MOA
+  Espace
+  SODIC
+  PalmHills
 }
 
-// ============================================
-// NOTIFICATIONS
-// ============================================
+enum MarketingPlatform {
+  facebook_page
+  instagram_business
+  whatsapp_business
+}
+
+enum MessageChannel {
+  email
+  sms
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+}
+
+enum MessageType {
+  text
+  image
+  video
+  audio
+  file
+  sticker
+  location
+}
 
 enum NotificationChannel {
   email
@@ -1160,66 +879,55 @@ enum NotificationStatus {
   failed
 }
 
-model Notification {
-  id        String              @id @default(uuid())
-  channel   NotificationChannel
-  recipient String // email, phone, etc.
-  template  String? // Template identifier
-  subject   String?
-  message   String
-
-  status       NotificationStatus @default(pending)
-  sentAt       DateTime?
-  errorMessage String?
-  scheduledAt  DateTime? // For scheduled one-time messages
-
-  // Links
-  studentId String?
-  leadId    String?
-  parentId  String?
-
-  // Payload (JSON)
-  payload String? // JSON string for template variables
-
-  // Audit
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([status])
-  @@index([channel])
-  @@index([studentId])
-  @@index([leadId])
-  @@index([scheduledAt])
-  @@map("notifications")
+enum ParticipantType {
+  unknown
+  lead
+  parent
+  school
 }
 
-// ============================================
-// AUDIT LOG
-// ============================================
-
-enum AuditAction {
-  create
-  update
-  delete
-  view
-  login
-  logout
+enum PaymentMethod {
+  cash
+  bank_transfer
+  vodafone_cash
+  instapay
+  pos
 }
 
-model AuditLog {
-  id         String      @id @default(uuid())
-  userId     String?
-  action     AuditAction
-  entityType String // e.g., "Student", "Payment"
-  entityId   String?
-  changes    String? // JSON string of changes
-  ipAddress  String?
-  userAgent  String?
+enum PaymentStatus {
+  pending
+  received
+  reversed
+  failed
+}
 
-  createdAt DateTime @default(now())
+enum ReconciliationType {
+  adjustment
+  correction
+  write_off
+  reversal
+}
 
-  @@index([userId])
-  @@index([entityType, entityId])
-  @@index([createdAt])
-  @@map("audit_logs")
+enum StudentStatus {
+  active
+  paused
+  finished
+}
+
+enum UserRole {
+  super_admin
+  management
+  operations
+  accounting
+  sales
+  instructor
+  student
+  parent
+  school_admin
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
 }

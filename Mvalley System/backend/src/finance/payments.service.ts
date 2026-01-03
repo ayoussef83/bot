@@ -57,11 +57,13 @@ export class PaymentsService {
     });
   }
 
-  async findAll() {
+  async findAll(studentId?: string) {
     return this.prisma.payment.findMany({
+      where: studentId ? { studentId } : undefined,
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,
+        student: true, // Include student directly
         allocations: {
           include: {
             invoice: {

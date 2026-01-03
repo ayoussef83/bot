@@ -344,13 +344,26 @@ export default function StudentsPage() {
       },
     },
     {
-      key: 'class',
+      key: 'course',
       label: 'Course',
-      render: (_, row) => (
-        <span className="text-sm text-gray-500">
-          <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
-        </span>
-      ),
+      render: (_, row) => {
+        const enrollments = row.enrollments || [];
+        if (enrollments.length === 0) {
+          return <span className="text-sm text-gray-500">-</span>;
+        }
+        const courseNames = enrollments
+          .map((enr: any) => enr.courseLevel?.course?.name || enr.courseLevel?.name || 'Unknown')
+          .filter((name: string) => name !== 'Unknown');
+        if (courseNames.length === 0) {
+          return <span className="text-sm text-gray-500">-</span>;
+        }
+        const displayText = courseNames.join(', ');
+        return (
+          <span className="text-sm text-gray-500">
+            <HighlightedText text={displayText} query={searchTerm} />
+          </span>
+        );
+      },
     },
   ];
 
@@ -427,15 +440,35 @@ export default function StudentsPage() {
                         {checkingPhone ? (
                           <span>Checking phone…</span>
                         ) : phoneGate === 'found' ? (
-                          <div className="bg-green-50 border border-green-200 rounded p-2">
+                          <div className="bg-green-50 border border-green-200 rounded p-3 space-y-2">
                             <div className="font-medium text-green-800">
-                              Existing parent found: {parentLookup?.parent?.firstName}{' '}
+                              ✓ Existing parent found: {parentLookup?.parent?.firstName}{' '}
                               {parentLookup?.parent?.lastName}
                             </div>
-                            <div className="text-green-700">
-                              Students: {(parentLookup?.parent?.students || [])
-                                .map((s: any) => `${s.firstName} ${s.lastName}`)
-                                .join(', ') || '—'}
+                            {(parentLookup?.parent?.students || []).length > 0 ? (
+                              <div className="text-green-700">
+                                <div className="font-medium mb-1">Existing students:</div>
+                                <div className="space-y-1">
+                                  {(parentLookup?.parent?.students || []).map((s: any) => (
+                                    <a
+                                      key={s.id}
+                                      href={`/dashboard/students/details?id=${s.id}`}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        router.push(`/dashboard/students/details?id=${s.id}`);
+                                      }}
+                                      className="block text-indigo-600 hover:text-indigo-900 hover:underline"
+                                    >
+                                      → {s.firstName} {s.lastName}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-green-700">No existing students</div>
+                            )}
+                            <div className="text-green-800 font-medium mt-2 pt-2 border-t border-green-200">
+                              Adding a new student to this parent
                             </div>
                           </div>
                         ) : phoneGate === 'new' && formData.phone.trim().length >= 7 ? (
