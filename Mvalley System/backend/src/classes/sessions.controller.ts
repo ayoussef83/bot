@@ -47,7 +47,7 @@ export class SessionsController {
     // Instructors only see their own sessions
     if (user?.role === 'instructor' && !instructorId) {
       // Get instructor ID from user
-      const instructor = await this.prisma.instructor.findUnique({
+      const instructor = await this.prisma.instructors.findUnique({
         where: { userId: user.id },
       });
       return this.sessionsService.findAll(classId, instructor?.id);
@@ -79,7 +79,7 @@ export class SessionsController {
   @Post(':id/confirm')
   @Roles(UserRole.instructor, UserRole.operations)
   async confirmAttendance(@Param('id') id: string, @CurrentUser() user: any) {
-    const instructor = await this.prisma.instructor.findUnique({
+    const instructor = await this.prisma.instructors.findUnique({
       where: { userId: user.id },
     });
     return this.sessionsService.confirmAttendance(id, instructor?.id || '');

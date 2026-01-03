@@ -24,18 +24,18 @@ export class ClassesService {
     // Ensure a matching Course + default Level exists so "Courses" dropdowns show newly created courses like "Python".
     const courseName = (data.name || '').trim();
     if (!courseName) throw new BadRequestException('Course name is required');
-    const course = await this.prisma.course.upsert({
+    const course = await this.prisma.courses.upsert({
       where: { name: courseName },
       update: { deletedAt: null, isActive: true },
       create: { name: courseName, isActive: true },
     });
-    const level = await this.prisma.courseLevel.upsert({
+    const level = await this.prisma.course_levels.upsert({
       where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
       update: { deletedAt: null, isActive: true, sortOrder: 1 },
       create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
     });
 
-    const classEntity = await this.prisma.class.create({
+    const classEntity = await this.prisma.classes.create({
       data: {
         ...data,
         courseLevelId: level.id,
@@ -45,9 +45,9 @@ export class ClassesService {
         endDate,
       },
       include: {
-        instructor: {
+        instructors: {
           include: {
-            user: {
+            users: {
               select: {
                 id: true,
                 firstName: true,
@@ -68,7 +68,7 @@ export class ClassesService {
     });
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -81,12 +81,12 @@ export class ClassesService {
   }
 
   async findAll() {
-    return this.prisma.class.findMany({
+    return this.prisma.classes.findMany({
       where: { deletedAt: null },
       include: {
-        instructor: {
+        instructors: {
           include: {
-            user: {
+            users: {
               select: {
                 id: true,
                 firstName: true,
@@ -111,12 +111,12 @@ export class ClassesService {
   }
 
   async findOne(id: string) {
-    const classEntity = await this.prisma.class.findFirst({
+    const classEntity = await this.prisma.classes.findFirst({
       where: { id, deletedAt: null },
       include: {
-        instructor: {
+        instructors: {
           include: {
-            user: {
+            users: {
               select: {
                 id: true,
                 firstName: true,
@@ -129,15 +129,15 @@ export class ClassesService {
         students: {
           where: { deletedAt: null },
           include: {
-            parent: true,
+            parents: true,
           },
         },
         sessions: {
           orderBy: { scheduledDate: 'desc' },
           include: {
-            attendances: {
+            session_attendances: {
               include: {
-                student: true,
+                students: true,
               },
             },
           },
@@ -155,7 +155,7 @@ export class ClassesService {
   async update(id: string, data: UpdateClassDto, updatedBy: string) {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
-    const classEntity = await this.prisma.class.update({
+    const classEntity = await this.prisma.classes.update({
       where: { id },
       data: {
         ...data,
@@ -164,9 +164,9 @@ export class ClassesService {
         endDate,
       },
       include: {
-        instructor: {
+        instructors: {
           include: {
-            user: {
+            users: {
               select: {
                 id: true,
                 firstName: true,
@@ -185,7 +185,7 @@ export class ClassesService {
     await this.recalculateMetrics(id);
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -199,13 +199,13 @@ export class ClassesService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const classEntity = await this.prisma.class.update({
+    const classEntity = await this.prisma.classes.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: deletedBy,
         action: 'delete',
@@ -218,12 +218,12 @@ export class ClassesService {
   }
 
   async recalculateMetrics(classId: string) {
-    const classEntity = await this.prisma.class.findUnique({
+    const classEntity = await this.prisma.classes.findUnique({
       where: { id: classId },
       include: {
         sessions: {
           include: {
-            attendances: {
+            session_attendances: {
               where: { attended: true },
             },
           },
@@ -235,7 +235,7 @@ export class ClassesService {
 
     const sessions = classEntity.sessions.filter((s) => s.status === 'completed');
     if (sessions.length === 0) {
-      await this.prisma.class.update({
+      await this.prisma.classes.update({
         where: { id: classId },
         data: {
           avgStudentsPerSession: 0,
@@ -247,14 +247,14 @@ export class ClassesService {
     }
 
     const totalAttendances = sessions.reduce(
-      (sum, session) => sum + session.attendances.length,
+      (sum, session) => sum + session.session_attendances.length,
       0,
     );
     const avgStudentsPerSession = totalAttendances / sessions.length;
     const utilizationPercentage = (avgStudentsPerSession / classEntity.capacity) * 100;
     const isUnderfilled = utilizationPercentage < 60; // Flag if less than 60% capacity
 
-    await this.prisma.class.update({
+    await this.prisma.classes.update({
       where: { id: classId },
       data: {
         avgStudentsPerSession,
