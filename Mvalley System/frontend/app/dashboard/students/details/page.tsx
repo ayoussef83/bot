@@ -152,8 +152,8 @@ export default function StudentDetailPage() {
     {
       label: 'Edit',
       onClick: () => {
-        // Navigate to edit page or open edit modal
-        router.push(`/dashboard/students/edit?id=${id}`);
+        // Open edit modal on Students list
+        router.push(`/dashboard/students?editId=${id}`);
       },
       icon: <FiEdit className="w-4 h-4" />,
     },
@@ -287,8 +287,10 @@ export default function StudentDetailPage() {
               <p className="text-lg text-gray-900">{student.age}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Learning Track</h3>
-              <p className="text-lg text-gray-900 capitalize">{student.learningTrack}</p>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Courses</h3>
+              <p className="text-lg text-gray-900">
+                {(student.enrollments || []).length}
+              </p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1">Status</h3>

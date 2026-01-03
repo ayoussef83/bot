@@ -63,6 +63,7 @@ export class StudentsService {
     const student = await this.prisma.student.create({
       data: {
         ...data,
+        learningTrack: (data as any).learningTrack || 'general',
       },
       include: {
         class: {
