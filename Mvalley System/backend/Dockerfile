@@ -55,4 +55,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 # Start application
 # - Normal: apply migrations then start
 # - One-time RESET (DESTRUCTIVE): set RESET_DB=1 to drop all data and rebuild schema from baseline migration
-CMD ["sh", "-c", "if [ \"${RESET_DB:-}\" = \"1\" ]; then echo \"⚠️ RESET_DB=1 -> prisma migrate reset (DESTRUCTIVE)\"; npx prisma migrate reset --force --skip-seed; fi; npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "if [ \"${RESET_DB:-}\" = \"1\" ]; then echo \"⚠️ RESET_DB=1 -> prisma migrate reset (DESTRUCTIVE)\"; npx prisma migrate reset --force --skip-seed; fi; echo \"🔧 Attempting to resolve known failed migration (safe if already resolved)...\"; npx prisma migrate resolve --rolled-back 20260101210000_courses_levels_enrollments || true; npx prisma migrate deploy && node dist/main.js"]
