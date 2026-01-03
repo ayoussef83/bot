@@ -250,7 +250,7 @@ export default function SessionsPage() {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            router.push(`/dashboard/sessions/details?id=${row.id}`);
+            router.push(`/dashboard/sessions/details?id=${encodeURIComponent(row.id)}`);
           }}
         >
           <HighlightedText
@@ -266,12 +266,12 @@ export default function SessionsPage() {
       sortable: true,
       render: (_, row) => (
         <a
-          href={`/dashboard/courses/details?id=${row.classId}`}
+          href={`/dashboard/courses/details?id=${encodeURIComponent(row.classId)}`}
           className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            router.push(`/dashboard/courses/details?id=${row.classId}`);
+            router.push(`/dashboard/courses/details?id=${encodeURIComponent(row.classId)}`);
           }}
         >
           <HighlightedText text={row.class?.name || '-'} query={searchTerm} />

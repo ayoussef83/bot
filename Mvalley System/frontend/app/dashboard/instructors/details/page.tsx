@@ -306,14 +306,14 @@ export default function InstructorDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Cost Type
+                Fees Type
               </h3>
               <p className="text-lg text-gray-900 capitalize">{instructor.costType}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Cost Amount
+                Fees
               </h3>
               <p className="text-lg text-gray-900">
                 EGP {instructor.costAmount.toLocaleString()}
@@ -413,7 +413,7 @@ export default function InstructorDetailPage() {
             </span>
           </div>
           <div className="flex justify-between pt-2 border-t border-gray-200">
-            <span className="text-gray-500">Cost Type:</span>
+            <span className="text-gray-500">Fees Type:</span>
             <span className="font-medium text-gray-900 capitalize">{instructor.costType}</span>
           </div>
         </div>

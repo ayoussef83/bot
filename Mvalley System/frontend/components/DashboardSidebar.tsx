@@ -87,13 +87,6 @@ const navigationSections: NavigationSection[] = [
         roles: ['super_admin', 'operations', 'management', 'accounting', 'sales', 'instructor'],
       },
       {
-        id: 'course-catalog',
-        label: 'Course Catalog',
-        icon: <FiLayers className="w-4 h-4" />,
-        path: '/dashboard/course-catalog',
-        roles: ['super_admin', 'operations', 'management'],
-      },
-      {
         id: 'sessions',
         label: 'Sessions',
         icon: <FiCalendar className="w-4 h-4" />,
