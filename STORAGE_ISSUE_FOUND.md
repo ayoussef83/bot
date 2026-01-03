@@ -97,3 +97,4 @@ After cleanup:
 3. **Restart Mac** to update storage calculations
 4. **Check System Settings > Storage** - should show correct values
 
+

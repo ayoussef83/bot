@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { financeService, Payment, CashAccount, Invoice } from '@/lib/services';
 import { studentsService, Student } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
@@ -10,6 +10,7 @@ import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { FiCreditCard, FiPlus, FiEye, FiDollarSign, FiCheckCircle, FiXCircle, FiClock, FiX } from 'react-icons/fi';
+import StudentSearchSelect from '@/components/StudentSearchSelect';
 
 interface CreatePaymentDto {
   amount: number;
@@ -25,6 +26,7 @@ interface CreatePaymentDto {
 
 export default function PaymentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,7 +36,7 @@ export default function PaymentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [allInvoices, setAllInvoices] = useState<Invoice[]>([]);
   const [formData, setFormData] = useState<CreatePaymentDto>({
     amount: 0,
     method: 'cash',
@@ -46,27 +48,52 @@ export default function PaymentsPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  // Filter invoices based on selected student
+  const invoices = formData.studentId
+    ? allInvoices.filter((inv) => inv.studentId === formData.studentId)
+    : allInvoices;
+
   useEffect(() => {
     fetchPayments();
-  }, []);
+    
+    // Check if we should open modal with pre-filled student
+    const studentId = searchParams.get('studentId');
+    const openModal = searchParams.get('openModal') === 'true';
+    
+    if (studentId && openModal) {
+      // Set student ID in form data first
+      setFormData(prev => ({ ...prev, studentId }));
+      // Fetch required data and open modal
+      const openModalWithData = async () => {
+        await Promise.all([
+          fetchCashAccounts(),
+          fetchStudents(),
+          fetchInvoices(),
+        ]);
+        setShowCreateModal(true);
+        // Clean up URL params
+        router.replace('/dashboard/finance/cash/payments', { scroll: false });
+      };
+      openModalWithData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     if (showCreateModal) {
-      fetchCashAccounts();
-      fetchStudents();
-      fetchInvoices();
+      // Only fetch if not already fetched (e.g., when opening manually)
+      if (cashAccounts.length === 0) {
+        fetchCashAccounts();
+      }
+      if (students.length === 0) {
+        fetchStudents();
+      }
+      if (allInvoices.length === 0) {
+        fetchInvoices();
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showCreateModal]);
-
-  useEffect(() => {
-    if (formData.studentId) {
-      // Filter invoices for selected student
-      const studentInvoices = invoices.filter((inv) => inv.studentId === formData.studentId);
-      setInvoices(studentInvoices);
-    } else {
-      fetchInvoices();
-    }
-  }, [formData.studentId]);
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -114,7 +141,7 @@ export default function PaymentsPage() {
       const unpaidInvoices = response.data.filter(
         (inv) => inv.status === 'issued' || inv.status === 'partially_paid' || inv.status === 'overdue'
       );
-      setInvoices(unpaidInvoices);
+      setAllInvoices(unpaidInvoices);
     } catch (err: any) {
       console.error('Error fetching invoices:', err);
     }
@@ -138,6 +165,9 @@ export default function PaymentsPage() {
     if (!formData.method) {
       errors.method = 'Payment method is required';
     }
+    if (!formData.studentId || formData.studentId.trim() === '') {
+      errors.studentId = 'Student is required';
+    }
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -153,7 +183,7 @@ export default function PaymentsPage() {
         status: formData.status || 'received',
         referenceNumber: formData.referenceNumber || undefined,
         notes: formData.notes || undefined,
-        studentId: formData.studentId || undefined,
+        studentId: formData.studentId,
       };
 
       const response = await financeService.createPayment(paymentData);
@@ -529,7 +559,7 @@ export default function PaymentsPage() {
                         <option value="">Select Account</option>
                         {cashAccounts.map((account) => (
                           <option key={account.id} value={account.id}>
-                            {account.name} ({account.type}) - {account.balance.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+                            {account.name} ({account.type})
                           </option>
                         ))}
                       </select>
@@ -576,23 +606,20 @@ export default function PaymentsPage() {
                   </div>
 
                   <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">Optional: Link to Student/Invoice</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Link to Student/Invoice</h3>
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Student (Optional)</label>
-                        <select
+                        <label className="block text-sm font-medium text-gray-700">
+                          Student <span className="text-red-500">*</span>
+                        </label>
+                        <StudentSearchSelect
+                          students={students}
                           value={formData.studentId || ''}
-                          onChange={(e) => setFormData({ ...formData, studentId: e.target.value, invoiceId: '' })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                          <option value="">No Student</option>
-                          {students.map((student) => (
-                            <option key={student.id} value={student.id}>
-                              {student.firstName} {student.lastName}
-                              {student.email ? ` (${student.email})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(studentId) => setFormData({ ...formData, studentId, invoiceId: '' })}
+                          placeholder="Search for a student by name, email, or phone..."
+                          required
+                          error={formErrors.studentId}
+                        />
                       </div>
                       {formData.studentId && (
                         <div>
@@ -603,9 +630,7 @@ export default function PaymentsPage() {
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           >
                             <option value="">No Invoice (Unallocated)</option>
-                            {invoices
-                              .filter((inv) => inv.studentId === formData.studentId)
-                              .map((invoice) => {
+                            {invoices.map((invoice) => {
                                 const allocated = invoice.paymentAllocations?.reduce((sum, alloc) => sum + alloc.amount, 0) || 0;
                                 const remaining = invoice.totalAmount - allocated;
                                 return (
@@ -656,7 +681,12 @@ export default function PaymentsPage() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                      disabled={!formData.studentId}
+                      className={`flex-1 px-4 py-2 rounded-md text-sm font-medium ${
+                        formData.studentId
+                          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
                     >
                       Record Payment
                     </button>

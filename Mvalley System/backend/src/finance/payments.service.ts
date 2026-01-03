@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentAllocationDto } from './dto/create-payment-allocation.dto';
@@ -41,9 +40,11 @@ export class PaymentsService {
         paymentNumber,
         receivedDate: createPaymentDto.receivedDate ? new Date(createPaymentDto.receivedDate) : new Date(),
         receivedBy: userId,
+        studentId: createPaymentDto.studentId,
       },
       include: {
         cashAccount: true,
+        student: true,
         allocations: {
           include: {
             invoice: {
@@ -239,10 +240,8 @@ export class PaymentsService {
         );
         const totalPaid = remainingAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
 
-        let newStatus: InvoiceStatus = 'issued';
-        if (totalPaid >= invoice.totalAmount) {
-          newStatus = 'paid';
-        } else if (totalPaid > 0) {
+        let newStatus = 'issued';
+        if (totalPaid > 0) {
           newStatus = 'partially_paid';
         }
         if (invoice.dueDate < new Date() && newStatus !== 'paid') {
