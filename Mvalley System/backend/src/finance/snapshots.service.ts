@@ -10,7 +10,7 @@ export class SnapshotsService {
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
     // Get payments
-    const payments = await this.prisma.payments.findMany({
+    const payments = await this.prisma.payment.findMany({
       where: {
         receivedDate: {
           gte: startDate,
@@ -21,46 +21,44 @@ export class SnapshotsService {
     });
 
     // Get expenses
-    const expenses = await this.prisma.expenses.findMany({
+    const expenses = await this.prisma.expense.findMany({
       where: {
-        expenseDate: {
+        paidDate: {
           gte: startDate,
           lte: endDate,
         },
+        status: 'paid',
       },
-      include: { category: true },
+      include: {
+        category: true,
+      },
     });
 
     // Calculate revenue
     const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-    // Payment "type" is not modeled in Prisma; keep breakdowns as 0 for now.
-    const subscriptionRevenue = 0;
-    const campRevenue = 0;
-    const b2bRevenue = 0;
+    // Note: Payment model doesn't have a 'type' field, so we can't categorize by type
+    // If needed, this should be derived from invoice allocations or other relations
+    const subscriptionRevenue = 0; // TODO: Calculate from invoice types if needed
+    const campRevenue = 0; // TODO: Calculate from invoice types if needed
+    const b2bRevenue = 0; // TODO: Calculate from invoice types if needed
 
     // Calculate expenses
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-    // Best-effort bucketization based on expense category name/code.
-    const byBucket = expenses.reduce(
-      (acc, e) => {
-        const key = `${e.category?.code ?? ''} ${e.category?.name ?? ''}`.toLowerCase();
-        if (key.includes('rent')) acc.rent += e.amount;
-        else if (key.includes('instr') || key.includes('instructor')) acc.instructor += e.amount;
-        else if (key.includes('mkt') || key.includes('market')) acc.marketing += e.amount;
-        else if (key.includes('oper')) acc.operations += e.amount;
-        else acc.other += e.amount;
-        return acc;
-      },
-      { rent: 0, instructors: 0, marketing: 0, operations: 0, other: 0 },
-    );
-
-    const rentExpenses = byBucket.rent;
-    const instructorExpenses = byBucket.instructor;
-    const marketingExpenses = byBucket.marketing;
-    const operationsExpenses = byBucket.operations;
+    const rentExpenses = expenses
+      .filter((e) => e.category?.code === 'RENT')
+      .reduce((sum, e) => sum + e.amount, 0);
+    const instructorExpenses = expenses
+      .filter((e) => e.category?.code === 'INSTR')
+      .reduce((sum, e) => sum + e.amount, 0);
+    const marketingExpenses = expenses
+      .filter((e) => e.category?.code === 'MKTG')
+      .reduce((sum, e) => sum + e.amount, 0);
+    const operationsExpenses = expenses
+      .filter((e) => e.category?.code === 'OPS')
+      .reduce((sum, e) => sum + e.amount, 0);
 
     // Get active students
-    const activeStudents = await this.prisma.students.count({
+    const activeStudents = await this.prisma.student.count({
       where: {
         status: 'active',
         deletedAt: null,
@@ -68,7 +66,7 @@ export class SnapshotsService {
     });
 
     // Calculate average students per session (from classes)
-    const classes = await this.prisma.classes.findMany({
+    const classes = await this.prisma.class.findMany({
       where: { deletedAt: null },
       include: {
         sessions: {
@@ -80,7 +78,7 @@ export class SnapshotsService {
             status: 'completed',
           },
           include: {
-            session_attendances: {
+            attendances: {
               where: { attended: true },
             },
           },
@@ -97,7 +95,7 @@ export class SnapshotsService {
       allSessions.length > 0 ? totalAttendances / allSessions.length : 0;
 
     // Calculate instructor utilization (simplified)
-    const instructors = await this.prisma.instructors.findMany({
+    const instructors = await this.prisma.instructor.findMany({
       where: { deletedAt: null },
       include: {
         sessions: {
@@ -120,7 +118,7 @@ export class SnapshotsService {
       instructors.length > 0 ? totalInstructorSessions / instructors.length : 0;
 
     // Check if snapshot exists
-    const existing = await this.prisma.monthly_snapshots.findUnique({
+    const existing = await this.prisma.monthlySnapshot.findUnique({
       where: {
         year_month: {
           year,
@@ -147,7 +145,7 @@ export class SnapshotsService {
     };
 
     const snapshot = existing
-      ? await this.prisma.monthly_snapshots.update({
+      ? await this.prisma.monthlySnapshot.update({
           where: {
             year_month: {
               year,
@@ -156,7 +154,7 @@ export class SnapshotsService {
           },
           data: snapshotData,
         })
-      : await this.prisma.monthly_snapshots.create({
+      : await this.prisma.monthlySnapshot.create({
           data: snapshotData,
         });
 
@@ -164,7 +162,7 @@ export class SnapshotsService {
   }
 
   async getSnapshot(year: number, month: number) {
-    return this.prisma.monthly_snapshots.findUnique({
+    return this.prisma.monthlySnapshot.findUnique({
       where: {
         year_month: {
           year,
@@ -175,7 +173,7 @@ export class SnapshotsService {
   }
 
   async getAllSnapshots(year?: number) {
-    return this.prisma.monthly_snapshots.findMany({
+    return this.prisma.monthlySnapshot.findMany({
       where: year ? { year } : {},
       orderBy: [
         { year: 'desc' },

@@ -12,51 +12,49 @@ export class SnapshotsService {
     // Get payments
     const payments = await this.prisma.payment.findMany({
       where: {
-        paymentDate: {
+        receivedDate: {
           gte: startDate,
           lte: endDate,
         },
-        status: 'completed',
-        deletedAt: null,
+        status: 'received',
       },
     });
 
     // Get expenses
     const expenses = await this.prisma.expense.findMany({
       where: {
-        expenseDate: {
+        paidDate: {
           gte: startDate,
           lte: endDate,
         },
-        deletedAt: null,
+        status: 'paid',
+      },
+      include: {
+        category: true,
       },
     });
 
     // Calculate revenue
     const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-    const subscriptionRevenue = payments
-      .filter((p) => p.type === 'subscription')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const campRevenue = payments
-      .filter((p) => p.type === 'camp')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const b2bRevenue = payments
-      .filter((p) => p.type === 'b2b')
-      .reduce((sum, p) => sum + p.amount, 0);
+    // Note: Payment model doesn't have a 'type' field, so we can't categorize by type
+    // If needed, this should be derived from invoice allocations or other relations
+    const subscriptionRevenue = 0; // TODO: Calculate from invoice types if needed
+    const campRevenue = 0; // TODO: Calculate from invoice types if needed
+    const b2bRevenue = 0; // TODO: Calculate from invoice types if needed
 
     // Calculate expenses
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
     const rentExpenses = expenses
-      .filter((e) => e.category === 'rent')
+      .filter((e) => e.category?.code === 'RENT')
       .reduce((sum, e) => sum + e.amount, 0);
     const instructorExpenses = expenses
-      .filter((e) => e.category === 'instructor')
+      .filter((e) => e.category?.code === 'INSTR')
       .reduce((sum, e) => sum + e.amount, 0);
     const marketingExpenses = expenses
-      .filter((e) => e.category === 'marketing')
+      .filter((e) => e.category?.code === 'MKTG')
       .reduce((sum, e) => sum + e.amount, 0);
     const operationsExpenses = expenses
-      .filter((e) => e.category === 'operations')
+      .filter((e) => e.category?.code === 'OPS')
       .reduce((sum, e) => sum + e.amount, 0);
 
     // Get active students

@@ -49,7 +49,7 @@ export class PaymentsService {
           include: {
             invoice: {
               include: {
-                Student: true,
+                student: true,
               },
             },
           },
@@ -84,7 +84,7 @@ export class PaymentsService {
           include: {
             invoice: {
               include: {
-                Student: true,
+                student: true,
               },
             },
           },
@@ -119,7 +119,7 @@ export class PaymentsService {
           include: {
             invoice: {
               include: {
-                Student: true,
+                student: true,
               },
             },
           },
@@ -158,7 +158,7 @@ export class PaymentsService {
         payment: true,
         invoice: {
           include: {
-            Student: true,
+            student: true,
           },
         },
       },
@@ -240,7 +240,7 @@ export class PaymentsService {
         );
         const totalPaid = remainingAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
 
-        let newStatus = 'issued';
+        let newStatus: 'issued' | 'partially_paid' | 'paid' | 'overdue' = 'issued';
         if (totalPaid > 0) {
           newStatus = 'partially_paid';
         }

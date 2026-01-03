@@ -6,7 +6,7 @@ export class ReconciliationService {
   constructor(private prisma: PrismaService) {}
 
   async getReconciliation(periodCode: string) {
-    const period = await this.prisma.financial_periods.findUnique({
+    const period = await this.prisma.financialPeriod.findUnique({
       where: { periodCode },
     });
 
@@ -15,7 +15,7 @@ export class ReconciliationService {
     }
 
     // Expected Revenue: Sum of invoices issued in period
-    const invoices = await this.prisma.invoices.findMany({
+    const invoices = await this.prisma.invoice.findMany({
       where: {
         issueDate: {
           gte: period.startDate,
@@ -40,7 +40,7 @@ export class ReconciliationService {
     }, 0);
 
     // Actual Revenue: Sum of payments received in period
-    const payments = await this.prisma.payments.findMany({
+    const payments = await this.prisma.payment.findMany({
       where: {
         receivedDate: {
           gte: period.startDate,
@@ -53,7 +53,7 @@ export class ReconciliationService {
     const actualRevenue = payments.reduce((sum, pay) => sum + pay.amount, 0);
 
     // Get reconciliation records for this period
-    const reconciliationRecords = await this.prisma.reconciliation_records.findMany({
+    const reconciliationRecords = await this.prisma.reconciliationRecord.findMany({
       where: {
         periodId: period.id,
       },
@@ -150,7 +150,7 @@ export class ReconciliationService {
       notes?: string;
     }
   ) {
-    const period = await this.prisma.financial_periods.findUnique({
+    const period = await this.prisma.financialPeriod.findUnique({
       where: { periodCode },
     });
 
@@ -166,7 +166,7 @@ export class ReconciliationService {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const count = await this.prisma.reconciliation_records.count({
+    const count = await this.prisma.reconciliationRecord.count({
       where: {
         reconciliationNumber: {
           startsWith: `REC-${year}-${month}-`,
@@ -175,7 +175,7 @@ export class ReconciliationService {
     });
     const reconciliationNumber = `REC-${year}-${month}-${String(count + 1).padStart(4, '0')}`;
 
-    return this.prisma.reconciliation_records.create({
+    return this.prisma.reconciliationRecord.create({
       data: {
         reconciliationNumber,
         periodId: period.id,
@@ -192,7 +192,7 @@ export class ReconciliationService {
   }
 
   async closePeriod(periodCode: string) {
-    const period = await this.prisma.financial_periods.findUnique({
+    const period = await this.prisma.financialPeriod.findUnique({
       where: { periodCode },
     });
 
@@ -204,7 +204,7 @@ export class ReconciliationService {
       throw new Error('Period is not open');
     }
 
-    return this.prisma.financial_periods.update({
+    return this.prisma.financialPeriod.update({
       where: { periodCode },
       data: {
         status: 'closed',
@@ -214,7 +214,7 @@ export class ReconciliationService {
   }
 
   async lockPeriod(periodCode: string) {
-    const period = await this.prisma.financial_periods.findUnique({
+    const period = await this.prisma.financialPeriod.findUnique({
       where: { periodCode },
     });
 
@@ -226,7 +226,7 @@ export class ReconciliationService {
       throw new Error('Period must be closed before locking');
     }
 
-    return this.prisma.financial_periods.update({
+    return this.prisma.financialPeriod.update({
       where: { periodCode },
       data: {
         status: 'locked',
