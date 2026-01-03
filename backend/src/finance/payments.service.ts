@@ -58,17 +58,19 @@ export class PaymentsService {
 
   async findAll(studentId?: string) {
     // Debug logging
-    if (studentId) {
-      console.log('[PaymentsService.findAll] Filtering by studentId:', studentId);
-    } else {
-      console.log('[PaymentsService.findAll] No studentId filter - returning all payments');
-    }
-
-    const whereClause = studentId 
+    console.log('[PaymentsService.findAll] Called with studentId:', studentId, typeof studentId);
+    
+    // If studentId is provided, we MUST filter strictly - no null values allowed
+    const whereClause = studentId && studentId.trim() !== ''
       ? { 
-          studentId: studentId, // Direct match - Prisma will automatically exclude null
+          AND: [
+            { studentId: studentId.trim() }, // Exact match required
+            { studentId: { not: null } }, // Explicitly exclude null
+          ],
         } 
       : undefined;
+
+    console.log('[PaymentsService.findAll] Where clause:', JSON.stringify(whereClause, null, 2));
 
     const payments = await this.prisma.payment.findMany({
       where: whereClause,
@@ -88,15 +90,22 @@ export class PaymentsService {
       },
     });
 
-    // Debug logging
-    if (studentId) {
-      console.log(`[PaymentsService.findAll] Found ${payments.length} payments for studentId: ${studentId}`);
-      payments.forEach((p, i) => {
-        console.log(`  Payment ${i + 1}: id=${p.id}, studentId=${p.studentId}, amount=${p.amount}`);
-      });
+    // Debug logging - show what we actually got
+    console.log(`[PaymentsService.findAll] Query returned ${payments.length} payments`);
+    payments.forEach((p, i) => {
+      console.log(`  Payment ${i + 1}: id=${p.id}, studentId=${p.studentId || 'NULL'}, amount=${p.amount}, method=${p.method}`);
+    });
+
+    // Additional safety: filter out any payments with null studentId (defensive programming)
+    const filteredPayments = studentId && studentId.trim() !== ''
+      ? payments.filter(p => p.studentId === studentId.trim())
+      : payments;
+
+    if (filteredPayments.length !== payments.length) {
+      console.warn(`[PaymentsService.findAll] WARNING: Filtered out ${payments.length - filteredPayments.length} payments with mismatched/null studentId`);
     }
 
-    return payments;
+    return filteredPayments;
   }
 
   async findOne(id: string) {

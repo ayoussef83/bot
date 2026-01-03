@@ -64,13 +64,10 @@ export class PaymentsService {
     // If studentId is provided, we MUST filter strictly - no null values allowed
     const whereClause = studentId && studentId.trim() !== ''
       ? { 
-          studentId: {
-            equals: studentId.trim(), // Exact match required
-          },
-          // Explicitly ensure studentId is not null (defensive check)
-          NOT: {
-            studentId: null,
-          },
+          AND: [
+            { studentId: studentId.trim() }, // Exact match required
+            { studentId: { not: null } }, // Explicitly exclude null
+          ],
         } 
       : undefined;
 
