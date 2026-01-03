@@ -82,7 +82,7 @@ export default function ClassDetailPage() {
     if (!classItem || !confirm('Are you sure you want to delete this class?')) return;
     try {
       await classesService.delete(classItem.id);
-      router.push('/dashboard/classes');
+      router.push('/dashboard/courses');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete class');
     }
@@ -100,13 +100,13 @@ export default function ClassDetailPage() {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error || 'Class not found'}
+          {error || 'Course not found'}
         </div>
         <button
-          onClick={() => router.push('/dashboard/classes')}
+          onClick={() => router.push('/dashboard/courses')}
           className="text-indigo-600 hover:text-indigo-900"
         >
-          ← Back to Classes
+          ← Back to Courses
         </button>
       </div>
     );
@@ -115,8 +115,8 @@ export default function ClassDetailPage() {
   // Breadcrumbs
   const breadcrumbs: Breadcrumb[] = [
     { label: 'Dashboard', href: '/dashboard/management' },
-    { label: 'Classes', href: '/dashboard/classes' },
-    { label: classItem.name, href: `/dashboard/classes/details?id=${id}` },
+    { label: 'Courses', href: '/dashboard/courses' },
+    { label: classItem.name, href: `/dashboard/courses/details?id=${id}` },
   ];
 
   // Action buttons
@@ -124,7 +124,7 @@ export default function ClassDetailPage() {
     {
       label: 'Edit',
       onClick: () => {
-        router.push(`/dashboard/classes/edit?id=${id}`);
+        router.push(`/dashboard/courses?editId=${id}`);
       },
       icon: <FiEdit className="w-4 h-4" />,
     },
@@ -381,13 +381,13 @@ export default function ClassDetailPage() {
             onClick={() => router.push(`/dashboard/academics/allocations?classId=${encodeURIComponent(classItem.id)}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
-            👥 Add Student
+            👥 Add Student to Course
           </button>
           <button
             onClick={() => router.push(`/dashboard/sessions?classId=${encodeURIComponent(classItem.id)}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
-            📅 View Sessions
+            📅 View Course Sessions
           </button>
         </div>
       </div>

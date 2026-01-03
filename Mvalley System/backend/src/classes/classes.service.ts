@@ -20,9 +20,26 @@ export class ClassesService {
   async create(data: CreateClassDto, createdBy: string) {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
+
+    // Ensure a matching Course + default Level exists so "Courses" dropdowns show newly created courses like "Python".
+    const courseName = (data.name || '').trim();
+    if (!courseName) throw new BadRequestException('Course name is required');
+    const course = await this.prisma.course.upsert({
+      where: { name: courseName },
+      update: { deletedAt: null, isActive: true },
+      create: { name: courseName, isActive: true },
+    });
+    const level = await this.prisma.courseLevel.upsert({
+      where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
+      update: { deletedAt: null, isActive: true, sortOrder: 1 },
+      create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
+    });
+
     const classEntity = await this.prisma.class.create({
       data: {
         ...data,
+        courseLevelId: level.id,
+        locationName: (data as any).locationName || String((data as any).location || ''),
         instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
         startDate,
         endDate,

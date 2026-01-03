@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { coursesService, studentsService, Student, type StudentEnrollment, notificationsService, type NotificationChannel } from '@/lib/services';
 import { financeService, Payment } from '@/lib/services';
@@ -22,6 +22,22 @@ interface Session {
 }
 
 export default function StudentDetailPage() {
+  const toErrorString = (err: any, fallback: string) => {
+    const msg = err?.response?.data?.message ?? err?.message ?? err;
+    if (typeof msg === 'string') return msg;
+    if (Array.isArray(msg)) return msg.filter(Boolean).join(', ') || fallback;
+    if (msg && typeof msg === 'object') {
+      const nested = (msg as any).message;
+      if (typeof nested === 'string') return nested;
+      if (Array.isArray(nested)) return nested.filter(Boolean).join(', ') || fallback;
+      try {
+        return JSON.stringify(msg);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -63,7 +79,7 @@ export default function StudentDetailPage() {
       setStudent(response.data);
       setError('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load student');
+      setError(toErrorString(err, 'Failed to load student'));
     } finally {
       setLoading(false);
     }
@@ -112,9 +128,77 @@ export default function StudentDetailPage() {
       await studentsService.delete(student.id);
       router.push('/dashboard/students');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete student');
+      setError(toErrorString(err, 'Failed to delete student'));
     }
   };
+
+  // Session columns (memoized - MUST be before early returns to avoid React error #310)
+  const sessionColumns: Column<Session>[] = useMemo(() => {
+    if (!student) return [];
+    return [
+      {
+        key: 'date',
+        label: 'Date',
+        render: (_, row) => (
+          <span className="text-sm text-gray-900">
+            {new Date(row.scheduledDate).toLocaleDateString()}
+          </span>
+        ),
+      },
+      {
+        key: 'class',
+        label: 'Class',
+        render: (_, row) => (
+          <span className="text-sm text-gray-900">{row.class?.name || '-'}</span>
+        ),
+      },
+      {
+        key: 'time',
+        label: 'Time',
+        render: (_, row) => (
+          <span className="text-sm text-gray-500">
+            {new Date(row.startTime).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}{' '}
+            -{' '}
+            {new Date(row.endTime).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        ),
+      },
+      {
+        key: 'attendance',
+        label: 'Attendance',
+        render: (_, row) => {
+          const attendance = row.attendances?.find((a: any) => a.studentId === student?.id);
+          return (
+            <span className="text-sm text-gray-500">
+              {attendance?.attended ? (
+                <span className="text-green-600">Present</span>
+              ) : (
+                <span className="text-red-600">Absent</span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        render: (value) => {
+          const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' } = {
+            completed: 'active',
+            scheduled: 'warning',
+            cancelled: 'inactive',
+          };
+          return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
+        },
+      },
+    ];
+  }, [student]);
 
   if (loading) {
     return (
@@ -152,8 +236,8 @@ export default function StudentDetailPage() {
     {
       label: 'Edit',
       onClick: () => {
-        // Navigate to edit page or open edit modal
-        router.push(`/dashboard/students/edit?id=${id}`);
+        // Open edit modal on Students list
+        router.push(`/dashboard/students?editId=${id}`);
       },
       icon: <FiEdit className="w-4 h-4" />,
     },
@@ -208,71 +292,6 @@ export default function StudentDetailPage() {
     },
   ];
 
-  // Session columns
-  const sessionColumns: Column<Session>[] = [
-    {
-      key: 'date',
-      label: 'Date',
-      render: (_, row) => (
-        <span className="text-sm text-gray-900">
-          {new Date(row.scheduledDate).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      key: 'class',
-      label: 'Class',
-      render: (_, row) => (
-        <span className="text-sm text-gray-900">{row.class?.name || '-'}</span>
-      ),
-    },
-    {
-      key: 'time',
-      label: 'Time',
-      render: (_, row) => (
-        <span className="text-sm text-gray-500">
-          {new Date(row.startTime).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}{' '}
-          -{' '}
-          {new Date(row.endTime).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </span>
-      ),
-    },
-    {
-      key: 'attendance',
-      label: 'Attendance',
-      render: (_, row) => {
-        const attendance = row.attendances?.find((a: any) => a.studentId === student.id);
-        return (
-          <span className="text-sm text-gray-500">
-            {attendance?.attended ? (
-              <span className="text-green-600">Present</span>
-            ) : (
-              <span className="text-red-600">Absent</span>
-            )}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (value) => {
-        const statusMap: { [key: string]: 'active' | 'inactive' | 'warning' } = {
-          completed: 'active',
-          scheduled: 'warning',
-          cancelled: 'inactive',
-        };
-        return <StatusBadge status={statusMap[value] || 'inactive'} label={value} />;
-      },
-    },
-  ];
-
   // Tabs
   const tabs: Tab[] = [
     {
@@ -287,8 +306,10 @@ export default function StudentDetailPage() {
               <p className="text-lg text-gray-900">{student.age}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Learning Track</h3>
-              <p className="text-lg text-gray-900 capitalize">{student.learningTrack}</p>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Courses</h3>
+              <p className="text-lg text-gray-900">
+                {(student.enrollments || []).length}
+              </p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1">Status</h3>
@@ -327,14 +348,14 @@ export default function StudentDetailPage() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                   <FiBookOpen className="w-4 h-4" />
-                  Class
+                  Course
                 </h3>
                 <a
-                  href={`/dashboard/classes/${student.classId}`}
+                  href={`/dashboard/courses/details?id=${student.classId}`}
                   className="text-lg text-indigo-600 hover:text-indigo-900"
                   onClick={(e) => {
                     e.preventDefault();
-                    router.push(`/dashboard/classes/${student.classId}`);
+                    router.push(`/dashboard/courses/details?id=${student.classId}`);
                   }}
                 >
                   {student.class.name}
@@ -347,44 +368,17 @@ export default function StudentDetailPage() {
                 <p className="text-lg text-gray-900">
                   {student.parent.firstName} {student.parent.lastName}
                 </p>
+                <div className="mt-1 text-sm text-gray-600">
+                  {student.parent.phone ? <div>Phone: {student.parent.phone}</div> : null}
+                  {student.parent.email ? <div>Email: {student.parent.email}</div> : null}
+                </div>
               </div>
             )}
           </div>
         </div>
       ),
     },
-    {
-      id: 'classes',
-      label: 'Classes',
-      count: student.class ? 1 : 0,
-      icon: <FiBookOpen className="w-4 h-4" />,
-      content: (
-        <div>
-          {student.class ? (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-gray-900">{student.class.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {student.class.location} • Capacity: {student.class.capacity}
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push(`/dashboard/classes/${student.classId}`)}
-                  className="text-sm text-indigo-600 hover:text-indigo-900"
-                >
-                  View Class →
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>No classes enrolled</p>
-            </div>
-          )}
-        </div>
-      ),
-    },
+    // Removed legacy "Courses" tab (was duplicating the new multi-course enrollments tab).
     {
       id: 'courses',
       label: 'Courses',
@@ -419,7 +413,7 @@ export default function StudentDetailPage() {
                     setNewLevelId('');
                     await fetchEnrollments(id);
                   } catch (err: any) {
-                    setError(err?.response?.data?.message || 'Failed to add enrollment');
+                    setError(toErrorString(err, 'Failed to add enrollment'));
                   } finally {
                     setAddingEnrollment(false);
                   }
@@ -451,7 +445,7 @@ export default function StudentDetailPage() {
                         await studentsService.removeEnrollment(enr.id);
                         if (id) await fetchEnrollments(id);
                       } catch (err: any) {
-                        setError(err?.response?.data?.message || 'Failed to remove enrollment');
+                        setError(toErrorString(err, 'Failed to remove enrollment'));
                       }
                     }}
                   >
@@ -569,7 +563,7 @@ export default function StudentDetailPage() {
       });
       setShowMessageModal(false);
     } catch (err: any) {
-      setMessageError(err.response?.data?.message || 'Failed to send message');
+        setMessageError(toErrorString(err, 'Failed to send message'));
     } finally {
       setSendingMessage(false);
     }

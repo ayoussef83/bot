@@ -167,11 +167,11 @@ export default function InstructorDashboard() {
           <DataTable
             columns={classColumns}
             data={data.assignedClasses}
-            emptyMessage="No classes assigned"
+            emptyMessage="No courses assigned"
             loading={loading}
           />
         ) : (
-          <div className="text-center py-8 text-gray-500">No classes assigned</div>
+          <div className="text-center py-8 text-gray-500">No courses assigned</div>
         )}
       </div>
 

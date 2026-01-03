@@ -22,8 +22,9 @@ export class CreateStudentDto {
   @Max(18)
   age: number;
 
+  @IsOptional()
   @IsEnum(LearningTrack)
-  learningTrack: LearningTrack;
+  learningTrack?: LearningTrack;
 
   @IsOptional()
   @IsEnum(StudentStatus)
