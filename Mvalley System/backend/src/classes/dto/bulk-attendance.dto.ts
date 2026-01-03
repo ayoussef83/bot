@@ -20,6 +20,6 @@ export class BulkAttendanceDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AttendanceItem)
-  attendances: AttendanceItem[];
+  session_attendances: AttendanceItem[];
 }
 

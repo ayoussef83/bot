@@ -7,7 +7,7 @@ export class LeadsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateLeadDto, createdBy: string) {
-    const lead = await this.prisma.lead.create({
+    const lead = await this.prisma.leads.create({
       data: {
         ...data,
         createdBy,
@@ -21,7 +21,7 @@ export class LeadsService {
     });
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: createdBy,
         action: 'create',
@@ -34,7 +34,7 @@ export class LeadsService {
   }
 
   async findAll(status?: string, source?: string) {
-    return this.prisma.lead.findMany({
+    return this.prisma.leads.findMany({
       where: {
         ...(status && { status: status as any }),
         ...(source && { source: source as any }),
@@ -53,7 +53,7 @@ export class LeadsService {
   }
 
   async findOne(id: string) {
-    const lead = await this.prisma.lead.findFirst({
+    const lead = await this.prisma.leads.findFirst({
       where: { id, deletedAt: null },
       include: {
         followUps: {
@@ -70,7 +70,7 @@ export class LeadsService {
   }
 
   async update(id: string, data: UpdateLeadDto, updatedBy: string) {
-    const lead = await this.prisma.lead.update({
+    const lead = await this.prisma.leads.update({
       where: { id },
       data,
       include: {
@@ -81,7 +81,7 @@ export class LeadsService {
     });
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: updatedBy,
         action: 'update',
@@ -97,7 +97,7 @@ export class LeadsService {
   async convertToStudent(leadId: string, studentData: any, convertedBy: string) {
     // This would typically create a student from the lead
     // For now, just mark as converted
-    const lead = await this.prisma.lead.update({
+    const lead = await this.prisma.leads.update({
       where: { id: leadId },
       data: {
         status: 'converted',
@@ -106,7 +106,7 @@ export class LeadsService {
     });
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: convertedBy,
         action: 'update',
@@ -120,14 +120,14 @@ export class LeadsService {
   }
 
   async convertToContact(leadId: string, convertedBy: string) {
-    const lead = await this.prisma.lead.findFirst({
+    const lead = await this.prisma.leads.findFirst({
       where: { id: leadId, deletedAt: null },
     });
     if (!lead) throw new NotFoundException('Lead not found');
 
     // If already linked, return the lead (idempotent)
     if (lead.convertedToParentId) {
-      return this.prisma.lead.update({
+      return this.prisma.leads.update({
         where: { id: leadId },
         data: { status: 'converted', convertedAt: lead.convertedAt ?? new Date() },
         include: { convertedParent: true },
@@ -135,13 +135,13 @@ export class LeadsService {
     }
 
     // Try to match an existing parent contact by phone (primary identifier)
-    let parent = await this.prisma.parent.findFirst({
+    let parent = await this.prisma.parents.findFirst({
       where: { phone: lead.phone, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!parent) {
-      parent = await this.prisma.parent.create({
+      parent = await this.prisma.parents.create({
         data: {
           firstName: lead.firstName,
           lastName: lead.lastName,
@@ -151,7 +151,7 @@ export class LeadsService {
       });
     }
 
-    const updatedLead = await this.prisma.lead.update({
+    const updatedLead = await this.prisma.leads.update({
       where: { id: leadId },
       data: {
         status: 'converted',
@@ -161,7 +161,7 @@ export class LeadsService {
       include: { convertedParent: true },
     });
 
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: convertedBy,
         action: 'update',
@@ -175,13 +175,13 @@ export class LeadsService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const lead = await this.prisma.lead.update({
+    const lead = await this.prisma.leads.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
 
     // Log audit
-    await this.prisma.auditLog.create({
+    await this.prisma.audit_logs.create({
       data: {
         userId: deletedBy,
         action: 'delete',

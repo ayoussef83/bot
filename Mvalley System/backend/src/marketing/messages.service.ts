@@ -9,9 +9,9 @@ export class MessagesService {
   async create(data: CreateMessageDto) {
     // Unified messaging: if outbound and Facebook Page, send via Meta API first, then store message.
     if (data.direction === 'outbound') {
-      const conv = await this.prisma.conversation.findUnique({
+      const conv = await this.prisma.conversations.findUnique({
         where: { id: data.conversationId },
-        include: { channelAccount: true, participant: true },
+        include: { channel_accounts: true, participants: true },
       });
       if (!conv) throw new NotFoundException('Conversation not found');
 
@@ -51,18 +51,18 @@ export class MessagesService {
             readAt: data.readAt ? new Date(data.readAt) : null,
           },
           include: {
-            conversation: { include: { participant: true } },
+            conversations: { include: { participants: true } },
           },
         });
 
-        await this.prisma.conversation.update({
+        await this.prisma.conversations.update({
           where: { id: data.conversationId },
           data: { lastMessageAt: created.sentAt },
         });
 
         // Update channel last sync
         if (conv.channelAccountId) {
-          await this.prisma.channelAccount.update({
+          await this.prisma.channel_accounts.update({
             where: { id: conv.channelAccountId },
             data: { lastSyncAt: new Date() },
           }).catch(() => undefined);
@@ -80,16 +80,16 @@ export class MessagesService {
         readAt: data.readAt ? new Date(data.readAt) : null,
       },
       include: {
-        conversation: {
+        conversations: {
           include: {
-            participant: true,
+            participants: true,
           },
         },
       },
     });
 
     // Update conversation's lastMessageAt
-    await this.prisma.conversation.update({
+    await this.prisma.conversations.update({
       where: { id: data.conversationId },
       data: {
         lastMessageAt: message.sentAt,
@@ -112,10 +112,10 @@ export class MessagesService {
     const message = await this.prisma.message.findUnique({
       where: { id },
       include: {
-        conversation: {
+        conversations: {
           include: {
-            participant: true,
-            channelAccount: true,
+            participants: true,
+            channel_accounts: true,
           },
         },
       },

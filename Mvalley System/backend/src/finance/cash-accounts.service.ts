@@ -7,7 +7,7 @@ export class CashAccountsService {
   constructor(private prisma: PrismaService) {}
 
   async create(createCashAccountDto: CreateCashAccountDto) {
-    return this.prisma.cashAccount.create({
+    return this.prisma.cash_accounts.create({
       data: {
         ...createCashAccountDto,
         balance: createCashAccountDto.balance || 0,
@@ -18,13 +18,13 @@ export class CashAccountsService {
   }
 
   async findAll() {
-    return this.prisma.cashAccount.findMany({
+    return this.prisma.cash_accounts.findMany({
       orderBy: { name: 'asc' },
     });
   }
 
   async findOne(id: string) {
-    return this.prisma.cashAccount.findUnique({
+    return this.prisma.cash_accounts.findUnique({
       where: { id },
       include: {
         payments: {
@@ -40,7 +40,7 @@ export class CashAccountsService {
   }
 
   async update(id: string, updateData: Partial<CreateCashAccountDto>) {
-    return this.prisma.cashAccount.update({
+    return this.prisma.cash_accounts.update({
       where: { id },
       data: updateData,
     });
@@ -48,22 +48,22 @@ export class CashAccountsService {
 
   async remove(id: string) {
     // Check if account has transactions
-    const paymentCount = await this.prisma.payment.count({
+    const paymentCount = await this.prisma.payments.count({
       where: { cashAccountId: id },
     });
-    const expenseCount = await this.prisma.expense.count({
+    const expenseCount = await this.prisma.expenses.count({
       where: { cashAccountId: id },
     });
 
     if (paymentCount > 0 || expenseCount > 0) {
       // Soft delete by marking as inactive
-      return this.prisma.cashAccount.update({
+      return this.prisma.cash_accounts.update({
         where: { id },
         data: { isActive: false },
       });
     }
 
-    return this.prisma.cashAccount.delete({
+    return this.prisma.cash_accounts.delete({
       where: { id },
     });
   }

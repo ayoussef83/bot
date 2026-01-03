@@ -65,7 +65,7 @@ export class ConversationsController {
   convertToLead(
     @Param('id') id: string,
     @Body() convertToLeadDto: ConvertToLeadDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.conversationsService.convertToLead(id, convertToLeadDto, user.id);
   }

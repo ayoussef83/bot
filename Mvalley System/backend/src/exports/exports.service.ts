@@ -126,9 +126,9 @@ export class ExportsService {
 
     switch (entity) {
       case 'students': {
-        const students = await this.prisma.student.findMany({
+        const students = await this.prisma.students.findMany({
           where: { deletedAt: null },
-          include: { class: true, parent: true },
+          include: { classes: true, parents: true },
           orderBy: { createdAt: 'desc' },
         });
         return {
@@ -150,9 +150,9 @@ export class ExportsService {
       }
 
       case 'classes': {
-        const classes = await this.prisma.class.findMany({
+        const classes = await this.prisma.classes.findMany({
           where: { deletedAt: null },
-          include: { instructor: { include: { user: true } } },
+          include: { instructors: { include: { users: true } } },
           orderBy: { createdAt: 'desc' },
         });
         return {
@@ -162,7 +162,7 @@ export class ExportsService {
             name: c.name,
             location: c.location,
             capacity: c.capacity,
-            instructor: c.instructor?.user
+            instructors: c.instructor?.user
               ? `${c.instructor.user.firstName} ${c.instructor.user.lastName}`
               : null,
             dayOfWeek: c.dayOfWeek,
@@ -178,8 +178,8 @@ export class ExportsService {
       }
 
       case 'payments': {
-        const payments = await this.prisma.payment.findMany({
-          include: { Student: true, cashAccount: true },
+        const payments = await this.prisma.payments.findMany({
+          include: { Student: true, cash_accounts: true },
           orderBy: { createdAt: 'desc' },
         });
         return {
@@ -191,7 +191,7 @@ export class ExportsService {
             status: p.status,
             method: p.method,
             receivedDate: p.receivedDate,
-            cashAccount: p.cashAccount?.name ?? null,
+            cash_accounts: p.cashAccount?.name ?? null,
             referenceNumber: p.referenceNumber ?? null,
             notes: p.notes,
             createdAt: p.createdAt,
@@ -200,8 +200,8 @@ export class ExportsService {
       }
 
       case 'expenses': {
-        const expenses = await this.prisma.expense.findMany({
-          include: { instructor: { include: { user: true } }, category: true, cashAccount: true },
+        const expenses = await this.prisma.expenses.findMany({
+          include: { instructors: { include: { users: true } }, category: true, cash_accounts: true },
           orderBy: { expenseDate: 'desc' },
         });
         return {
@@ -211,11 +211,11 @@ export class ExportsService {
             category: e.category?.name ?? e.categoryId,
             amount: e.amount,
             description: e.description,
-            instructor: e.instructor?.user
+            instructors: e.instructor?.user
               ? `${e.instructor.user.firstName} ${e.instructor.user.lastName}`
               : null,
             expenseDate: e.expenseDate,
-            cashAccount: e.cashAccount?.name ?? null,
+            cash_accounts: e.cashAccount?.name ?? null,
             status: e.status,
             createdAt: e.createdAt,
           })),
@@ -223,7 +223,7 @@ export class ExportsService {
       }
 
       case 'leads': {
-        const leads = await this.prisma.lead.findMany({
+        const leads = await this.prisma.leads.findMany({
           where: { deletedAt: null },
           orderBy: { createdAt: 'desc' },
         });
@@ -245,9 +245,9 @@ export class ExportsService {
       }
 
       case 'instructors': {
-        const instructors = await this.prisma.instructor.findMany({
+        const instructors = await this.prisma.instructors.findMany({
           where: { deletedAt: null },
-          include: { user: true, _count: { select: { classes: true, sessions: true } } },
+          include: { users: true, _count: { select: { classes: true, sessions: true } } },
           orderBy: { createdAt: 'desc' },
         });
         return {
@@ -266,9 +266,9 @@ export class ExportsService {
       }
 
       case 'sessions': {
-        const sessions = await this.prisma.session.findMany({
+        const sessions = await this.prisma.sessions.findMany({
           where: { deletedAt: null },
-          include: { class: true, instructor: { include: { user: true } } },
+          include: { classes: true, instructors: { include: { users: true } } },
           orderBy: { scheduledDate: 'desc' },
           take: 5000,
         });
@@ -282,7 +282,7 @@ export class ExportsService {
             startTime: s.startTime,
             endTime: s.endTime,
             status: s.status,
-            instructor: s.instructor?.user
+            instructors: s.instructor?.user
               ? `${s.instructor.user.firstName} ${s.instructor.user.lastName}`
               : null,
             createdAt: s.createdAt,

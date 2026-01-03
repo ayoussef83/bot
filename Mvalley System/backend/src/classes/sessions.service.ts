@@ -12,7 +12,7 @@ export class SessionsService {
   ) {}
 
   async create(data: CreateSessionDto, createdBy: string) {
-    const session = await this.prisma.sessions.create({
+    const session = await this.prisma.sessionss.create({
       data: {
         ...data,
       },
@@ -65,7 +65,7 @@ export class SessionsService {
   }
 
   async findAll(classId?: string, instructorId?: string) {
-    return this.prisma.sessions.findMany({
+    return this.prisma.sessionss.findMany({
       where: {
         ...(classId && { classId }),
         ...(instructorId && { instructorId }),
@@ -116,7 +116,7 @@ export class SessionsService {
   }
 
   async findOne(id: string) {
-    const session = await this.prisma.sessions.findFirst({
+    const session = await this.prisma.sessionss.findFirst({
       where: { id, deletedAt: null },
       include: {
         classes: {
@@ -168,7 +168,7 @@ export class SessionsService {
   }
 
   async update(id: string, data: UpdateSessionDto, updatedBy: string) {
-    const session = await this.prisma.sessions.update({
+    const session = await this.prisma.sessionss.update({
       where: { id },
       data,
       include: {
@@ -198,7 +198,7 @@ export class SessionsService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const session = await this.prisma.sessions.update({
+    const session = await this.prisma.sessionss.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
@@ -217,7 +217,7 @@ export class SessionsService {
   }
 
   async confirmAttendance(sessionId: string, instructorId: string) {
-    return this.prisma.sessions.update({
+    return this.prisma.sessionss.update({
       where: { id: sessionId },
       data: {
         instructorConfirmed: true,

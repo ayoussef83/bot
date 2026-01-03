@@ -10,7 +10,7 @@ export class SnapshotsService {
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
     // Get payments
-    const payments = await this.prisma.payment.findMany({
+    const payments = await this.prisma.payments.findMany({
       where: {
         receivedDate: {
           gte: startDate,
@@ -21,7 +21,7 @@ export class SnapshotsService {
     });
 
     // Get expenses
-    const expenses = await this.prisma.expense.findMany({
+    const expenses = await this.prisma.expenses.findMany({
       where: {
         expenseDate: {
           gte: startDate,
@@ -51,7 +51,7 @@ export class SnapshotsService {
         else acc.other += e.amount;
         return acc;
       },
-      { rent: 0, instructor: 0, marketing: 0, operations: 0, other: 0 },
+      { rent: 0, instructors: 0, marketing: 0, operations: 0, other: 0 },
     );
 
     const rentExpenses = byBucket.rent;
@@ -60,7 +60,7 @@ export class SnapshotsService {
     const operationsExpenses = byBucket.operations;
 
     // Get active students
-    const activeStudents = await this.prisma.student.count({
+    const activeStudents = await this.prisma.students.count({
       where: {
         status: 'active',
         deletedAt: null,
@@ -68,7 +68,7 @@ export class SnapshotsService {
     });
 
     // Calculate average students per session (from classes)
-    const classes = await this.prisma.class.findMany({
+    const classes = await this.prisma.classes.findMany({
       where: { deletedAt: null },
       include: {
         sessions: {
@@ -80,7 +80,7 @@ export class SnapshotsService {
             status: 'completed',
           },
           include: {
-            attendances: {
+            session_attendances: {
               where: { attended: true },
             },
           },
@@ -97,7 +97,7 @@ export class SnapshotsService {
       allSessions.length > 0 ? totalAttendances / allSessions.length : 0;
 
     // Calculate instructor utilization (simplified)
-    const instructors = await this.prisma.instructor.findMany({
+    const instructors = await this.prisma.instructors.findMany({
       where: { deletedAt: null },
       include: {
         sessions: {
@@ -120,7 +120,7 @@ export class SnapshotsService {
       instructors.length > 0 ? totalInstructorSessions / instructors.length : 0;
 
     // Check if snapshot exists
-    const existing = await this.prisma.monthlySnapshot.findUnique({
+    const existing = await this.prisma.monthly_snapshots.findUnique({
       where: {
         year_month: {
           year,
@@ -147,7 +147,7 @@ export class SnapshotsService {
     };
 
     const snapshot = existing
-      ? await this.prisma.monthlySnapshot.update({
+      ? await this.prisma.monthly_snapshots.update({
           where: {
             year_month: {
               year,
@@ -156,7 +156,7 @@ export class SnapshotsService {
           },
           data: snapshotData,
         })
-      : await this.prisma.monthlySnapshot.create({
+      : await this.prisma.monthly_snapshots.create({
           data: snapshotData,
         });
 
@@ -164,7 +164,7 @@ export class SnapshotsService {
   }
 
   async getSnapshot(year: number, month: number) {
-    return this.prisma.monthlySnapshot.findUnique({
+    return this.prisma.monthly_snapshots.findUnique({
       where: {
         year_month: {
           year,
@@ -175,7 +175,7 @@ export class SnapshotsService {
   }
 
   async getAllSnapshots(year?: number) {
-    return this.prisma.monthlySnapshot.findMany({
+    return this.prisma.monthly_snapshots.findMany({
       where: year ? { year } : {},
       orderBy: [
         { year: 'desc' },

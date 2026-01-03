@@ -13,7 +13,7 @@ export class EmailService {
     template?: string,
     payload?: any,
   ) {
-    const cfg = await this.prisma.integrationConfig.findUnique({
+    const cfg = await this.prisma.integration_configs.findUnique({
       where: { provider: 'zoho_email' },
     });
 
@@ -44,7 +44,7 @@ export class EmailService {
         port,
         secure, // true for 465, false for other ports
         auth: {
-          user: username,
+          users: username,
           pass: password,
         },
       });

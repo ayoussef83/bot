@@ -24,18 +24,18 @@ export class ClassesService {
     // Ensure a matching Course + default Level exists so "Courses" dropdowns show newly created courses like "Python".
     const courseName = (data.name || '').trim();
     if (!courseName) throw new BadRequestException('Course name is required');
-    const course = await this.prisma.courses.upsert({
+    const course = await this.prisma.coursess.upsert({
       where: { name: courseName },
       update: { deletedAt: null, isActive: true },
       create: { name: courseName, isActive: true },
     });
-    const level = await this.prisma.course_levels.upsert({
+    const level = await this.prisma.courses_levels.upsert({
       where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
       update: { deletedAt: null, isActive: true, sortOrder: 1 },
       create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
     });
 
-    const classEntity = await this.prisma.classes.create({
+    const classEntity = await this.prisma.classeses.create({
       data: {
         ...data,
         courseLevelId: level.id,
@@ -81,7 +81,7 @@ export class ClassesService {
   }
 
   async findAll() {
-    return this.prisma.classes.findMany({
+    return this.prisma.classeses.findMany({
       where: { deletedAt: null },
       include: {
         instructors: {
@@ -111,7 +111,7 @@ export class ClassesService {
   }
 
   async findOne(id: string) {
-    const classEntity = await this.prisma.classes.findFirst({
+    const classEntity = await this.prisma.classeses.findFirst({
       where: { id, deletedAt: null },
       include: {
         instructors: {
@@ -155,7 +155,7 @@ export class ClassesService {
   async update(id: string, data: UpdateClassDto, updatedBy: string) {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
-    const classEntity = await this.prisma.classes.update({
+    const classEntity = await this.prisma.classeses.update({
       where: { id },
       data: {
         ...data,
@@ -199,7 +199,7 @@ export class ClassesService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const classEntity = await this.prisma.classes.update({
+    const classEntity = await this.prisma.classeses.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
@@ -218,7 +218,7 @@ export class ClassesService {
   }
 
   async recalculateMetrics(classId: string) {
-    const classEntity = await this.prisma.classes.findUnique({
+    const classEntity = await this.prisma.classeses.findUnique({
       where: { id: classId },
       include: {
         sessions: {
@@ -235,7 +235,7 @@ export class ClassesService {
 
     const sessions = classEntity.sessions.filter((s) => s.status === 'completed');
     if (sessions.length === 0) {
-      await this.prisma.classes.update({
+      await this.prisma.classeses.update({
         where: { id: classId },
         data: {
           avgStudentsPerSession: 0,
@@ -254,7 +254,7 @@ export class ClassesService {
     const utilizationPercentage = (avgStudentsPerSession / classEntity.capacity) * 100;
     const isUnderfilled = utilizationPercentage < 60; // Flag if less than 60% capacity
 
-    await this.prisma.classes.update({
+    await this.prisma.classeses.update({
       where: { id: classId },
       data: {
         avgStudentsPerSession,

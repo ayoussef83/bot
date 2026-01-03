@@ -11,7 +11,7 @@ export class ExpensesService {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const count = await this.prisma.expense.count({
+    const count = await this.prisma.expenses.count({
       where: {
         expenseDate: {
           gte: new Date(year, now.getMonth(), 1),
@@ -23,14 +23,14 @@ export class ExpensesService {
 
     // Get or create current period
     const periodCode = `${year}-${month}`;
-    let period = await this.prisma.financialPeriod.findUnique({
+    let period = await this.prisma.financial_periods.findUnique({
       where: { periodCode },
     });
 
     if (!period) {
       const startDate = new Date(year, now.getMonth(), 1);
       const endDate = new Date(year, now.getMonth() + 1, 0);
-      period = await this.prisma.financialPeriod.create({
+      period = await this.prisma.financial_periods.create({
         data: {
           periodCode,
           startDate,
@@ -42,7 +42,7 @@ export class ExpensesService {
 
     // Update cash account balance if expense is paid
     if (createExpenseDto.status === 'paid' && createExpenseDto.cashAccountId) {
-      await this.prisma.cashAccount.update({
+      await this.prisma.cash_accounts.update({
         where: { id: createExpenseDto.cashAccountId },
         data: {
           balance: {
@@ -52,7 +52,7 @@ export class ExpensesService {
       });
     }
 
-    return this.prisma.expense.create({
+    return this.prisma.expenses.create({
       data: {
         ...createExpenseDto,
         expenseNumber,
@@ -62,51 +62,51 @@ export class ExpensesService {
       },
       include: {
         category: true,
-        instructor: {
+        instructors: {
           include: {
-            user: true,
+            users: true,
           },
         },
-        cashAccount: true,
+        cash_accounts: true,
         period: true,
       },
     });
   }
 
   async findAll() {
-    return this.prisma.expense.findMany({
+    return this.prisma.expenses.findMany({
       orderBy: { expenseDate: 'desc' },
       include: {
         category: true,
-        instructor: {
+        instructors: {
           include: {
-            user: true,
+            users: true,
           },
         },
-        cashAccount: true,
+        cash_accounts: true,
         period: true,
       },
     });
   }
 
   async findOne(id: string) {
-    return this.prisma.expense.findUnique({
+    return this.prisma.expenses.findUnique({
       where: { id },
       include: {
         category: true,
-        instructor: {
+        instructors: {
           include: {
-            user: true,
+            users: true,
           },
         },
-        cashAccount: true,
+        cash_accounts: true,
         period: true,
       },
     });
   }
 
   async approve(id: string, userId: string) {
-    return this.prisma.expense.update({
+    return this.prisma.expenses.update({
       where: { id },
       data: {
         status: 'approved',
@@ -115,18 +115,18 @@ export class ExpensesService {
       },
       include: {
         category: true,
-        instructor: {
+        instructors: {
           include: {
-            user: true,
+            users: true,
           },
         },
-        cashAccount: true,
+        cash_accounts: true,
       },
     });
   }
 
   async markAsPaid(id: string, cashAccountId: string, paidDate: string, userId?: string) {
-    const expense = await this.prisma.expense.findUnique({
+    const expense = await this.prisma.expenses.findUnique({
       where: { id },
     });
 
@@ -139,7 +139,7 @@ export class ExpensesService {
     }
 
     // Update cash account balance
-    await this.prisma.cashAccount.update({
+    await this.prisma.cash_accounts.update({
       where: { id: cashAccountId },
       data: {
         balance: {
@@ -148,7 +148,7 @@ export class ExpensesService {
       },
     });
 
-    return this.prisma.expense.update({
+    return this.prisma.expenses.update({
       where: { id },
       data: {
         status: 'paid',
@@ -158,21 +158,21 @@ export class ExpensesService {
       },
       include: {
         category: true,
-        instructor: {
+        instructors: {
           include: {
-            user: true,
+            users: true,
           },
         },
-        cashAccount: true,
+        cash_accounts: true,
       },
     });
   }
 
   async reverse(id: string, reason: string, userId?: string) {
-    const expense = await this.prisma.expense.findUnique({
+    const expense = await this.prisma.expenses.findUnique({
       where: { id },
       include: {
-        cashAccount: true,
+        cash_accounts: true,
       },
     });
 
@@ -186,7 +186,7 @@ export class ExpensesService {
 
     // Reverse cash account balance if expense was paid
     if (expense.status === 'paid' && expense.cashAccount) {
-      await this.prisma.cashAccount.update({
+      await this.prisma.cash_accounts.update({
         where: { id: expense.cashAccountId },
         data: {
           balance: {
@@ -196,7 +196,7 @@ export class ExpensesService {
       });
     }
 
-    return this.prisma.expense.update({
+    return this.prisma.expenses.update({
       where: { id },
       data: {
         status: 'reversed',

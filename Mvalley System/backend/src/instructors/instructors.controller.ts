@@ -25,7 +25,7 @@ export class InstructorsController {
   @Roles(UserRole.super_admin, UserRole.operations)
   create(
     @Body() createInstructorDto: CreateInstructorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.instructorsService.create(createInstructorDto, user.id);
   }
@@ -58,14 +58,14 @@ export class InstructorsController {
   update(
     @Param('id') id: string,
     @Body() updateInstructorDto: UpdateInstructorDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.instructorsService.update(id, updateInstructorDto, user.id);
   }
 
   @Delete(':id')
   @Roles(UserRole.super_admin)
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() users: any) {
     return this.instructorsService.remove(id, user.id);
   }
 }

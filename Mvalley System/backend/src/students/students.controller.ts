@@ -31,7 +31,7 @@ export class StudentsController {
   )
   create(
     @Body() createStudentDto: CreateStudentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.studentsService.create(createStudentDto, user.id);
   }
@@ -45,7 +45,7 @@ export class StudentsController {
     UserRole.sales,
     UserRole.instructor,
   )
-  findAll(@CurrentUser() user: any) {
+  findAll(@CurrentUser() users: any) {
     return this.studentsService.findAll(user.role, user.id);
   }
 
@@ -70,7 +70,7 @@ export class StudentsController {
     UserRole.sales,
     UserRole.instructor,
   )
-  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentUser() users: any) {
     return this.studentsService.findOne(id, user.role, user.id);
   }
 
@@ -83,7 +83,7 @@ export class StudentsController {
     UserRole.sales,
     UserRole.instructor,
   )
-  listEnrollments(@Param('id') id: string, @CurrentUser() user: any) {
+  listEnrollments(@Param('id') id: string, @CurrentUser() users: any) {
     return this.studentsService.listEnrollments(id, user.role, user.id);
   }
 
@@ -96,13 +96,13 @@ export class StudentsController {
     UserRole.sales,
     UserRole.instructor,
   )
-  listSessions(@Param('id') id: string, @CurrentUser() user: any) {
+  listSessions(@Param('id') id: string, @CurrentUser() users: any) {
     return this.studentsService.listSessions(id, user.role, user.id);
   }
 
   @Post(':id/enrollments')
   @Roles(UserRole.super_admin, UserRole.operations, UserRole.sales)
-  addEnrollment(@Param('id') id: string, @Body() body: Omit<CreateEnrollmentDto, 'studentId'>, @CurrentUser() user: any) {
+  addEnrollment(@Param('id') id: string, @Body() body: Omit<CreateEnrollmentDto, 'studentId'>, @CurrentUser() users: any) {
     return this.studentsService.addEnrollment(id, body.courseLevelId, body.classId, user.id);
   }
 
@@ -111,14 +111,14 @@ export class StudentsController {
   updateEnrollment(
     @Param('enrollmentId') enrollmentId: string,
     @Body() body: UpdateEnrollmentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.studentsService.updateEnrollment(enrollmentId, body, user.id);
   }
 
   @Delete('enrollments/:enrollmentId')
   @Roles(UserRole.super_admin, UserRole.operations)
-  removeEnrollment(@Param('enrollmentId') enrollmentId: string, @CurrentUser() user: any) {
+  removeEnrollment(@Param('enrollmentId') enrollmentId: string, @CurrentUser() users: any) {
     return this.studentsService.removeEnrollment(enrollmentId, user.id);
   }
 
@@ -130,14 +130,14 @@ export class StudentsController {
   update(
     @Param('id') id: string,
     @Body() updateStudentDto: UpdateStudentDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.studentsService.update(id, updateStudentDto, user.id);
   }
 
   @Delete(':id')
   @Roles(UserRole.super_admin, UserRole.operations)
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() users: any) {
     return this.studentsService.remove(id, user.id);
   }
 }

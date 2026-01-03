@@ -16,20 +16,20 @@ export class MarketingService {
       activeCampaigns,
       recentConversations,
     ] = await Promise.all([
-      this.prisma.conversation.count(),
-      this.prisma.conversation.count({ where: { status: 'new' } }),
-      this.prisma.conversation.count({ where: { status: 'in_progress' } }),
-      this.prisma.conversation.count({ where: { status: 'waiting_reply' } }),
-      this.prisma.conversation.count({ where: { status: 'converted' } }),
-      this.prisma.channelAccount.count({ where: { status: 'connected' } }),
-      this.prisma.campaign.count({ where: { status: 'active' } }),
-      this.prisma.conversation.findMany({
+      this.prisma.conversations.count(),
+      this.prisma.conversations.count({ where: { status: 'new' } }),
+      this.prisma.conversations.count({ where: { status: 'in_progress' } }),
+      this.prisma.conversations.count({ where: { status: 'waiting_reply' } }),
+      this.prisma.conversations.count({ where: { status: 'converted' } }),
+      this.prisma.channel_accounts.count({ where: { status: 'connected' } }),
+      this.prisma.campaigns.count({ where: { status: 'active' } }),
+      this.prisma.conversations.findMany({
         take: 10,
         orderBy: { lastMessageAt: 'desc' },
         include: {
-          channelAccount: true,
-          participant: true,
-          campaign: true,
+          channel_accounts: true,
+          participants: true,
+          campaigns: true,
           messages: {
             orderBy: { sentAt: 'desc' },
             take: 1,
@@ -39,7 +39,7 @@ export class MarketingService {
     ]);
 
     // Channel breakdown
-    const channelBreakdown = await this.prisma.conversation.groupBy({
+    const channelBreakdown = await this.prisma.conversations.groupBy({
       by: ['platform'],
       _count: {
         id: true,
@@ -47,7 +47,7 @@ export class MarketingService {
     });
 
     // Campaign performance (top 5)
-    const topCampaigns = await this.prisma.campaign.findMany({
+    const topCampaigns = await this.prisma.campaigns.findMany({
       where: { status: 'active' },
       take: 5,
       include: {

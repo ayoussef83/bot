@@ -99,7 +99,7 @@ export class WebhooksController {
         const phoneNumberId = String(metadata?.phone_number_id || '');
         if (!phoneNumberId) continue;
 
-        const channel = await this.prisma.channelAccount.findFirst({
+        const channel = await this.prisma.channel_accounts.findFirst({
           where: { platform: MarketingPlatform.whatsapp_business, externalId: phoneNumberId },
         });
         if (!channel) {
@@ -109,7 +109,7 @@ export class WebhooksController {
         }
 
         // Best-effort sync marker
-        await this.prisma.channelAccount
+        await this.prisma.channel_accounts
           .update({ where: { id: channel.id }, data: { lastSyncAt: new Date() } })
           .catch(() => undefined);
 
@@ -128,18 +128,18 @@ export class WebhooksController {
           const contact = contacts.find((c) => String(c?.wa_id || '') === waId);
           const contactName = String(contact?.profile?.name || '').trim() || undefined;
 
-          const existingParticipant = await this.prisma.participant.findFirst({
+          const existingParticipant = await this.prisma.participants.findFirst({
             where: { platformUserId: waId },
           });
           const participant = existingParticipant
-            ? await this.prisma.participant.update({
+            ? await this.prisma.participants.update({
                 where: { id: existingParticipant.id },
                 data: {
                   ...(contactName ? { name: contactName } : {}),
                   lastSeenAt: new Date(),
                 },
               })
-            : await this.prisma.participant.create({
+            : await this.prisma.participants.create({
                 data: {
                   platformUserId: waId,
                   type: 'unknown',
@@ -150,7 +150,7 @@ export class WebhooksController {
               });
 
           const threadId = `${phoneNumberId}:${waId}`;
-          const conversation = await this.prisma.conversation.upsert({
+          const conversation = await this.prisma.conversations.upsert({
             where: {
               platform_externalThreadId: {
                 platform: MarketingPlatform.whatsapp_business,
@@ -272,13 +272,13 @@ export class WebhooksController {
 
         if (!senderId || !pageId) continue;
 
-        const channel = await this.prisma.channelAccount.findFirst({
+        const channel = await this.prisma.channel_accounts.findFirst({
           where: { platform: MarketingPlatform.facebook_page, externalId: pageId },
         });
         const effectiveChannel =
           channel ||
           (normalized.isMetaTestPayload
-            ? await this.prisma.channelAccount.findFirst({
+            ? await this.prisma.channel_accounts.findFirst({
                 where: { platform: MarketingPlatform.facebook_page },
                 orderBy: { updatedAt: 'desc' },
               })
@@ -305,15 +305,15 @@ export class WebhooksController {
             ? String(effectiveChannel.externalId || pageId)
             : pageId;
 
-        const existingParticipant = await this.prisma.participant.findFirst({
+        const existingParticipant = await this.prisma.participants.findFirst({
           where: { platformUserId: senderId },
         });
         const participant = existingParticipant
-          ? await this.prisma.participant.update({
+          ? await this.prisma.participants.update({
               where: { id: existingParticipant.id },
               data: { lastSeenAt: new Date() },
             })
-          : await this.prisma.participant.create({
+          : await this.prisma.participants.create({
               data: {
                 platformUserId: senderId,
                 type: 'unknown',
@@ -323,7 +323,7 @@ export class WebhooksController {
             });
 
         const threadId = `${effectivePageId}:${senderId}`;
-        const conversation = await this.prisma.conversation.upsert({
+        const conversation = await this.prisma.conversations.upsert({
           where: {
             platform_externalThreadId: {
               platform: MarketingPlatform.facebook_page,
@@ -358,7 +358,7 @@ export class WebhooksController {
               const name = `${first} ${last}`.trim();
               const pic = String(json?.profile_pic || '').trim();
               if (name || pic) {
-                await this.prisma.participant.update({
+                await this.prisma.participants.update({
                   where: { id: participant.id },
                   data: {
                     ...(name ? { name } : {}),
@@ -423,7 +423,7 @@ export class WebhooksController {
         const read = evt?.read;
         if (read?.watermark) {
           const readAt = new Date(Number(read.watermark) || Date.now());
-          await this.prisma.conversation
+          await this.prisma.conversations
             .update({
               where: { id: conversation.id },
               data: { lastReadAt: readAt },
@@ -432,7 +432,7 @@ export class WebhooksController {
         }
 
         // Update channel last sync (best-effort)
-        await this.prisma.channelAccount
+        await this.prisma.channel_accounts
           .update({
             where: { id: effectiveChannel.id },
             data: { lastSyncAt: new Date() },
@@ -465,13 +465,13 @@ export class WebhooksController {
         const accountId = recipientId || entryId;
         if (!accountId) continue;
 
-        const channel = await this.prisma.channelAccount.findFirst({
+        const channel = await this.prisma.channel_accounts.findFirst({
           where: { platform: MarketingPlatform.instagram_business, externalId: accountId },
         });
         const effectiveChannel =
           channel ||
           (normalized.isMetaTestPayload
-            ? await this.prisma.channelAccount.findFirst({
+            ? await this.prisma.channel_accounts.findFirst({
                 where: { platform: MarketingPlatform.instagram_business },
                 orderBy: { updatedAt: 'desc' },
               })
@@ -486,15 +486,15 @@ export class WebhooksController {
           continue;
         }
 
-        const existingParticipant = await this.prisma.participant.findFirst({
+        const existingParticipant = await this.prisma.participants.findFirst({
           where: { platformUserId: senderId },
         });
         const participant = existingParticipant
-          ? await this.prisma.participant.update({
+          ? await this.prisma.participants.update({
               where: { id: existingParticipant.id },
               data: { lastSeenAt: new Date() },
             })
-          : await this.prisma.participant.create({
+          : await this.prisma.participants.create({
               data: {
                 platformUserId: senderId,
                 type: 'unknown',
@@ -504,7 +504,7 @@ export class WebhooksController {
             });
 
         const threadId = `${String(effectiveChannel.externalId)}:${senderId}`;
-        const conversation = await this.prisma.conversation.upsert({
+        const conversation = await this.prisma.conversations.upsert({
           where: {
             platform_externalThreadId: {
               platform: MarketingPlatform.instagram_business,
@@ -553,7 +553,7 @@ export class WebhooksController {
           }
         }
 
-        await this.prisma.channelAccount
+        await this.prisma.channel_accounts
           .update({
             where: { id: effectiveChannel.id },
             data: { lastSyncAt: new Date() },

@@ -8,13 +8,13 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
+    return this.prisma.users.findUnique({
       where: { email, deletedAt: null },
     });
   }
 
   async findById(id: string) {
-    return this.prisma.user.findUnique({
+    return this.prisma.users.findUnique({
       where: { id, deletedAt: null },
     });
   }
@@ -27,7 +27,7 @@ export class UsersService {
     role: UserRole;
   }) {
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    return this.prisma.user.create({
+    return this.prisma.users.create({
       data: {
         ...data,
         password: hashedPassword,
@@ -36,7 +36,7 @@ export class UsersService {
   }
 
   async findAll() {
-    return this.prisma.user.findMany({
+    return this.prisma.users.findMany({
       where: { deletedAt: null },
       select: {
         id: true,
@@ -63,21 +63,21 @@ export class UsersService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    return this.prisma.user.update({
+    return this.prisma.users.update({
       where: { id },
       data,
     });
   }
 
   async softDelete(id: string) {
-    return this.prisma.user.update({
+    return this.prisma.users.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
   }
 
   async getInstructorProfile(userId: string) {
-    return this.prisma.instructor.findUnique({
+    return this.prisma.instructors.findUnique({
       where: { userId },
     });
   }

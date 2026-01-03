@@ -20,7 +20,7 @@ export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
   private async getSmsMisrActiveConfig() {
-    const cfg = await this.prisma.integrationConfig.findUnique({
+    const cfg = await this.prisma.integration_configs.findUnique({
       where: { provider: 'smsmisr' },
     });
     if (!cfg || !cfg.isActive) {
@@ -44,7 +44,7 @@ export class SettingsService {
   }
 
   async listCustomFields(entity: CustomFieldEntity) {
-    return this.prisma.customFieldDefinition.findMany({
+    return this.prisma.custom_field_definitions.findMany({
       where: {
         entity,
         deletedAt: null,
@@ -57,7 +57,7 @@ export class SettingsService {
     const key = dto.key.trim();
     if (!key) throw new BadRequestException('key is required');
 
-    return this.prisma.customFieldDefinition.create({
+    return this.prisma.custom_field_definitions.create({
       data: {
         entity: dto.entity,
         key,
@@ -73,12 +73,12 @@ export class SettingsService {
   }
 
   async updateCustomField(id: string, dto: UpdateCustomFieldDto) {
-    const existing = await this.prisma.customFieldDefinition.findFirst({
+    const existing = await this.prisma.custom_field_definitions.findFirst({
       where: { id, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Custom field not found');
 
-    return this.prisma.customFieldDefinition.update({
+    return this.prisma.custom_field_definitions.update({
       where: { id },
       data: {
         ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
@@ -92,12 +92,12 @@ export class SettingsService {
   }
 
   async deleteCustomField(id: string) {
-    const existing = await this.prisma.customFieldDefinition.findFirst({
+    const existing = await this.prisma.custom_field_definitions.findFirst({
       where: { id, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Custom field not found');
 
-    return this.prisma.customFieldDefinition.update({
+    return this.prisma.custom_field_definitions.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
@@ -108,7 +108,7 @@ export class SettingsService {
   // -----------------------------
 
   async getIntegrationConfig(provider: IntegrationProvider) {
-    const cfg = await this.prisma.integrationConfig.findUnique({
+    const cfg = await this.prisma.integration_configs.findUnique({
       where: { provider },
     });
     if (!cfg) {
@@ -128,7 +128,7 @@ export class SettingsService {
   }
 
   async upsertIntegrationConfig(dto: UpsertIntegrationConfigDto) {
-    const existing = await this.prisma.integrationConfig.findUnique({
+    const existing = await this.prisma.integration_configs.findUnique({
       where: { provider: dto.provider },
     });
 
@@ -136,7 +136,7 @@ export class SettingsService {
     const nextSecrets = dto.secrets ?? undefined;
 
     if (!existing) {
-      return this.prisma.integrationConfig.create({
+      return this.prisma.integration_configs.create({
         data: {
           provider: dto.provider,
           isActive: dto.isActive ?? true,
@@ -154,7 +154,7 @@ export class SettingsService {
       });
     }
 
-    return this.prisma.integrationConfig.update({
+    return this.prisma.integration_configs.update({
       where: { provider: dto.provider },
       data: {
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
@@ -177,7 +177,7 @@ export class SettingsService {
   // -----------------------------
 
   async listTemplates(channel?: MessageChannel) {
-    return this.prisma.messageTemplate.findMany({
+    return this.prisma.message_templates.findMany({
       where: {
         deletedAt: null,
         ...(channel ? { channel } : {}),
@@ -189,7 +189,7 @@ export class SettingsService {
   async createTemplate(dto: CreateMessageTemplateDto, createdBy?: string) {
     const key = dto.key.trim();
     if (!key) throw new BadRequestException('key is required');
-    return this.prisma.messageTemplate.create({
+    return this.prisma.message_templates.create({
       data: {
         channel: dto.channel,
         key,
@@ -203,12 +203,12 @@ export class SettingsService {
   }
 
   async updateTemplate(id: string, dto: UpdateMessageTemplateDto) {
-    const existing = await this.prisma.messageTemplate.findFirst({
+    const existing = await this.prisma.message_templates.findFirst({
       where: { id, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Template not found');
 
-    return this.prisma.messageTemplate.update({
+    return this.prisma.message_templates.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
@@ -220,12 +220,12 @@ export class SettingsService {
   }
 
   async deleteTemplate(id: string) {
-    const existing = await this.prisma.messageTemplate.findFirst({
+    const existing = await this.prisma.message_templates.findFirst({
       where: { id, deletedAt: null },
     });
     if (!existing) throw new NotFoundException('Template not found');
 
-    return this.prisma.messageTemplate.update({
+    return this.prisma.message_templates.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });

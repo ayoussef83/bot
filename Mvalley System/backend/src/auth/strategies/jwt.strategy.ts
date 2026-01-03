@@ -27,7 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     
     // Include instructor profile if user is an instructor
     if (user.role === 'instructor') {
-      const instructor = await this.prisma.instructor.findUnique({
+      const instructor = await this.prisma.instructors.findUnique({
         where: { userId: user.id },
       });
       return { ...user, instructorId: instructor?.id };

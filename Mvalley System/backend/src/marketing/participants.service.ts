@@ -7,7 +7,7 @@ export class ParticipantsService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: CreateParticipantDto) {
-    return this.prisma.participant.create({
+    return this.prisma.participants.create({
       data: {
         ...data,
         type: data.type || 'unknown',
@@ -23,7 +23,7 @@ export class ParticipantsService {
   }
 
   async findAll() {
-    return this.prisma.participant.findMany({
+    return this.prisma.participants.findMany({
       include: {
         _count: {
           select: {
@@ -39,14 +39,14 @@ export class ParticipantsService {
   }
 
   async findOne(id: string) {
-    const participant = await this.prisma.participant.findUnique({
+    const participant = await this.prisma.participants.findUnique({
       where: { id },
       include: {
         conversations: {
           orderBy: { lastMessageAt: 'desc' },
           include: {
-            channelAccount: true,
-            campaign: true,
+            channel_accounts: true,
+            campaigns: true,
             _count: {
               select: {
                 messages: true,
@@ -66,7 +66,7 @@ export class ParticipantsService {
   }
 
   async update(id: string, data: UpdateParticipantDto) {
-    return this.prisma.participant.update({
+    return this.prisma.participants.update({
       where: { id },
       data: {
         ...data,
@@ -83,7 +83,7 @@ export class ParticipantsService {
   }
 
   async remove(id: string) {
-    await this.prisma.participant.delete({
+    await this.prisma.participants.delete({
       where: { id },
     });
 

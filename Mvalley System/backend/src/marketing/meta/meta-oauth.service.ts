@@ -188,7 +188,7 @@ export class MetaOAuthService {
         subscribed = false;
       }
 
-      const upserted = await this.prisma.channelAccount.upsert({
+      const upserted = await this.prisma.channel_accounts.upsert({
         where: {
           platform_externalId: { platform: MarketingPlatform.facebook_page, externalId: pageId },
         },

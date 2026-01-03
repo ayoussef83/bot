@@ -23,7 +23,7 @@ export class ClassesController {
 
   @Post()
   @Roles(UserRole.super_admin, UserRole.operations)
-  create(@Body() createClassDto: CreateClassDto, @CurrentUser() user: any) {
+  create(@Body() createClassDto: CreateClassDto, @CurrentUser() users: any) {
     return this.classesService.create(createClassDto, user.id);
   }
 
@@ -54,14 +54,14 @@ export class ClassesController {
   update(
     @Param('id') id: string,
     @Body() updateClassDto: UpdateClassDto,
-    @CurrentUser() user: any,
+    @CurrentUser() users: any,
   ) {
     return this.classesService.update(id, updateClassDto, user.id);
   }
 
   @Delete(':id')
   @Roles(UserRole.super_admin, UserRole.operations)
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@Param('id') id: string, @CurrentUser() users: any) {
     return this.classesService.remove(id, user.id);
   }
 }

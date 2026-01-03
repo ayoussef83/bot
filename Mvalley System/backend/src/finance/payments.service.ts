@@ -12,7 +12,7 @@ export class PaymentsService {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const count = await this.prisma.payment.count({
+    const count = await this.prisma.payments.count({
       where: {
         receivedDate: {
           gte: new Date(year, now.getMonth(), 1),
@@ -24,7 +24,7 @@ export class PaymentsService {
 
     // Update cash account balance if payment is received
     if (createPaymentDto.status === 'received') {
-      await this.prisma.cashAccount.update({
+      await this.prisma.cash_accounts.update({
         where: { id: createPaymentDto.cashAccountId },
         data: {
           balance: {
@@ -34,7 +34,7 @@ export class PaymentsService {
       });
     }
 
-    return this.prisma.payment.create({
+    return this.prisma.payments.create({
       data: {
         ...createPaymentDto,
         paymentNumber,
@@ -43,13 +43,13 @@ export class PaymentsService {
         studentId: createPaymentDto.studentId,
       },
       include: {
-        cashAccount: true,
-        student: true,
-        allocations: {
+        cash_accounts: true,
+        students: true,
+        payment_allocations: {
           include: {
             invoice: {
               include: {
-                student: true,
+                students: true,
               },
             },
           },
@@ -74,17 +74,17 @@ export class PaymentsService {
 
     console.log('[PaymentsService.findAll] Where clause:', JSON.stringify(whereClause, null, 2));
 
-    const payments = await this.prisma.payment.findMany({
+    const payments = await this.prisma.payments.findMany({
       where: whereClause,
       orderBy: { receivedDate: 'desc' },
       include: {
-        cashAccount: true,
-        student: true, // Include student directly
-        allocations: {
+        cash_accounts: true,
+        students: true, // Include student directly
+        payment_allocations: {
           include: {
             invoice: {
               include: {
-                student: true,
+                students: true,
               },
             },
           },
@@ -111,15 +111,15 @@ export class PaymentsService {
   }
 
   async findOne(id: string) {
-    return this.prisma.payment.findUnique({
+    return this.prisma.payments.findUnique({
       where: { id },
       include: {
-        cashAccount: true,
-        allocations: {
+        cash_accounts: true,
+        payment_allocations: {
           include: {
             invoice: {
               include: {
-                student: true,
+                students: true,
               },
             },
           },
@@ -130,10 +130,10 @@ export class PaymentsService {
 
   async createAllocation(createAllocationDto: CreatePaymentAllocationDto, userId?: string) {
     // Verify payment exists and has enough unallocated amount
-    const payment = await this.prisma.payment.findUnique({
+    const payment = await this.prisma.payments.findUnique({
       where: { id: createAllocationDto.paymentId },
       include: {
-        allocations: true,
+        payment_allocations: true,
       },
     });
 
@@ -149,7 +149,7 @@ export class PaymentsService {
     }
 
     // Create allocation
-    const allocation = await this.prisma.paymentAllocation.create({
+    const allocation = await this.prisma.payments_allocations.create({
       data: {
         ...createAllocationDto,
         allocatedBy: userId,
@@ -158,14 +158,14 @@ export class PaymentsService {
         payment: true,
         invoice: {
           include: {
-            student: true,
+            students: true,
           },
         },
       },
     });
 
     // Update invoice status
-    const invoice = await this.prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoices.findUnique({
       where: { id: createAllocationDto.invoiceId },
       include: {
         paymentAllocations: true,
@@ -187,7 +187,7 @@ export class PaymentsService {
         newStatus = 'overdue';
       }
 
-      await this.prisma.invoice.update({
+      await this.prisma.invoices.update({
         where: { id: invoice.id },
         data: { status: newStatus },
       });
@@ -197,11 +197,11 @@ export class PaymentsService {
   }
 
   async reverse(id: string, reason: string, userId?: string) {
-    const payment = await this.prisma.payment.findUnique({
+    const payment = await this.prisma.payments.findUnique({
       where: { id },
       include: {
-        allocations: true,
-        cashAccount: true,
+        payment_allocations: true,
+        cash_accounts: true,
       },
     });
 
@@ -215,7 +215,7 @@ export class PaymentsService {
 
     // Reverse cash account balance if payment was received
     if (payment.status === 'received' && payment.cashAccount) {
-      await this.prisma.cashAccount.update({
+      await this.prisma.cash_accounts.update({
         where: { id: payment.cashAccountId },
         data: {
           balance: {
@@ -227,7 +227,7 @@ export class PaymentsService {
 
     // Reverse invoice statuses
     for (const allocation of payment.allocations) {
-      const invoice = await this.prisma.invoice.findUnique({
+      const invoice = await this.prisma.invoices.findUnique({
         where: { id: allocation.invoiceId },
         include: {
           paymentAllocations: true,
@@ -248,7 +248,7 @@ export class PaymentsService {
           newStatus = 'overdue';
         }
 
-        await this.prisma.invoice.update({
+        await this.prisma.invoices.update({
           where: { id: invoice.id },
           data: { status: newStatus },
         });
@@ -256,12 +256,12 @@ export class PaymentsService {
     }
 
     // Delete allocations
-    await this.prisma.paymentAllocation.deleteMany({
+    await this.prisma.payments_allocations.deleteMany({
       where: { paymentId: id },
     });
 
     // Update payment status
-    return this.prisma.payment.update({
+    return this.prisma.payments.update({
       where: { id },
       data: {
         status: 'reversed',

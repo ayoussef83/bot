@@ -86,7 +86,7 @@ export class BankSyncService {
     notes?: string;
     createdBy?: string;
   }) {
-    const acc = await this.prisma.cashAccount.findUnique({ where: { id: params.cashAccountId } });
+    const acc = await this.prisma.cash_accounts.findUnique({ where: { id: params.cashAccountId } });
     if (!acc) throw new NotFoundException('Cash account not found');
     if (acc.type !== CashAccountType.bank) {
       throw new BadRequestException('Bank sync is only available for cash accounts of type "bank"');
@@ -95,7 +95,7 @@ export class BankSyncService {
     const asOfDate = params.asOfDate ?? new Date();
     const endingBalance = params.balance;
 
-    const run = await this.prisma.bankSyncRun.create({
+    const run = await this.prisma.bank_sync_runs.create({
       data: {
         cashAccountId: acc.id,
         source: BankSyncSource.manual,
@@ -106,12 +106,12 @@ export class BankSyncService {
       },
     });
 
-    const updated = await this.prisma.cashAccount.update({
+    const updated = await this.prisma.cash_accounts.update({
       where: { id: acc.id },
       data: { balance: endingBalance },
     });
 
-    return { cashAccount: updated, run };
+    return { cash_accounts: updated, run };
   }
 
   async uploadCsv(params: {
@@ -122,7 +122,7 @@ export class BankSyncService {
     notes?: string;
     createdBy?: string;
   }) {
-    const acc = await this.prisma.cashAccount.findUnique({ where: { id: params.cashAccountId } });
+    const acc = await this.prisma.cash_accounts.findUnique({ where: { id: params.cashAccountId } });
     if (!acc) throw new NotFoundException('Cash account not found');
     if (acc.type !== CashAccountType.bank) {
       throw new BadRequestException('Bank sync is only available for cash accounts of type "bank"');
@@ -157,7 +157,7 @@ export class BankSyncService {
 
     const asOfDate = params.asOfDate ?? new Date();
 
-    const run = await this.prisma.bankSyncRun.create({
+    const run = await this.prisma.bank_sync_runs.create({
       data: {
         cashAccountId: acc.id,
         source: BankSyncSource.csv_upload,
@@ -170,16 +170,16 @@ export class BankSyncService {
       },
     });
 
-    const updated = await this.prisma.cashAccount.update({
+    const updated = await this.prisma.cash_accounts.update({
       where: { id: acc.id },
       data: { balance: endingBalance },
     });
 
-    return { cashAccount: updated, run };
+    return { cash_accounts: updated, run };
   }
 
   async listRuns(cashAccountId?: string) {
-    return this.prisma.bankSyncRun.findMany({
+    return this.prisma.bank_sync_runs.findMany({
       where: cashAccountId ? { cashAccountId } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 50,

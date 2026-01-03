@@ -22,7 +22,7 @@ export class SmsService {
     template?: string,
     payload?: any,
   ) {
-    const cfg = await this.prisma.integrationConfig.findUnique({
+    const cfg = await this.prisma.integration_configs.findUnique({
       where: { provider: 'smsmisr' },
     });
 

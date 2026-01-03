@@ -9,13 +9,13 @@ export class CoursesService {
   async createCourse(dto: CreateCourseDto) {
     const name = dto.name?.trim();
     if (!name) throw new BadRequestException('Course name is required');
-    return this.prisma.course.create({
+    return this.prisma.courses.create({
       data: { name, isActive: dto.isActive ?? true },
     });
   }
 
   async listCourses() {
-    return this.prisma.course.findMany({
+    return this.prisma.courses.findMany({
       where: { deletedAt: null },
       include: {
         levels: {
@@ -28,7 +28,7 @@ export class CoursesService {
   }
 
   async getCourse(id: string) {
-    const course = await this.prisma.course.findFirst({
+    const course = await this.prisma.courses.findFirst({
       where: { id, deletedAt: null },
       include: {
         levels: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
@@ -39,9 +39,9 @@ export class CoursesService {
   }
 
   async updateCourse(id: string, dto: UpdateCourseDto) {
-    const existing = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.courses.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Course not found');
-    return this.prisma.course.update({
+    return this.prisma.courses.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
@@ -51,17 +51,17 @@ export class CoursesService {
   }
 
   async deleteCourse(id: string) {
-    const existing = await this.prisma.course.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.courses.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Course not found');
-    return this.prisma.course.update({ where: { id }, data: { deletedAt: new Date() } });
+    return this.prisma.courses.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   async createLevel(dto: CreateCourseLevelDto) {
-    const course = await this.prisma.course.findFirst({ where: { id: dto.courseId, deletedAt: null } });
+    const course = await this.prisma.courses.findFirst({ where: { id: dto.courseId, deletedAt: null } });
     if (!course) throw new NotFoundException('Course not found');
     const name = dto.name?.trim();
     if (!name) throw new BadRequestException('Level name is required');
-    return this.prisma.courseLevel.create({
+    return this.prisma.courses_levels.create({
       data: {
         courseId: dto.courseId,
         name,
@@ -72,9 +72,9 @@ export class CoursesService {
   }
 
   async updateLevel(id: string, dto: UpdateCourseLevelDto) {
-    const existing = await this.prisma.courseLevel.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.courses_levels.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Course level not found');
-    return this.prisma.courseLevel.update({
+    return this.prisma.courses_levels.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
@@ -85,16 +85,16 @@ export class CoursesService {
   }
 
   async deleteLevel(id: string) {
-    const existing = await this.prisma.courseLevel.findFirst({ where: { id, deletedAt: null } });
+    const existing = await this.prisma.courses_levels.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Course level not found');
-    return this.prisma.courseLevel.update({ where: { id }, data: { deletedAt: new Date() } });
+    return this.prisma.courses_levels.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   // For dropdowns
   async listLevels() {
     // Backfill: ensure courses/levels exist for existing course groups (classes) like "Python", "Lego Mindstorm".
     // This keeps dropdowns working even if older data was created before the Course/CourseLevel tables existed.
-    const classNames = await this.prisma.class.findMany({
+    const classNames = await this.prisma.classes.findMany({
       where: { deletedAt: null },
       select: { name: true },
       distinct: ['name'],
@@ -102,22 +102,22 @@ export class CoursesService {
     for (const row of classNames) {
       const name = (row?.name || '').trim();
       if (!name) continue;
-      const course = await this.prisma.course.upsert({
+      const course = await this.prisma.courses.upsert({
         where: { name },
         update: { deletedAt: null, isActive: true },
         create: { name, isActive: true },
       });
-      await this.prisma.courseLevel.upsert({
+      await this.prisma.courses_levels.upsert({
         where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
         update: { deletedAt: null, isActive: true, sortOrder: 1 },
         create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
       });
     }
 
-    return this.prisma.courseLevel.findMany({
-      where: { deletedAt: null, course: { deletedAt: null } },
-      include: { course: true },
-      orderBy: [{ course: { name: 'asc' } }, { sortOrder: 'asc' }],
+    return this.prisma.courses_levels.findMany({
+      where: { deletedAt: null, courses: { deletedAt: null } },
+      include: { courses: true },
+      orderBy: [{ courses: { name: 'asc' } }, { sortOrder: 'asc' }],
     });
   }
 }

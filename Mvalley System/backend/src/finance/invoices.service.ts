@@ -12,7 +12,7 @@ export class InvoicesService {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const count = await this.prisma.invoice.count({
+    const count = await this.prisma.invoices.count({
       where: {
         issueDate: {
           gte: new Date(year, now.getMonth(), 1),
@@ -36,7 +36,7 @@ export class InvoicesService {
       status = 'overdue';
     }
 
-    return this.prisma.invoice.create({
+    return this.prisma.invoices.create({
       data: {
         ...createInvoiceDto,
         invoiceNumber,
@@ -49,7 +49,7 @@ export class InvoicesService {
         status,
       },
       include: {
-        student: true,
+        students: true,
         paymentAllocations: {
           include: {
             payment: true,
@@ -60,10 +60,10 @@ export class InvoicesService {
   }
 
   async findAll() {
-    return this.prisma.invoice.findMany({
+    return this.prisma.invoices.findMany({
       orderBy: { issueDate: 'desc' },
       include: {
-        student: true,
+        students: true,
         paymentAllocations: {
           include: {
             payment: true,
@@ -74,15 +74,15 @@ export class InvoicesService {
   }
 
   async findOne(id: string) {
-    return this.prisma.invoice.findUnique({
+    return this.prisma.invoices.findUnique({
       where: { id },
       include: {
-        student: true,
+        students: true,
         paymentAllocations: {
           include: {
             payment: {
               include: {
-                cashAccount: true,
+                cash_accounts: true,
               },
             },
           },
@@ -92,7 +92,7 @@ export class InvoicesService {
   }
 
   async findByStudent(studentId: string) {
-    return this.prisma.invoice.findMany({
+    return this.prisma.invoices.findMany({
       where: { studentId },
       orderBy: { issueDate: 'desc' },
       include: {
@@ -106,7 +106,7 @@ export class InvoicesService {
   }
 
   async updateStatus(id: string, status: InvoiceStatus) {
-    const invoice = await this.prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoices.findUnique({
       where: { id },
     });
 
@@ -120,11 +120,11 @@ export class InvoicesService {
       newStatus = 'overdue';
     }
 
-    return this.prisma.invoice.update({
+    return this.prisma.invoices.update({
       where: { id },
       data: { status: newStatus },
       include: {
-        student: true,
+        students: true,
         paymentAllocations: {
           include: {
             payment: true,
@@ -135,7 +135,7 @@ export class InvoicesService {
   }
 
   async cancel(id: string) {
-    const invoice = await this.prisma.invoice.findUnique({
+    const invoice = await this.prisma.invoices.findUnique({
       where: { id },
       include: {
         paymentAllocations: true,
@@ -154,7 +154,7 @@ export class InvoicesService {
       throw new Error('Cannot cancel invoice with payments allocated');
     }
 
-    return this.prisma.invoice.update({
+    return this.prisma.invoices.update({
       where: { id },
       data: { status: 'cancelled' },
     });

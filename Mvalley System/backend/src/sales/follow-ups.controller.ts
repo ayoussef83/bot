@@ -21,7 +21,7 @@ export class FollowUpsController {
 
   @Post()
   @Roles(UserRole.super_admin, UserRole.sales)
-  create(@Body() createFollowUpDto: CreateFollowUpDto, @CurrentUser() user: any) {
+  create(@Body() createFollowUpDto: CreateFollowUpDto, @CurrentUser() users: any) {
     return this.followUpsService.create(createFollowUpDto, user.id);
   }
 

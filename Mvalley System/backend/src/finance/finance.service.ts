@@ -9,13 +9,13 @@ export class FinanceService {
     const currentPeriod = await this.getCurrentPeriod();
 
     // Cash Position
-    const cashAccounts = await this.prisma.cashAccount.findMany({
+    const cashAccounts = await this.prisma.cash_accounts.findMany({
       where: { isActive: true },
     });
     const totalCash = cashAccounts.reduce((sum, acc) => sum + acc.balance, 0);
 
     // Expected Revenue (unpaid invoices)
-    const expectedRevenue = await this.prisma.invoice.aggregate({
+    const expectedRevenue = await this.prisma.invoices.aggregate({
       where: {
         status: {
           in: ['issued', 'partially_paid', 'overdue'],
@@ -27,7 +27,7 @@ export class FinanceService {
     });
 
     // Actual Revenue (received payments in current period)
-    const actualRevenue = await this.prisma.payment.aggregate({
+    const actualRevenue = await this.prisma.payments.aggregate({
       where: {
         status: 'received',
         receivedDate: currentPeriod
@@ -43,7 +43,7 @@ export class FinanceService {
     });
 
     // Expenses (paid in current period)
-    const expenses = await this.prisma.expense.aggregate({
+    const expenses = await this.prisma.expenses.aggregate({
       where: {
         status: 'paid',
         paidDate: currentPeriod
@@ -59,7 +59,7 @@ export class FinanceService {
     });
 
     // Overdue Invoices
-    const overdueInvoices = await this.prisma.invoice.count({
+    const overdueInvoices = await this.prisma.invoices.count({
       where: {
         status: 'overdue',
         dueDate: {
@@ -68,7 +68,7 @@ export class FinanceService {
       },
     });
 
-    const overdueAmount = await this.prisma.invoice.aggregate({
+    const overdueAmount = await this.prisma.invoices.aggregate({
       where: {
         status: 'overdue',
         dueDate: {
@@ -81,11 +81,11 @@ export class FinanceService {
     });
 
     // Unpaid Instructor Balances
-    const instructorCategory = await this.prisma.expenseCategory.findFirst({
+    const instructorCategory = await this.prisma.expenses_categories.findFirst({
       where: { code: 'INSTR' },
     });
 
-    const unpaidInstructorExpenses = await this.prisma.expense.aggregate({
+    const unpaidInstructorExpenses = await this.prisma.expenses.aggregate({
       where: {
         categoryId: instructorCategory?.id,
         status: {
@@ -112,16 +112,16 @@ export class FinanceService {
     }));
 
     // Recent payments
-    const recentPayments = await this.prisma.payment.findMany({
+    const recentPayments = await this.prisma.payments.findMany({
       take: 10,
       orderBy: { receivedDate: 'desc' },
       include: {
-        cashAccount: true,
-        allocations: {
+        cash_accounts: true,
+        payment_allocations: {
           include: {
             invoice: {
               include: {
-                student: true,
+                students: true,
               },
             },
           },
@@ -130,17 +130,17 @@ export class FinanceService {
     });
 
     // Recent expenses
-    const recentExpenses = await this.prisma.expense.findMany({
+    const recentExpenses = await this.prisma.expenses.findMany({
       take: 10,
       orderBy: { expenseDate: 'desc' },
       include: {
         category: true,
-        instructor: {
+        instructors: {
           include: {
-            user: true,
+            users: true,
           },
         },
-        cashAccount: true,
+        cash_accounts: true,
       },
     });
 
@@ -177,13 +177,13 @@ export class FinanceService {
     const month = now.getMonth() + 1;
     const periodCode = `${year}-${String(month).padStart(2, '0')}`;
 
-    return this.prisma.financialPeriod.findUnique({
+    return this.prisma.financial_periods.findUnique({
       where: { periodCode },
     });
   }
 
   async getFinancialPeriods() {
-    return this.prisma.financialPeriod.findMany({
+    return this.prisma.financial_periods.findMany({
       orderBy: {
         periodCode: 'desc',
       },
