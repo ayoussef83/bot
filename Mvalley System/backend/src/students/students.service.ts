@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
-import { CreateStudentDto, UpdateStudentDto } from './dto';
+import { CreateStudentDto, UpdateStudentDto, UpdateEnrollmentDto } from './dto';
 
 @Injectable()
 export class StudentsService {
@@ -81,6 +81,12 @@ export class StudentsService {
           },
         },
         parent: true,
+        enrollments: {
+          include: {
+            courseLevel: { include: { course: true } },
+            class: true,
+          },
+        },
       },
     });
 
@@ -145,6 +151,12 @@ export class StudentsService {
           },
         },
         parent: true,
+        enrollments: {
+          include: {
+            courseLevel: { include: { course: true } },
+            class: true,
+          },
+        },
       },
     });
   }
@@ -169,6 +181,12 @@ export class StudentsService {
           },
         },
         parent: true,
+        enrollments: {
+          include: {
+            courseLevel: { include: { course: true } },
+            class: true,
+          },
+        },
         payments: userRole !== 'instructor', // Hide payments from instructors
         attendances: {
           include: {
@@ -204,6 +222,116 @@ export class StudentsService {
     return student;
   }
 
+  async listEnrollments(studentId: string, userRole: UserRole, userId?: string) {
+    // Basic access check for instructor: only if the student is in any of their classes OR any enrollment class is theirs
+    if (userRole === 'instructor') {
+      const instructor = await this.prisma.instructor.findUnique({ where: { userId } });
+      if (!instructor) return [];
+
+      const student = await this.prisma.student.findFirst({
+        where: { id: studentId, deletedAt: null },
+        select: { class: { select: { instructorId: true } } },
+      });
+      const baseOk = student?.class?.instructorId === instructor.id;
+
+      const enrollmentOk = await this.prisma.studentEnrollment.findFirst({
+        where: {
+          studentId,
+          class: { instructorId: instructor.id },
+        },
+        select: { id: true },
+      });
+
+      if (!baseOk && !enrollmentOk) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    return this.prisma.studentEnrollment.findMany({
+      where: { studentId },
+      include: {
+        courseLevel: { include: { course: true } },
+        class: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async addEnrollment(studentId: string, courseLevelId: string, classId: string | undefined, createdBy: string) {
+    const student = await this.prisma.student.findFirst({ where: { id: studentId, deletedAt: null } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const level = await this.prisma.courseLevel.findFirst({ where: { id: courseLevelId, deletedAt: null } });
+    if (!level) throw new NotFoundException('Course level not found');
+
+    const created = await this.prisma.studentEnrollment.create({
+      data: {
+        studentId,
+        courseLevelId,
+        classId: classId || undefined,
+      },
+      include: {
+        courseLevel: { include: { course: true } },
+        class: true,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: createdBy,
+        action: 'create',
+        entityType: 'StudentEnrollment',
+        entityId: created.id,
+        changes: JSON.stringify({ studentId, courseLevelId, classId }),
+      },
+    });
+    return created;
+  }
+
+  async updateEnrollment(enrollmentId: string, dto: UpdateEnrollmentDto, updatedBy: string) {
+    const existing = await this.prisma.studentEnrollment.findFirst({ where: { id: enrollmentId } });
+    if (!existing) throw new NotFoundException('Enrollment not found');
+
+    const updated = await this.prisma.studentEnrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        ...(dto.classId !== undefined ? { classId: dto.classId as any } : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
+      },
+      include: {
+        courseLevel: { include: { course: true } },
+        class: true,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: updatedBy,
+        action: 'update',
+        entityType: 'StudentEnrollment',
+        entityId: enrollmentId,
+        changes: JSON.stringify(dto),
+      },
+    });
+    return updated;
+  }
+
+  async removeEnrollment(enrollmentId: string, deletedBy: string) {
+    const existing = await this.prisma.studentEnrollment.findFirst({ where: { id: enrollmentId } });
+    if (!existing) throw new NotFoundException('Enrollment not found');
+
+    await this.prisma.studentEnrollment.delete({ where: { id: enrollmentId } });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: deletedBy,
+        action: 'delete',
+        entityType: 'StudentEnrollment',
+        entityId: enrollmentId,
+      },
+    });
+    return { ok: true };
+  }
+
   async update(id: string, data: UpdateStudentDto, updatedBy: string) {
     const student = await this.prisma.student.update({
       where: { id },
@@ -211,6 +339,12 @@ export class StudentsService {
       include: {
         class: true,
         parent: true,
+        enrollments: {
+          include: {
+            courseLevel: { include: { course: true } },
+            class: true,
+          },
+        },
       },
     });
 

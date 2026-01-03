@@ -17,6 +17,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ParentsModule } from './parents/parents.module';
+import { CoursesModule } from './courses/courses.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ParentsModule } from './parents/parents.module';
     UsersModule,
     StudentsModule,
     ClassesModule,
+    CoursesModule,
     InstructorsModule,
     FinanceModule,
     SalesModule,

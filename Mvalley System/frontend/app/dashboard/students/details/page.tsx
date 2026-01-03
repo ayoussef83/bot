@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { studentsService, Student, notificationsService, type NotificationChannel } from '@/lib/services';
+import { coursesService, studentsService, Student, type StudentEnrollment, notificationsService, type NotificationChannel } from '@/lib/services';
 import { financeService, Payment } from '@/lib/services';
 import api from '@/lib/api';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
@@ -29,6 +29,10 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [enrollments, setEnrollments] = useState<StudentEnrollment[]>([]);
+  const [levels, setLevels] = useState<any[]>([]);
+  const [newLevelId, setNewLevelId] = useState('');
+  const [addingEnrollment, setAddingEnrollment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -44,6 +48,8 @@ export default function StudentDetailPage() {
       fetchStudent(id);
       fetchPayments(id);
       fetchSessions(id);
+      fetchEnrollments(id);
+      fetchLevels();
     } else {
       setError('Missing student id');
       setLoading(false);
@@ -79,6 +85,24 @@ export default function StudentDetailPage() {
       setSessions(response.data);
     } catch (err: any) {
       console.error('Failed to load sessions', err);
+    }
+  };
+
+  const fetchLevels = async () => {
+    try {
+      const res = await coursesService.listLevels();
+      setLevels(res.data || []);
+    } catch {
+      setLevels([]);
+    }
+  };
+
+  const fetchEnrollments = async (studentId: string) => {
+    try {
+      const res = await studentsService.listEnrollments(studentId);
+      setEnrollments(res.data || []);
+    } catch {
+      setEnrollments([]);
     }
   };
 
@@ -358,6 +382,88 @@ export default function StudentDetailPage() {
               <p>No classes enrolled</p>
             </div>
           )}
+        </div>
+      ),
+    },
+    {
+      id: 'courses',
+      label: 'Courses',
+      count: enrollments.length,
+      icon: <FiBookOpen className="w-4 h-4" />,
+      content: (
+        <div className="space-y-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="grid grid-cols-3 gap-4 items-end">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700">Add Course Level</label>
+                <select
+                  value={newLevelId}
+                  onChange={(e) => setNewLevelId(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                >
+                  <option value="">— Select —</option>
+                  {levels.map((l: any) => (
+                    <option key={l.id} value={l.id}>
+                      {l.course?.name} — {l.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                disabled={!newLevelId || addingEnrollment}
+                onClick={async () => {
+                  if (!id || !newLevelId) return;
+                  setAddingEnrollment(true);
+                  try {
+                    await studentsService.addEnrollment(id, { courseLevelId: newLevelId });
+                    setNewLevelId('');
+                    await fetchEnrollments(id);
+                  } catch (err: any) {
+                    setError(err?.response?.data?.message || 'Failed to add enrollment');
+                  } finally {
+                    setAddingEnrollment(false);
+                  }
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+              >
+                {addingEnrollment ? 'Adding…' : 'Add'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="divide-y divide-gray-200">
+              {enrollments.map((enr) => (
+                <div key={enr.id} className="p-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {enr.courseLevel?.course?.name || 'Course'} — {enr.courseLevel?.name || 'Level'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Status: {enr.status} • Group: {enr.class?.name || 'Unassigned'}
+                    </div>
+                  </div>
+                  <button
+                    className="text-sm text-red-600 hover:text-red-800"
+                    onClick={async () => {
+                      if (!confirm('Remove this course enrollment from the student?')) return;
+                      try {
+                        await studentsService.removeEnrollment(enr.id);
+                        if (id) await fetchEnrollments(id);
+                      } catch (err: any) {
+                        setError(err?.response?.data?.message || 'Failed to remove enrollment');
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {enrollments.length === 0 && (
+                <div className="p-8 text-center text-gray-500 text-sm">No course enrollments yet.</div>
+              )}
+            </div>
+          </div>
         </div>
       ),
     },

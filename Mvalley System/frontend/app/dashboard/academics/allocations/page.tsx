@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import StandardListView from '@/components/StandardListView';
 import { ActionButton, Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
-import { studentsService, classesService, parentsService, Student, Class, ParentContact } from '@/lib/services';
+import { studentsService, classesService, parentsService, Student, Class, ParentContact, type StudentEnrollment } from '@/lib/services';
 import { FiEdit, FiSave, FiX } from 'react-icons/fi';
 import HighlightedText from '@/components/HighlightedText';
 import { useSearchParams } from 'next/navigation';
@@ -12,6 +12,18 @@ import { useSearchParams } from 'next/navigation';
 type Draft = {
   parentId: string;
   classId: string;
+};
+
+type EnrollmentRow = {
+  id: string; // enrollmentId
+  enrollmentId: string;
+  studentId: string;
+  student: Student;
+  enrollment: StudentEnrollment;
+  parentId?: string | null;
+  parent?: any;
+  classId?: string | null;
+  class?: any;
 };
 
 export default function AllocationsPage() {
@@ -55,7 +67,7 @@ export default function AllocationsPage() {
 
   const parentLabel = (p: ParentContact) => `${p.firstName} ${p.lastName} (${p.phone})`;
 
-  const columns: Column<Student>[] = [
+  const columns: Column<EnrollmentRow>[] = [
     {
       key: 'student',
       label: 'Student',
@@ -63,12 +75,12 @@ export default function AllocationsPage() {
         <div className="text-sm">
           <div className="font-medium text-gray-900">
             <HighlightedText
-              text={`${row.firstName} ${row.lastName}`}
+              text={`${row.student.firstName} ${row.student.lastName}`}
               query={searchTerm}
             />
           </div>
           <div className="text-gray-500">
-            <HighlightedText text={row.phone || row.email || '-'} query={searchTerm} />
+            <HighlightedText text={row.student.phone || row.student.email || '-'} query={searchTerm} />
           </div>
         </div>
       ),
@@ -77,13 +89,13 @@ export default function AllocationsPage() {
       key: 'parent',
       label: 'Contact (Parent)',
       render: (_, row) => {
-        const isEditing = editingId === row.id;
+        const isEditing = editingId === row.enrollmentId;
         if (!isEditing) {
           return (
             <span className="text-sm text-gray-700">
-              {row.parent ? (
+              {row.student.parent ? (
                 <HighlightedText
-                  text={`${row.parent.firstName} ${row.parent.lastName}`}
+                  text={`${row.student.parent.firstName} ${row.student.parent.lastName}`}
                   query={searchTerm}
                 />
               ) : (
@@ -109,14 +121,26 @@ export default function AllocationsPage() {
       },
     },
     {
+      key: 'course',
+      label: 'Course / Level',
+      render: (_, row) => (
+        <span className="text-sm text-gray-700">
+          <HighlightedText
+            text={`${row.enrollment?.courseLevel?.course?.name || 'Course'} — ${row.enrollment?.courseLevel?.name || 'Level'}`}
+            query={searchTerm}
+          />
+        </span>
+      ),
+    },
+    {
       key: 'class',
       label: 'Group (Class)',
       render: (_, row) => {
-        const isEditing = editingId === row.id;
+        const isEditing = editingId === row.enrollmentId;
         if (!isEditing) {
           return (
             <span className="text-sm text-gray-700">
-              <HighlightedText text={row.class?.name || '-'} query={searchTerm} />
+              <HighlightedText text={row.enrollment?.class?.name || '-'} query={searchTerm} />
             </span>
           );
         }
@@ -129,7 +153,7 @@ export default function AllocationsPage() {
             <option value="">— Unassigned —</option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} ({c.location})
+                {c.name} ({(c as any).locationName || c.location})
               </option>
             ))}
           </select>
@@ -141,7 +165,7 @@ export default function AllocationsPage() {
       label: 'Branch',
       render: (_, row) => (
         <span className="text-sm text-gray-600">
-          <HighlightedText text={row.class?.location || '-'} query={searchTerm} />
+          <HighlightedText text={row.enrollment?.class?.locationName || row.enrollment?.class?.location || '-'} query={searchTerm} />
         </span>
       ),
     },
@@ -150,9 +174,9 @@ export default function AllocationsPage() {
       label: 'Instructor',
       render: (_, row) => (
         <span className="text-sm text-gray-600">
-          {row.class?.instructor?.user ? (
+          {row.enrollment?.class?.instructor?.user ? (
             <HighlightedText
-              text={`${row.class.instructor.user.firstName} ${row.class.instructor.user.lastName}`}
+              text={`${row.enrollment.class.instructor.user.firstName} ${row.enrollment.class.instructor.user.lastName}`}
               query={searchTerm}
             />
           ) : (
@@ -163,18 +187,18 @@ export default function AllocationsPage() {
     },
   ];
 
-  const actions = (row: Student): ActionButton[] => {
-    const isEditing = editingId === row.id;
+  const actions = (row: EnrollmentRow): ActionButton[] => {
+    const isEditing = editingId === row.enrollmentId;
     if (!isEditing) {
       return [
         {
           label: 'Edit row',
           icon: <FiEdit className="w-4 h-4" />,
           onClick: () => {
-            setEditingId(row.id);
+            setEditingId(row.enrollmentId);
             setDraft({
-              parentId: row.parentId || '',
-              classId: row.classId || preselectedClassId || '',
+              parentId: row.student.parentId || '',
+              classId: row.enrollment.classId || preselectedClassId || '',
             });
           },
         },
@@ -185,12 +209,16 @@ export default function AllocationsPage() {
         label: 'Save',
         icon: <FiSave className="w-4 h-4" />,
         onClick: async () => {
-          if (!row.id) return;
+          if (!row.enrollmentId) return;
           setSaving(true);
           setError('');
           try {
-            await studentsService.update(row.id, {
+            // Parent is on Student
+            await studentsService.update(row.studentId, {
               parentId: draft.parentId ? draft.parentId : null,
+            });
+            // Allocation is on Enrollment
+            await studentsService.updateEnrollment(row.enrollmentId, {
               classId: draft.classId ? draft.classId : null,
             });
             setEditingId(null);
@@ -214,22 +242,67 @@ export default function AllocationsPage() {
   };
 
   const rows = useMemo(() => {
+    const enrollmentRows: EnrollmentRow[] = [];
+    for (const s of students) {
+      const ens = Array.isArray(s.enrollments) ? s.enrollments : [];
+      for (const e of ens) {
+        enrollmentRows.push({
+          id: e.id,
+          enrollmentId: e.id,
+          studentId: s.id,
+          student: s,
+          enrollment: e,
+          parentId: s.parentId,
+          parent: s.parent,
+          classId: e.classId,
+          class: e.class,
+        });
+      }
+      // If student has no enrollments yet, keep a row representing legacy class assignment
+      if (ens.length === 0) {
+        enrollmentRows.push({
+          id: `legacy_${s.id}`,
+          enrollmentId: `legacy_${s.id}`,
+          studentId: s.id,
+          student: s,
+          enrollment: {
+            id: `legacy_${s.id}` as any,
+            studentId: s.id,
+            courseLevelId: '' as any,
+            status: 'legacy',
+            classId: s.classId,
+            class: s.class,
+            courseLevel: { course: { name: 'Legacy' }, name: 'No enrollment' },
+            createdAt: '' as any,
+            updatedAt: '' as any,
+          } as any,
+          parentId: s.parentId,
+          parent: s.parent,
+          classId: s.classId,
+          class: s.class,
+        });
+      }
+    }
+
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter((s) => {
+    if (!q) return enrollmentRows;
+    return enrollmentRows.filter((r) => {
+      const s = r.student;
       const fullName = `${s.firstName || ''} ${s.lastName || ''}`.trim().toLowerCase();
       const phone = (s.phone || '').toLowerCase();
       const email = (s.email || '').toLowerCase();
-      const parentName = s.parent
-        ? `${s.parent.firstName || ''} ${s.parent.lastName || ''}`.trim().toLowerCase()
-        : '';
-      const className = (s.class?.name || '').toLowerCase();
-      const branch = (s.class?.location || '').toLowerCase();
+      const parentName = s.parent ? `${s.parent.firstName || ''} ${s.parent.lastName || ''}`.trim().toLowerCase() : '';
+      const courseName = (r.enrollment?.courseLevel?.course?.name || '').toLowerCase();
+      const levelName = (r.enrollment?.courseLevel?.name || '').toLowerCase();
+      const className = (r.enrollment?.class?.name || '').toLowerCase();
+      const branch = (r.enrollment?.class?.locationName || r.enrollment?.class?.location || '').toLowerCase();
       return (
         fullName.includes(q) ||
         phone.includes(q) ||
         email.includes(q) ||
         parentName.includes(q) ||
+        courseName.includes(q) ||
+        levelName.includes(q) ||
         className.includes(q) ||
         branch.includes(q)
       );
@@ -245,12 +318,12 @@ export default function AllocationsPage() {
       )}
       <StandardListView
         title="Allocations"
-        subtitle="Assign each student to a Contact (Parent) and a Group (Class) inline—no wizard."
+        subtitle="Assign each enrollment (Course Level) to a Group (Class) inline—students can have multiple courses."
         data={rows}
         columns={columns}
         actions={actions}
         loading={loading || saving}
-        getRowId={(r) => r.id}
+        getRowId={(r) => r.enrollmentId}
         searchPlaceholder="Search student, parent, phone, class, branch..."
         searchValue={searchTerm}
         onSearch={setSearchTerm}

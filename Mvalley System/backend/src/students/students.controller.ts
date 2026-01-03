@@ -16,6 +16,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import { CreateStudentDto, UpdateStudentDto } from './dto';
+import { CreateEnrollmentDto, UpdateEnrollmentDto } from './dto';
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,6 +72,41 @@ export class StudentsController {
   )
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.studentsService.findOne(id, user.role, user.id);
+  }
+
+  @Get(':id/enrollments')
+  @Roles(
+    UserRole.super_admin,
+    UserRole.management,
+    UserRole.operations,
+    UserRole.accounting,
+    UserRole.sales,
+    UserRole.instructor,
+  )
+  listEnrollments(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.studentsService.listEnrollments(id, user.role, user.id);
+  }
+
+  @Post(':id/enrollments')
+  @Roles(UserRole.super_admin, UserRole.operations, UserRole.sales)
+  addEnrollment(@Param('id') id: string, @Body() body: Omit<CreateEnrollmentDto, 'studentId'>, @CurrentUser() user: any) {
+    return this.studentsService.addEnrollment(id, body.courseLevelId, body.classId, user.id);
+  }
+
+  @Patch('enrollments/:enrollmentId')
+  @Roles(UserRole.super_admin, UserRole.operations, UserRole.instructor)
+  updateEnrollment(
+    @Param('enrollmentId') enrollmentId: string,
+    @Body() body: UpdateEnrollmentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.studentsService.updateEnrollment(enrollmentId, body, user.id);
+  }
+
+  @Delete('enrollments/:enrollmentId')
+  @Roles(UserRole.super_admin, UserRole.operations)
+  removeEnrollment(@Param('enrollmentId') enrollmentId: string, @CurrentUser() user: any) {
+    return this.studentsService.removeEnrollment(enrollmentId, user.id);
   }
 
   @Patch(':id')

@@ -195,6 +195,7 @@ model Student {
   payments    Payment[]
   invoices    Invoice[]
   attendances SessionAttendance[]
+  enrollments StudentEnrollment[]
 
   // Audit
   createdAt DateTime  @default(now())
@@ -241,13 +242,80 @@ enum Location {
   PalmHills
 }
 
+model Course {
+  id       String @id @default(uuid())
+  name     String @unique
+  isActive Boolean @default(true)
+
+  levels CourseLevel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([isActive])
+  @@map("courses")
+}
+
+model CourseLevel {
+  id       String @id @default(uuid())
+  courseId String
+  course   Course  @relation(fields: [courseId], references: [id])
+
+  name      String // e.g. "Level 1", "Beginner"
+  sortOrder Int    @default(1)
+  isActive  Boolean @default(true)
+
+  // Relations
+  classes      Class[]
+  enrollments  StudentEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([courseId, name])
+  @@index([courseId])
+  @@index([isActive])
+  @@map("course_levels")
+}
+
+model StudentEnrollment {
+  id           String @id @default(uuid())
+  studentId    String
+  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseLevelId String
+  courseLevel  CourseLevel @relation(fields: [courseLevelId], references: [id])
+
+  // Allocation to a specific scheduled group (Class)
+  classId String?
+  class   Class? @relation(fields: [classId], references: [id])
+
+  status String @default("active") // active, paused, completed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, courseLevelId])
+  @@index([studentId])
+  @@index([courseLevelId])
+  @@index([classId])
+  @@map("student_enrollments")
+}
+
 model Class {
   id           String      @id @default(uuid())
   name         String
   location     Location
+  // Dynamic location (user-managed). Backfilled from enum `location`.
+  locationName String?
   capacity     Int
   instructorId String?
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
+
+  // Link to Course Level (Course -> Level -> Class group)
+  courseLevelId String?
+  courseLevel   CourseLevel? @relation(fields: [courseLevelId], references: [id])
 
   // Schedule (recurring pattern)
   dayOfWeek Int // 0 = Sunday, 1 = Monday, etc.
@@ -262,6 +330,7 @@ model Class {
   // Relations
   students Student[]
   sessions Session[]
+  enrollments StudentEnrollment[]
 
   // Auto-calculated (cached)
   avgStudentsPerSession Float?  @default(0)
