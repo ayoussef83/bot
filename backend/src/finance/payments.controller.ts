@@ -20,6 +20,7 @@ export class PaymentsController {
   @Get()
   @Roles('super_admin', 'management', 'accounting', 'operations')
   async findAll(@Query('studentId') studentId?: string) {
+    console.log('[PaymentsController.findAll] Received studentId query param:', studentId);
     return this.paymentsService.findAll(studentId);
   }
 

@@ -57,15 +57,21 @@ export class PaymentsService {
   }
 
   async findAll(studentId?: string) {
-    return this.prisma.payment.findMany({
-      where: studentId 
-        ? { 
-            studentId: {
-              equals: studentId, // Exact match required
-              not: null, // Explicitly exclude null values
-            },
-          } 
-        : undefined,
+    // Debug logging
+    if (studentId) {
+      console.log('[PaymentsService.findAll] Filtering by studentId:', studentId);
+    } else {
+      console.log('[PaymentsService.findAll] No studentId filter - returning all payments');
+    }
+
+    const whereClause = studentId 
+      ? { 
+          studentId: studentId, // Direct match - Prisma will automatically exclude null
+        } 
+      : undefined;
+
+    const payments = await this.prisma.payment.findMany({
+      where: whereClause,
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,
@@ -81,6 +87,16 @@ export class PaymentsService {
         },
       },
     });
+
+    // Debug logging
+    if (studentId) {
+      console.log(`[PaymentsService.findAll] Found ${payments.length} payments for studentId: ${studentId}`);
+      payments.forEach((p, i) => {
+        console.log(`  Payment ${i + 1}: id=${p.id}, studentId=${p.studentId}, amount=${p.amount}`);
+      });
+    }
+
+    return payments;
   }
 
   async findOne(id: string) {
