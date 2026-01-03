@@ -197,7 +197,7 @@ export class ReportsService {
       const prevEndDate = previousPeriod.endDate;
       
       // Get all payments before current period start
-      const prevPayments = await this.prisma.payments.aggregate({
+      const prevPayments = await this.prisma.payment.aggregate({
         where: {
           receivedDate: {
             lt: period.startDate,
@@ -210,7 +210,7 @@ export class ReportsService {
       });
       
       // Get all expenses before current period start
-      const prevExpenses = await this.prisma.expenses.aggregate({
+      const prevExpenses = await this.prisma.expense.aggregate({
         where: {
           expenseDate: {
             lt: period.startDate,
@@ -238,7 +238,7 @@ export class ReportsService {
       openingBalance = allAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
       
       // Subtract transactions that occurred before period start
-      const prePeriodPayments = await this.prisma.payments.aggregate({
+      const prePeriodPayments = await this.prisma.payment.aggregate({
         where: {
           receivedDate: {
             lt: period.startDate,
@@ -250,7 +250,7 @@ export class ReportsService {
         },
       });
       
-      const prePeriodExpenses = await this.prisma.expenses.aggregate({
+      const prePeriodExpenses = await this.prisma.expense.aggregate({
         where: {
           expenseDate: {
             lt: period.startDate,
