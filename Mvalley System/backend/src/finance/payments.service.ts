@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -9,6 +9,20 @@ export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
   async create(createPaymentDto: CreatePaymentDto, userId?: string) {
+    const payerType = (createPaymentDto.payerType || 'student') as 'student' | 'school';
+    if (payerType === 'school') {
+      if (!String(createPaymentDto.schoolName || '').trim()) {
+        throw new BadRequestException('School name is required for B2B payments.');
+      }
+      // Ensure we don't accidentally attach to a student
+      createPaymentDto.studentId = undefined;
+    } else {
+      if (!String(createPaymentDto.studentId || '').trim()) {
+        throw new BadRequestException('Student is required for recording a payment.');
+      }
+      createPaymentDto.schoolName = undefined;
+    }
+
     // Generate payment number
     const now = new Date();
     const year = now.getFullYear();
@@ -24,7 +38,8 @@ export class PaymentsService {
     const paymentNumber = `PAY-${year}-${month}-${String(count + 1).padStart(4, '0')}`;
 
     // Update cash account balance if payment is received
-    if (createPaymentDto.status === 'received') {
+    const effectiveStatus = createPaymentDto.status || 'received';
+    if (effectiveStatus === 'received') {
       await this.prisma.cashAccount.update({
         where: { id: createPaymentDto.cashAccountId },
         data: {
@@ -38,6 +53,7 @@ export class PaymentsService {
     return this.prisma.payment.create({
       data: {
         ...createPaymentDto,
+        payerType,
         paymentNumber,
         receivedDate: createPaymentDto.receivedDate ? new Date(createPaymentDto.receivedDate) : new Date(),
         receivedBy: userId,
@@ -57,8 +73,13 @@ export class PaymentsService {
     });
   }
 
-  async findAll() {
+  async findAll(studentId?: string) {
     return this.prisma.payment.findMany({
+      where: studentId
+        ? {
+            studentId,
+          }
+        : undefined,
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,

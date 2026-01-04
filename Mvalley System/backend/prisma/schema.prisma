@@ -556,6 +556,12 @@ model Payment {
 
   notes String?
 
+  // Who this payment is for:
+  // - "student": must have studentId
+  // - "school": B2B payments (must have schoolName)
+  payerType  String @default("student")
+  schoolName String?
+
   // Relations
   allocations PaymentAllocation[]
 
@@ -565,6 +571,7 @@ model Payment {
   Student   Student? @relation(fields: [studentId], references: [id])
   studentId String?
 
+  @@index([payerType])
   @@index([cashAccountId])
   @@index([status])
   @@index([receivedDate])

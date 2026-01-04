@@ -19,7 +19,9 @@ interface CreatePaymentDto {
   referenceNumber?: string;
   status?: string;
   notes?: string;
+  payerType?: 'student' | 'school';
   studentId?: string;
+  schoolName?: string;
   invoiceId?: string; // For immediate allocation
 }
 
@@ -41,7 +43,9 @@ export default function PaymentsPage() {
     cashAccountId: '',
     receivedDate: new Date().toISOString().split('T')[0],
     status: 'received',
+    payerType: 'student',
     studentId: '',
+    schoolName: '',
     invoiceId: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -139,6 +143,13 @@ export default function PaymentsPage() {
       errors.method = 'Payment method is required';
     }
 
+    const payerType = (formData.payerType || 'student') as 'student' | 'school';
+    if (payerType === 'student') {
+      if (!formData.studentId) errors.studentId = 'Student is required';
+    } else {
+      if (!String(formData.schoolName || '').trim()) errors.schoolName = 'School name is required';
+    }
+
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -153,7 +164,9 @@ export default function PaymentsPage() {
         status: formData.status || 'received',
         referenceNumber: formData.referenceNumber || undefined,
         notes: formData.notes || undefined,
-        studentId: formData.studentId || undefined,
+        payerType,
+        studentId: payerType === 'student' ? formData.studentId || undefined : undefined,
+        schoolName: payerType === 'school' ? String(formData.schoolName || '').trim() : undefined,
       };
 
       const response = await financeService.createPayment(paymentData);
@@ -180,7 +193,9 @@ export default function PaymentsPage() {
         cashAccountId: '',
         receivedDate: new Date().toISOString().split('T')[0],
         status: 'received',
+        payerType: 'student',
         studentId: '',
+        schoolName: '',
         invoiceId: '',
       });
       setFormErrors({});
@@ -576,25 +591,60 @@ export default function PaymentsPage() {
                   </div>
 
                   <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">Optional: Link to Student/Invoice</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Payment For (required)</h3>
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Student (Optional)</label>
+                        <label className="block text-sm font-medium text-gray-700">Type</label>
                         <select
-                          value={formData.studentId || ''}
-                          onChange={(e) => setFormData({ ...formData, studentId: e.target.value, invoiceId: '' })}
+                          value={formData.payerType || 'student'}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              payerType: e.target.value as any,
+                              studentId: '',
+                              schoolName: '',
+                              invoiceId: '',
+                            })
+                          }
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
-                          <option value="">No Student</option>
-                          {students.map((student) => (
-                            <option key={student.id} value={student.id}>
-                              {student.firstName} {student.lastName}
-                              {student.email ? ` (${student.email})` : ''}
-                            </option>
-                          ))}
+                          <option value="student">Student</option>
+                          <option value="school">School (B2B)</option>
                         </select>
                       </div>
-                      {formData.studentId && (
+                      {(formData.payerType || 'student') === 'student' ? (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Student</label>
+                          <select
+                            value={formData.studentId || ''}
+                            onChange={(e) => setFormData({ ...formData, studentId: e.target.value, invoiceId: '' })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          >
+                            <option value="">Select student…</option>
+                            {students.map((student) => (
+                              <option key={student.id} value={student.id}>
+                                {student.firstName} {student.lastName}
+                                {student.email ? ` (${student.email})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {formErrors.studentId && <p className="mt-1 text-xs text-red-600">{formErrors.studentId}</p>}
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">School Name</label>
+                          <input
+                            type="text"
+                            value={formData.schoolName || ''}
+                            onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="e.g. International School XYZ"
+                          />
+                          {formErrors.schoolName && <p className="mt-1 text-xs text-red-600">{formErrors.schoolName}</p>}
+                        </div>
+                      )}
+
+                      {(formData.payerType || 'student') === 'student' && formData.studentId && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Allocate to Invoice (Optional)</label>
                           <select
@@ -645,7 +695,9 @@ export default function PaymentsPage() {
                           cashAccountId: '',
                           receivedDate: new Date().toISOString().split('T')[0],
                           status: 'received',
+                          payerType: 'student',
                           studentId: '',
+                          schoolName: '',
                           invoiceId: '',
                         });
                         setFormErrors({});
