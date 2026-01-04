@@ -14,7 +14,7 @@ export class PaymentsController {
   @Post()
   @Roles('super_admin', 'accounting')
   async create(@Body() createPaymentDto: CreatePaymentDto, @Request() req) {
-    return this.paymentsService.create(createPaymentDto, req.user?.userId);
+    return this.paymentsService.create(createPaymentDto, req.user?.id || req.user?.userId);
   }
 
   @Get()
@@ -32,12 +32,12 @@ export class PaymentsController {
   @Post('allocations')
   @Roles('super_admin', 'accounting')
   async createAllocation(@Body() createAllocationDto: CreatePaymentAllocationDto, @Request() req) {
-    return this.paymentsService.createAllocation(createAllocationDto, req.user?.userId);
+    return this.paymentsService.createAllocation(createAllocationDto, req.user?.id || req.user?.userId);
   }
 
   @Post(':id/reverse')
   @Roles('super_admin', 'accounting')
   async reverse(@Param('id') id: string, @Body() body: { reason: string }, @Request() req) {
-    return this.paymentsService.reverse(id, body.reason, req.user?.userId);
+    return this.paymentsService.reverse(id, body.reason, req.user?.id || req.user?.userId);
   }
 }

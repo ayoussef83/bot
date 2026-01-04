@@ -211,6 +211,20 @@ export default function PaymentDetailsPage() {
                   )}
                 </div>
               )}
+              {!payment.student && (payment as any).Student && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
+                    <FiUser className="w-4 h-4" />
+                    Student
+                  </h3>
+                  <p className="text-lg text-gray-900">
+                    {(payment as any).Student.firstName} {(payment as any).Student.lastName}
+                  </p>
+                  {(payment as any).Student.email && (
+                    <p className="text-sm text-gray-500 mt-1">{(payment as any).Student.email}</p>
+                  )}
+                </div>
+              )}
             </div>
             {payment.notes && (
               <div className="mt-6 pt-6 border-t border-gray-200">

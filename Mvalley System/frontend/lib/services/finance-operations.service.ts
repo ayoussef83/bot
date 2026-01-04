@@ -89,6 +89,10 @@ export interface Payment {
     notes?: string;
     invoice?: Invoice;
   }>;
+  recordedBy?: { id: string; firstName: string; lastName: string } | null;
+  Student?: { id: string; firstName: string; lastName: string; email?: string | null } | null;
+  payerType?: string;
+  schoolName?: string | null;
 }
 
 export interface Expense {

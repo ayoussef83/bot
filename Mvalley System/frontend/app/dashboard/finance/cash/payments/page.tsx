@@ -40,11 +40,18 @@ function PaymentsPageContent() {
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const getLocalDateInputValue = () => {
+    // Use local time (not UTC) to avoid "yesterday" when Cairo is already past midnight.
+    const d = new Date();
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
+  };
+
   const [formData, setFormData] = useState<CreatePaymentDto>({
     amount: 0,
     method: 'cash',
     cashAccountId: '',
-    receivedDate: new Date().toISOString().split('T')[0],
+    receivedDate: getLocalDateInputValue(),
     receivedTime: new Date().toTimeString().slice(0, 5),
     status: 'received',
     payerType: 'student',
@@ -61,6 +68,19 @@ function PaymentsPageContent() {
     } catch {
       return '-';
     }
+  };
+
+  const getStudentLabel = (p: any) => {
+    const direct = p?.Student || p?.student;
+    if (direct?.firstName || direct?.lastName) {
+      return `${direct.firstName || ''} ${direct.lastName || ''}`.trim();
+    }
+    const invStudent = p?.allocations?.[0]?.invoice?.student;
+    if (invStudent?.firstName || invStudent?.lastName) {
+      return `${invStudent.firstName || ''} ${invStudent.lastName || ''}`.trim();
+    }
+    if (p?.payerType === 'school') return p?.schoolName || 'School';
+    return '-';
   };
 
   useEffect(() => {
@@ -227,7 +247,7 @@ function PaymentsPageContent() {
         amount: 0,
         method: 'cash',
         cashAccountId: '',
-        receivedDate: new Date().toISOString().split('T')[0],
+        receivedDate: getLocalDateInputValue(),
         receivedTime: new Date().toTimeString().slice(0, 5),
         status: 'received',
         payerType: 'student',
@@ -284,6 +304,11 @@ function PaymentsPageContent() {
   };
 
   const columns: Column<Payment>[] = [
+    {
+      key: 'payer',
+      label: 'Student',
+      render: (_, row: any) => <span className="text-sm text-gray-900">{getStudentLabel(row)}</span>,
+    },
     {
       key: 'paymentNumber',
       label: 'Payment #',
@@ -469,7 +494,7 @@ function PaymentsPageContent() {
                   amount: 0,
                   method: 'cash',
                   cashAccountId: '',
-                  receivedDate: new Date().toISOString().split('T')[0],
+                  receivedDate: getLocalDateInputValue(),
                   receivedTime: new Date().toTimeString().slice(0, 5),
                   status: 'received',
                   studentId: '',
@@ -489,7 +514,7 @@ function PaymentsPageContent() {
                         amount: 0,
                         method: 'cash',
                         cashAccountId: '',
-                        receivedDate: new Date().toISOString().split('T')[0],
+                        receivedDate: getLocalDateInputValue(),
                         receivedTime: new Date().toTimeString().slice(0, 5),
                         status: 'received',
                         studentId: '',
@@ -601,7 +626,7 @@ function PaymentsPageContent() {
                         value={formData.receivedDate}
                         onChange={(e) => setFormData({ ...formData, receivedDate: e.target.value })}
                         className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        max={new Date().toISOString().split('T')[0]}
+                        max={getLocalDateInputValue()}
                       />
                     </div>
                     <div>
@@ -738,7 +763,7 @@ function PaymentsPageContent() {
                           amount: 0,
                           method: 'cash',
                           cashAccountId: '',
-                          receivedDate: new Date().toISOString().split('T')[0],
+                          receivedDate: getLocalDateInputValue(),
                           receivedTime: new Date().toTimeString().slice(0, 5),
                           status: 'received',
                           payerType: 'student',
