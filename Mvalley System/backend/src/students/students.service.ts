@@ -436,19 +436,58 @@ export class StudentsService {
   }
 
   async remove(id: string, deletedBy: string) {
-    const student = await this.prisma.student.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    const now = new Date();
 
-    // Log audit
-    await this.prisma.auditLog.create({
-      data: {
-        userId: deletedBy,
-        action: 'delete',
-        entityType: 'Student',
-        entityId: id,
-      },
+    const { student } = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.student.findFirst({
+        where: { id, deletedAt: null },
+        select: { id: true, parentId: true },
+      });
+      if (!existing) {
+        throw new NotFoundException('Student not found');
+      }
+
+      const student = await tx.student.update({
+        where: { id },
+        data: { deletedAt: now },
+      });
+
+      // Log audit (student)
+      await tx.auditLog.create({
+        data: {
+          userId: deletedBy,
+          action: 'delete',
+          entityType: 'Student',
+          entityId: id,
+        },
+      });
+
+      // If this student was the last active student for the parent, soft-delete the parent too.
+      if (existing.parentId) {
+        const remaining = await tx.student.count({
+          where: { parentId: existing.parentId, deletedAt: null },
+        });
+
+        if (remaining === 0) {
+          await tx.parent.update({
+            where: { id: existing.parentId },
+            data: { deletedAt: now },
+          });
+
+          // Log audit (parent)
+          await tx.auditLog.create({
+            data: {
+              userId: deletedBy,
+              action: 'delete',
+              entityType: 'Parent',
+              entityId: existing.parentId,
+              changes: JSON.stringify({ reason: 'Auto-delete parent (no remaining students)' }),
+            },
+          });
+        }
+      }
+
+      return { student };
     });
 
     return student;
