@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { financeService, Payment, CashAccount, Invoice } from '@/lib/services';
 import { studentsService, Student } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
@@ -9,6 +9,7 @@ import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/settings/StatusBadge';
+import StudentSearchSelect from '@/components/StudentSearchSelect';
 import { FiCreditCard, FiPlus, FiEye, FiDollarSign, FiCheckCircle, FiXCircle, FiClock, FiX } from 'react-icons/fi';
 
 interface CreatePaymentDto {
@@ -25,8 +26,9 @@ interface CreatePaymentDto {
   invoiceId?: string; // For immediate allocation
 }
 
-export default function PaymentsPage() {
+function PaymentsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -50,9 +52,35 @@ export default function PaymentsPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  const formatDateCairo = (value: any) => {
+    if (!value) return '-';
+    try {
+      return new Date(String(value)).toLocaleDateString('en-GB', { timeZone: 'Africa/Cairo' });
+    } catch {
+      return '-';
+    }
+  };
+
   useEffect(() => {
     fetchPayments();
   }, []);
+
+  useEffect(() => {
+    const openModal = searchParams?.get('openModal');
+    const studentId = searchParams?.get('studentId') || '';
+    const payerType = (searchParams?.get('payerType') as any) || undefined;
+    if (openModal === 'true') {
+      setShowCreateModal(true);
+      setFormData((prev) => ({
+        ...prev,
+        payerType: payerType === 'school' ? 'school' : 'student',
+        studentId: payerType === 'school' ? '' : studentId,
+        schoolName: payerType === 'school' ? (prev.schoolName || '') : '',
+        invoiceId: '',
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     if (showCreateModal) {
@@ -259,7 +287,7 @@ export default function PaymentsPage() {
       sortable: true,
       render: (value) => (
         <span className="text-sm text-gray-600">
-          {new Date(String(value)).toLocaleDateString()}
+          {formatDateCairo(value)}
         </span>
       ),
     },
@@ -481,8 +509,8 @@ export default function PaymentsPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })
                         }
-                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
-                          formErrors.amount ? 'border-red-300' : ''
+                        className={`mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                          formErrors.amount ? 'border-red-400' : ''
                         }`}
                         required
                       />
@@ -495,8 +523,8 @@ export default function PaymentsPage() {
                       <select
                         value={formData.method}
                         onChange={(e) => setFormData({ ...formData, method: e.target.value })}
-                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
-                          formErrors.method ? 'border-red-300' : ''
+                        className={`mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                          formErrors.method ? 'border-red-400' : ''
                         }`}
                         required
                       >
@@ -536,15 +564,15 @@ export default function PaymentsPage() {
                       <select
                         value={formData.cashAccountId}
                         onChange={(e) => setFormData({ ...formData, cashAccountId: e.target.value })}
-                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
-                          formErrors.cashAccountId ? 'border-red-300' : ''
+                        className={`mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                          formErrors.cashAccountId ? 'border-red-400' : ''
                         }`}
                         required
                       >
                         <option value="">Select Account</option>
                         {cashAccounts.map((account) => (
                           <option key={account.id} value={account.id}>
-                            {account.name} ({account.type}) - {account.balance.toLocaleString('en-US', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 })}
+                            {account.name} ({account.type})
                           </option>
                         ))}
                       </select>
@@ -561,7 +589,7 @@ export default function PaymentsPage() {
                         type="date"
                         value={formData.receivedDate}
                         onChange={(e) => setFormData({ ...formData, receivedDate: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         max={new Date().toISOString().split('T')[0]}
                       />
                     </div>
@@ -570,7 +598,7 @@ export default function PaymentsPage() {
                       <select
                         value={formData.status}
                         onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       >
                         <option value="received">Received</option>
                         <option value="pending">Pending</option>
@@ -585,7 +613,7 @@ export default function PaymentsPage() {
                       type="text"
                       value={formData.referenceNumber || ''}
                       onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       placeholder="Bank reference, transaction ID, receipt number"
                     />
                   </div>
@@ -606,7 +634,7 @@ export default function PaymentsPage() {
                               invoiceId: '',
                             })
                           }
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                           <option value="student">Student</option>
                           <option value="school">School (B2B)</option>
@@ -615,19 +643,12 @@ export default function PaymentsPage() {
                       {(formData.payerType || 'student') === 'student' ? (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Student</label>
-                          <select
+                          <StudentSearchSelect
+                            students={students}
                             value={formData.studentId || ''}
-                            onChange={(e) => setFormData({ ...formData, studentId: e.target.value, invoiceId: '' })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          >
-                            <option value="">Select student…</option>
-                            {students.map((student) => (
-                              <option key={student.id} value={student.id}>
-                                {student.firstName} {student.lastName}
-                                {student.email ? ` (${student.email})` : ''}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(id) => setFormData({ ...formData, studentId: id, invoiceId: '' })}
+                            placeholder="Search student…"
+                          />
                           {formErrors.studentId && <p className="mt-1 text-xs text-red-600">{formErrors.studentId}</p>}
                         </div>
                       ) : (
@@ -637,7 +658,7 @@ export default function PaymentsPage() {
                             type="text"
                             value={formData.schoolName || ''}
                             onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             placeholder="e.g. International School XYZ"
                           />
                           {formErrors.schoolName && <p className="mt-1 text-xs text-red-600">{formErrors.schoolName}</p>}
@@ -650,7 +671,7 @@ export default function PaymentsPage() {
                           <select
                             value={formData.invoiceId || ''}
                             onChange={(e) => setFormData({ ...formData, invoiceId: e.target.value })}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                           >
                             <option value="">No Invoice (Unallocated)</option>
                             {invoices
@@ -679,7 +700,7 @@ export default function PaymentsPage() {
                       rows={3}
                       value={formData.notes || ''}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       placeholder="Additional notes about this payment"
                     />
                   </div>
@@ -702,7 +723,7 @@ export default function PaymentsPage() {
                         });
                         setFormErrors({});
                       }}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                      className="flex-1 px-4 py-2 border border-gray-400 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
                     >
                       Cancel
                     </button>
@@ -720,6 +741,14 @@ export default function PaymentsPage() {
         </div>
       )}
     </>
+  );
+}
+
+export default function PaymentsPage() {
+  return (
+    <Suspense>
+      <PaymentsPageContent />
+    </Suspense>
   );
 }
 

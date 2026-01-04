@@ -95,6 +95,15 @@ export default function StudentDetailPage() {
     }
   };
 
+  const formatDateCairo = (value: any) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleDateString('en-GB', { timeZone: 'Africa/Cairo' });
+    } catch {
+      return '-';
+    }
+  };
+
   const fetchSessions = async (studentId: string) => {
     try {
       // Assuming there's an endpoint to get sessions for a student
@@ -287,7 +296,7 @@ export default function StudentDetailPage() {
       label: 'Received Date',
       render: (value) => (
         <span className="text-sm text-gray-500">
-          {value ? new Date(value).toLocaleDateString() : '-'}
+          {formatDateCairo(value)}
         </span>
       ),
     },
@@ -482,7 +491,7 @@ export default function StudentDetailPage() {
             <div className="text-center py-8 text-gray-500">
               <p>No payments recorded</p>
               <button
-                onClick={() => router.push('/dashboard/finance/cash/payments')}
+                onClick={() => router.push(`/dashboard/finance/cash/payments?openModal=true&payerType=student&studentId=${encodeURIComponent(student.id)}`)}
                 className="mt-4 text-sm text-indigo-600 hover:text-indigo-900"
               >
                 Add Payment →
@@ -593,7 +602,11 @@ export default function StudentDetailPage() {
             ✉️ Send Email
           </button>
           <button
-            onClick={() => router.push(`/dashboard/finance/cash/payments`)}
+            onClick={() =>
+              router.push(
+                `/dashboard/finance/cash/payments?openModal=true&payerType=student&studentId=${encodeURIComponent(student.id)}`,
+              )
+            }
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
             💳 Add Payment
