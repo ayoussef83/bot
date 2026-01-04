@@ -48,6 +48,7 @@ model User {
   instructorProfile Instructor?
   studentProfile    Student?
   parentProfile     Parent?
+  recordedPayments  Payment[]  @relation("PaymentRecordedBy")
 
   // Audit
   createdAt DateTime  @default(now())
@@ -549,6 +550,7 @@ model Payment {
 
   referenceNumber String? // Bank reference, transaction ID, receipt number
   receivedBy      String? // User ID who recorded the payment
+  recordedBy      User?   @relation("PaymentRecordedBy", fields: [receivedBy], references: [id])
   status          PaymentStatus @default(received)
 
   reversedAt     DateTime?

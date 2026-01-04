@@ -17,6 +17,7 @@ interface CreatePaymentDto {
   method: string;
   cashAccountId: string;
   receivedDate?: string;
+  receivedTime?: string;
   referenceNumber?: string;
   status?: string;
   notes?: string;
@@ -44,6 +45,7 @@ function PaymentsPageContent() {
     method: 'cash',
     cashAccountId: '',
     receivedDate: new Date().toISOString().split('T')[0],
+    receivedTime: new Date().toTimeString().slice(0, 5),
     status: 'received',
     payerType: 'student',
     studentId: '',
@@ -77,6 +79,7 @@ function PaymentsPageContent() {
         studentId: payerType === 'school' ? '' : studentId,
         schoolName: payerType === 'school' ? (prev.schoolName || '') : '',
         invoiceId: '',
+        receivedTime: prev.receivedTime || new Date().toTimeString().slice(0, 5),
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,11 +187,16 @@ function PaymentsPageContent() {
     }
 
     try {
+      const hasDate = Boolean(formData.receivedDate);
+      const hasTime = Boolean(formData.receivedTime);
+      const combinedIso =
+        hasDate && hasTime ? new Date(`${formData.receivedDate}T${formData.receivedTime}:00`).toISOString() : undefined;
+
       const paymentData: any = {
         amount: parseFloat(String(formData.amount)),
         method: formData.method,
         cashAccountId: formData.cashAccountId,
-        receivedDate: formData.receivedDate || new Date().toISOString(),
+        receivedDate: combinedIso || formData.receivedDate || new Date().toISOString(),
         status: formData.status || 'received',
         referenceNumber: formData.referenceNumber || undefined,
         notes: formData.notes || undefined,
@@ -220,6 +228,7 @@ function PaymentsPageContent() {
         method: 'cash',
         cashAccountId: '',
         receivedDate: new Date().toISOString().split('T')[0],
+        receivedTime: new Date().toTimeString().slice(0, 5),
         status: 'received',
         payerType: 'student',
         studentId: '',
@@ -461,6 +470,7 @@ function PaymentsPageContent() {
                   method: 'cash',
                   cashAccountId: '',
                   receivedDate: new Date().toISOString().split('T')[0],
+                  receivedTime: new Date().toTimeString().slice(0, 5),
                   status: 'received',
                   studentId: '',
                   invoiceId: '',
@@ -480,6 +490,7 @@ function PaymentsPageContent() {
                         method: 'cash',
                         cashAccountId: '',
                         receivedDate: new Date().toISOString().split('T')[0],
+                        receivedTime: new Date().toTimeString().slice(0, 5),
                         status: 'received',
                         studentId: '',
                         invoiceId: '',
@@ -594,6 +605,18 @@ function PaymentsPageContent() {
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700">Received Time</label>
+                      <input
+                        type="time"
+                        value={formData.receivedTime || ''}
+                        onChange={(e) => setFormData({ ...formData, receivedTime: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700">Status</label>
                       <select
                         value={formData.status}
@@ -605,6 +628,7 @@ function PaymentsPageContent() {
                         <option value="failed">Failed</option>
                       </select>
                     </div>
+                    <div />
                   </div>
 
                   <div>
@@ -715,6 +739,7 @@ function PaymentsPageContent() {
                           method: 'cash',
                           cashAccountId: '',
                           receivedDate: new Date().toISOString().split('T')[0],
+                          receivedTime: new Date().toTimeString().slice(0, 5),
                           status: 'received',
                           payerType: 'student',
                           studentId: '',

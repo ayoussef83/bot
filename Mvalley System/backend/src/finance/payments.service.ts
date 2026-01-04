@@ -60,6 +60,7 @@ export class PaymentsService {
       },
       include: {
         cashAccount: true,
+        recordedBy: { select: { id: true, firstName: true, lastName: true } },
         allocations: {
           include: {
             invoice: {
@@ -83,6 +84,7 @@ export class PaymentsService {
       orderBy: { receivedDate: 'desc' },
       include: {
         cashAccount: true,
+        recordedBy: { select: { id: true, firstName: true, lastName: true } },
         allocations: {
           include: {
             invoice: {
@@ -101,6 +103,7 @@ export class PaymentsService {
       where: { id },
       include: {
         cashAccount: true,
+        recordedBy: { select: { id: true, firstName: true, lastName: true } },
         allocations: {
           include: {
             invoice: {

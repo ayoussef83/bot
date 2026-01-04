@@ -104,6 +104,19 @@ export default function StudentDetailPage() {
     }
   };
 
+  const formatTimeCairo = (value: any) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleTimeString('en-GB', {
+        timeZone: 'Africa/Cairo',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '-';
+    }
+  };
+
   const fetchSessions = async (studentId: string) => {
     try {
       // Assuming there's an endpoint to get sessions for a student
@@ -295,9 +308,10 @@ export default function StudentDetailPage() {
       key: 'receivedDate',
       label: 'Received Date',
       render: (value) => (
-        <span className="text-sm text-gray-500">
-          {formatDateCairo(value)}
-        </span>
+        <div className="text-sm text-gray-500">
+          <div>{formatDateCairo(value)}</div>
+          <div className="text-xs text-gray-400">{formatTimeCairo(value)}</div>
+        </div>
       ),
     },
   ];

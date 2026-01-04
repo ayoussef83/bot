@@ -34,6 +34,41 @@ export default function PaymentDetailsPage() {
     }
   };
 
+  const formatDateCairo = (value: any) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleDateString('en-GB', { timeZone: 'Africa/Cairo' });
+    } catch {
+      return '-';
+    }
+  };
+
+  const formatTimeCairo = (value: any) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleTimeString('en-GB', {
+        timeZone: 'Africa/Cairo',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '-';
+    }
+  };
+
+  const handleRefund = async () => {
+    if (!payment) return;
+    const reason = prompt('Refund reason?');
+    if (!reason) return;
+    try {
+      await financeService.reversePayment(payment.id, reason);
+      await fetchPayment(payment.id);
+      alert('Payment refunded (reversed).');
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to refund payment');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges = {
       received: { color: 'bg-green-100 text-green-800', label: 'Received' },
@@ -100,6 +135,14 @@ export default function PaymentDetailsPage() {
         </div>
         <div className="flex items-center gap-3">
           {getStatusBadge(payment.status)}
+          {(payment.status || '') !== 'reversed' && (
+            <button
+              onClick={handleRefund}
+              className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-700 hover:bg-red-50"
+            >
+              Refund
+            </button>
+          )}
         </div>
       </div>
 
@@ -125,12 +168,18 @@ export default function PaymentDetailsPage() {
                   <FiCalendar className="w-4 h-4" />
                   Received Date
                 </h3>
+                <p className="text-lg text-gray-900">{formatDateCairo(payment.receivedDate)}</p>
+                <p className="text-sm text-gray-500">{formatTimeCairo(payment.receivedDate)}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
+                  <FiUser className="w-4 h-4" />
+                  Recorded By
+                </h3>
                 <p className="text-lg text-gray-900">
-                  {new Date(payment.receivedDate).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {(payment as any)?.recordedBy
+                    ? `${(payment as any).recordedBy.firstName || ''} ${(payment as any).recordedBy.lastName || ''}`.trim()
+                    : '-'}
                 </p>
               </div>
               <div>
