@@ -88,7 +88,8 @@ export default function StudentDetailPage() {
   const fetchPayments = async (studentId: string) => {
     try {
       const response = await financeService.getPayments({ studentId });
-      setPayments(response.data);
+      const rows = (response.data || []).filter((p: any) => String(p?.studentId || '') === String(studentId));
+      setPayments(rows);
     } catch (err: any) {
       // Failed to load payments
     }
