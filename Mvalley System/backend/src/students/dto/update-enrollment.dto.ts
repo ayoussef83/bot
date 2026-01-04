@@ -7,6 +7,10 @@ export class UpdateEnrollmentDto {
 
   @IsOptional()
   @IsString()
+  groupId?: string | null;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 }
 

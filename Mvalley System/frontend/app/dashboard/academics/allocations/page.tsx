@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import StandardListView from '@/components/StandardListView';
 import { ActionButton, Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
-import { studentsService, classesService, Student, Class, type StudentEnrollment } from '@/lib/services';
+import { studentsService, classesService, groupsService, Student, Class, type StudentEnrollment, type Group } from '@/lib/services';
 import { FiEdit, FiSave, FiX } from 'react-icons/fi';
 import HighlightedText from '@/components/HighlightedText';
 import { useSearchParams } from 'next/navigation';
 
 type Draft = {
   classId: string;
+  groupId: string;
 };
 
 type EnrollmentRow = {
@@ -29,21 +30,23 @@ export default function AllocationsPage() {
   const searchParams = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ classId: '' });
+  const [draft, setDraft] = useState<Draft>({ classId: '', groupId: '' });
   const [saving, setSaving] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
     setError('');
     try {
-      const [s, c] = await Promise.all([studentsService.getAll(), classesService.getAll()]);
+      const [s, c, g] = await Promise.all([studentsService.getAll(), classesService.getAll(), groupsService.getAll()]);
       setStudents(Array.isArray(s.data) ? s.data : []);
       setClasses(Array.isArray(c.data) ? c.data : []);
+      setGroups(Array.isArray(g.data) ? g.data : []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load allocations');
     } finally {
@@ -97,6 +100,46 @@ export default function AllocationsPage() {
           />
         </span>
       ),
+    },
+    {
+      key: 'group',
+      label: 'Group',
+      render: (_, row) => {
+        const isEditing = editingId === row.enrollmentId;
+        if (!isEditing) {
+          return (
+            <span className="text-sm text-gray-700">
+              <HighlightedText text={(row.enrollment as any)?.group?.name || '-'} query={searchTerm} />
+            </span>
+          );
+        }
+
+        const levelId = row.enrollment?.courseLevelId;
+        const options = levelId ? groups.filter((gg: any) => gg.courseLevelId === levelId) : groups;
+
+        return (
+          <select
+            value={draft.groupId}
+            onChange={(e) => {
+              const nextGroupId = e.target.value;
+              const selected = groups.find((gg) => gg.id === nextGroupId) as any;
+              setDraft((d) => ({
+                ...d,
+                groupId: nextGroupId,
+                classId: selected?.defaultClassId ? String(selected.defaultClassId) : d.classId,
+              }));
+            }}
+            className="w-full rounded-md border-gray-300 text-sm"
+          >
+            <option value="">— None —</option>
+            {options.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        );
+      },
     },
     {
       key: 'class',
@@ -172,6 +215,7 @@ export default function AllocationsPage() {
             setEditingId(row.enrollmentId);
             setDraft({
               classId: row.enrollment.classId || preselectedClassId || '',
+              groupId: (row.enrollment as any).groupId || '',
             });
           },
         },
@@ -189,6 +233,7 @@ export default function AllocationsPage() {
             // Allocation is on Enrollment
             await studentsService.updateEnrollment(row.enrollmentId, {
               classId: draft.classId ? draft.classId : null,
+              groupId: draft.groupId ? draft.groupId : null,
             });
             setEditingId(null);
             await fetchAll();

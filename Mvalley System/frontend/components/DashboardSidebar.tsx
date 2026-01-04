@@ -107,6 +107,13 @@ const navigationSections: NavigationSection[] = [
         path: '/dashboard/academics/allocations',
         roles: ['super_admin', 'operations', 'management', 'sales'],
       },
+      {
+        id: 'groups',
+        label: 'Groups',
+        icon: <FiGitBranch className="w-4 h-4" />,
+        path: '/dashboard/academics/groups',
+        roles: ['super_admin', 'operations', 'management', 'sales'],
+      },
     ],
   },
   {

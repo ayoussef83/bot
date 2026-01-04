@@ -369,11 +369,13 @@ export class StudentsService {
       where: { id: enrollmentId },
       data: {
         ...(dto.classId !== undefined ? { classId: dto.classId as any } : {}),
+        ...(dto.groupId !== undefined ? { groupId: dto.groupId as any } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
       include: {
         courseLevel: { include: { course: true } },
         class: true,
+        group: true,
       },
     });
 

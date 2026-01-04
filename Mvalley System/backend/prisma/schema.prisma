@@ -270,6 +270,7 @@ model CourseLevel {
   // Relations
   classes      Class[]
   enrollments  StudentEnrollment[]
+  groups       Group[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -292,6 +293,10 @@ model StudentEnrollment {
   classId String?
   class   Class? @relation(fields: [classId], references: [id])
 
+  // Optional grouping (used by operations for cohorting)
+  groupId String?
+  group   Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
   status String @default("active") // active, paused, completed
 
   createdAt DateTime @default(now())
@@ -301,7 +306,32 @@ model StudentEnrollment {
   @@index([studentId])
   @@index([courseLevelId])
   @@index([classId])
+  @@index([groupId])
   @@map("student_enrollments")
+}
+
+// Operational grouping of students within a course level (cohort/group name)
+model Group {
+  id           String @id @default(uuid())
+  name         String
+  courseLevelId String
+  courseLevel  CourseLevel @relation(fields: [courseLevelId], references: [id])
+
+  // Optional default class for this group (so allocations can auto-pick location/instructor)
+  defaultClassId String?
+  defaultClass   Class? @relation("GroupDefaultClass", fields: [defaultClassId], references: [id])
+
+  // Relations
+  enrollments StudentEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([courseLevelId])
+  @@index([defaultClassId])
+  @@index([deletedAt])
+  @@map("groups")
 }
 
 model Class {
@@ -332,6 +362,7 @@ model Class {
   students Student[]
   sessions Session[]
   enrollments StudentEnrollment[]
+  defaultForGroups Group[] @relation("GroupDefaultClass")
 
   // Auto-calculated (cached)
   avgStudentsPerSession Float?  @default(0)

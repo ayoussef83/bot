@@ -18,6 +18,7 @@ import { MarketingModule } from './marketing/marketing.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ParentsModule } from './parents/parents.module';
 import { CoursesModule } from './courses/courses.module';
+import { GroupsModule } from './groups/groups.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { CoursesModule } from './courses/courses.module';
     MarketingModule,
     WebhooksModule,
     ParentsModule,
+    GroupsModule,
   ],
   controllers: [HealthController],
 })
