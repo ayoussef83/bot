@@ -236,7 +236,7 @@ export default function PaymentDetailsPage() {
 
           {/* Allocations */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Allocations</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Invoice Allocations</h2>
             {payment.allocations && payment.allocations.length > 0 ? (
               <div className="space-y-4">
                 {payment.allocations.map((allocation) => (
@@ -272,7 +272,23 @@ export default function PaymentDetailsPage() {
               <div className="text-center py-8 text-gray-500">
                 <FiClock className="w-12 h-12 mx-auto mb-2 text-gray-400" />
                 <p>No allocations yet</p>
-                <p className="text-sm mt-1">This payment has not been allocated to any invoice</p>
+                <p className="text-sm mt-1">
+                  This payment is linked to{' '}
+                  <span className="font-medium text-gray-700">
+                    {payment.student
+                      ? `${payment.student.firstName} ${payment.student.lastName}`
+                      : (payment as any).Student
+                        ? `${(payment as any).Student.firstName} ${(payment as any).Student.lastName}`
+                        : 'a student'}
+                  </span>{' '}
+                  but not allocated to any invoice.
+                </p>
+                <button
+                  onClick={() => router.push(`/dashboard/finance/cash/payments?openModal=true&payerType=student&studentId=${encodeURIComponent((payment as any).studentId || '')}`)}
+                  className="mt-4 text-sm text-indigo-600 hover:text-indigo-900"
+                >
+                  Allocate now →
+                </button>
               </div>
             )}
           </div>

@@ -60,6 +60,7 @@ function PaymentsPageContent() {
     invoiceId: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [autoAllocate, setAutoAllocate] = useState(true);
 
   const formatDateCairo = (value: any) => {
     if (!value) return '-';
@@ -227,19 +228,38 @@ function PaymentsPageContent() {
 
       const response = await financeService.createPayment(paymentData);
 
-      // If invoice is selected, create allocation
-      if (formData.invoiceId) {
-        try {
-          await financeService.createPaymentAllocation({
-            paymentId: response.data.id,
-            invoiceId: formData.invoiceId,
-            amount: parseFloat(String(formData.amount)),
-          });
-        } catch (allocErr: any) {
-          console.error('Error creating allocation:', allocErr);
-          // Payment was created but allocation failed - show warning but don't fail
-          alert('Payment recorded but allocation failed: ' + (allocErr.response?.data?.message || 'Unknown error'));
+      // Allocation (invoice)
+      try {
+        const paymentId = response.data.id;
+        const total = parseFloat(String(formData.amount));
+        if (formData.invoiceId) {
+          await financeService.createPaymentAllocation({ paymentId, invoiceId: formData.invoiceId, amount: total });
+        } else if (autoAllocate && payerType === 'student' && formData.studentId) {
+          // Auto-allocate to unpaid invoices for this student (oldest first), best-effort.
+          let remaining = total;
+          const candidates = (invoices || [])
+            .filter((inv: any) => inv.studentId === formData.studentId)
+            .map((inv: any) => {
+              const allocated =
+                inv.paymentAllocations?.reduce((sum: number, a: any) => sum + Number(a.amount || 0), 0) || 0;
+              const due = inv.dueDate ? new Date(inv.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+              const left = Math.max(0, Number(inv.totalAmount || 0) - allocated);
+              return { inv, due, left };
+            })
+            .filter((x: any) => x.left > 0)
+            .sort((a: any, b: any) => a.due - b.due);
+
+          for (const c of candidates) {
+            if (remaining <= 0) break;
+            const alloc = Math.min(remaining, c.left);
+            if (alloc <= 0) continue;
+            await financeService.createPaymentAllocation({ paymentId, invoiceId: c.inv.id, amount: alloc });
+            remaining -= alloc;
+          }
         }
+      } catch (allocErr: any) {
+        console.error('Error creating allocation:', allocErr);
+        alert('Payment recorded but allocation failed: ' + (allocErr.response?.data?.message || 'Unknown error'));
       }
 
       setShowCreateModal(false);
@@ -256,6 +276,7 @@ function PaymentsPageContent() {
         invoiceId: '',
       });
       setFormErrors({});
+      setAutoAllocate(true);
       await fetchPayments();
     } catch (err: any) {
       console.error('Error creating payment:', err);
@@ -739,6 +760,17 @@ function PaymentsPageContent() {
                             Select an invoice to automatically allocate this payment
                           </p>
                         </div>
+                      )}
+                      {(formData.payerType || 'student') === 'student' && formData.studentId && !formData.invoiceId && (
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={autoAllocate}
+                            onChange={(e) => setAutoAllocate(e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          Auto-allocate to the student’s unpaid invoices (oldest first)
+                        </label>
                       )}
                     </div>
                   </div>
