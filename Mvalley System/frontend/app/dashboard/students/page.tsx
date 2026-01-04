@@ -433,9 +433,30 @@ export default function StudentsPage() {
                               {parentLookup?.parent?.lastName}
                             </div>
                             <div className="text-green-700">
-                              Students: {(parentLookup?.parent?.students || [])
-                                .map((s: any) => `${s.firstName} ${s.lastName}`)
-                                .join(', ') || '—'}
+                              <span className="mr-1">Students:</span>
+                              {(parentLookup?.parent?.students || []).length > 0 ? (
+                                <span>
+                                  {(parentLookup?.parent?.students || []).map((s: any, idx: number) => (
+                                    <span key={s?.id || `${s?.firstName}-${s?.lastName}-${idx}`}>
+                                      <button
+                                        type="button"
+                                        className="underline underline-offset-2 hover:text-green-900"
+                                        onClick={() => {
+                                          if (!s?.id) return;
+                                          setShowForm(false);
+                                          setEditingStudent(null);
+                                          router.push(`/dashboard/students/details?id=${encodeURIComponent(s.id)}`);
+                                        }}
+                                      >
+                                        {s?.firstName} {s?.lastName}
+                                      </button>
+                                      {idx < (parentLookup?.parent?.students || []).length - 1 ? ', ' : ''}
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : (
+                                <span>—</span>
+                              )}
                             </div>
                           </div>
                         ) : phoneGate === 'new' && formData.phone.trim().length >= 7 ? (
