@@ -600,369 +600,255 @@ export default function InstructorDetailPage() {
                   </div>
                 )}
 
-                <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="text-sm text-gray-600">
-                    Fast edit availability (no wizard). Weekdays and weekends are shown separately. Optional date-window = “extended availability”.
+                <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="text-sm text-gray-600">
+                      Simple weekly list. Weekend is <span className="font-medium">Fri</span> + <span className="font-medium">Sat</span>.
+                    </div>
+                    <button
+                      type="button"
+                      className="text-sm text-indigo-600 hover:text-indigo-900"
+                      onClick={refreshAvailability}
+                    >
+                      Refresh
+                    </button>
                   </div>
+
                   {canOps && (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="px-3 py-2 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
-                        onClick={async () => {
-                          if (!id) return;
-                          try {
-                            setTabError('');
-                            const days = [1, 2, 3, 4, 5];
-                            await Promise.all(
-                              days.map((d) =>
-                                instructorsService.addAvailability(String(id), {
-                                  dayOfWeek: d,
-                                  startTime: '09:00',
-                                  endTime: '17:00',
-                                  isActive: true,
-                                }),
-                              ),
-                            );
-                            await refreshAvailability();
-                          } catch (e: any) {
-                            setTabError(e?.response?.data?.message || 'Failed to apply weekdays preset');
-                          }
-                        }}
-                      >
-                        Apply Weekdays 09:00–17:00
-                      </button>
-                      <button
-                        type="button"
-                        className="px-3 py-2 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
-                        onClick={async () => {
-                          if (!id) return;
-                          try {
-                            setTabError('');
-                            const days = [0, 6];
-                            await Promise.all(
-                              days.map((d) =>
-                                instructorsService.addAvailability(String(id), {
-                                  dayOfWeek: d,
-                                  startTime: '10:00',
-                                  endTime: '14:00',
-                                  isActive: true,
-                                }),
-                              ),
-                            );
-                            await refreshAvailability();
-                          } catch (e: any) {
-                            setTabError(e?.response?.data?.message || 'Failed to apply weekend preset');
-                          }
-                        }}
-                      >
-                        Apply Weekend 10:00–14:00
-                      </button>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-600">Apply time (to checked days)</label>
+                        <div className="flex gap-2 mt-1">
+                          <input
+                            type="time"
+                            value={String(newSlot.startTime || '09:00')}
+                            onChange={(e) => setNewSlot((s) => ({ ...s, startTime: e.target.value }))}
+                            className="w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                          />
+                          <input
+                            type="time"
+                            value={String(newSlot.endTime || '17:00')}
+                            onChange={(e) => setNewSlot((s) => ({ ...s, endTime: e.target.value }))}
+                            className="w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-600">Location</label>
+                        <select
+                          value={String(newSlot.location || '')}
+                          onChange={(e) => setNewSlot((s) => ({ ...s, location: e.target.value }))}
+                          className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                        >
+                          <option value="">Any</option>
+                          {['MOA', 'Espace', 'SODIC', 'PalmHills'].map((loc) => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="md:col-span-2 flex gap-2">
+                        <button
+                          type="button"
+                          className="flex-1 px-3 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                          onClick={async () => {
+                            if (!id) return;
+                            try {
+                              setTabError('');
+                              // checked = draft.isActive true
+                              const selected = Object.entries(availabilityDrafts)
+                                .filter(([_, v]) => (v as any).isActive === true)
+                                .map(([k]) => k);
+                              const targets = selected.length > 0 ? selected : availability.filter((a) => a.isActive).map((a) => a.id);
+                              await Promise.all(
+                                targets.map((availId) =>
+                                  instructorsService.updateAvailability(availId, {
+                                    startTime: newSlot.startTime || '09:00',
+                                    endTime: newSlot.endTime || '17:00',
+                                    location: (newSlot.location as any) || null,
+                                  }),
+                                ),
+                              );
+                              setAvailabilityDrafts({});
+                              await refreshAvailability();
+                            } catch (e: any) {
+                              setTabError(e?.response?.data?.message || 'Failed to apply times');
+                            }
+                          }}
+                        >
+                          Apply
+                        </button>
+                        <button
+                          type="button"
+                          className="flex-1 px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+                          onClick={() => setAvailabilityDrafts({})}
+                        >
+                          Clear checks
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {[
-                    { title: 'Weekdays (Mon–Fri)', days: [1, 2, 3, 4, 5] },
-                    { title: 'Weekend (Sat/Sun)', days: [6, 0] },
-                  ].map((section) => (
-                    <div key={section.title} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                        <div className="text-sm font-semibold text-gray-900">{section.title}</div>
-                        <button
-                          type="button"
-                          className="text-sm text-indigo-600 hover:text-indigo-900"
-                          onClick={refreshAvailability}
-                        >
-                          Refresh
-                        </button>
-                      </div>
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-gray-900">Weekly Availability</div>
+                    <div className="text-xs text-gray-500">Fri + Sat = weekend</div>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayLabel, dayOfWeek) => {
+                      const row = availability.find((a) => Number(a.dayOfWeek) === dayOfWeek) || null;
+                      const draft = row ? (availabilityDrafts[row.id] || {}) : {};
+                      const isActive = row ? Boolean((draft as any).isActive ?? row.isActive) : false;
+                      const startTime = row ? String((draft as any).startTime ?? row.startTime ?? '09:00') : '09:00';
+                      const endTime = row ? String((draft as any).endTime ?? row.endTime ?? '17:00') : '17:00';
+                      const location = row ? String((draft as any).location ?? row.location ?? '') : '';
+                      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Fri + Sat
 
-                      <div className="p-4 space-y-3">
-                        {availability
-                          .filter((a) => section.days.includes(Number(a.dayOfWeek)))
-                          .map((row) => {
-                            const draft = availabilityDrafts[row.id] || {};
-                            const v = { ...row, ...draft } as AvailabilityRow;
-                            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                            return (
-                              <div key={row.id} className="border border-gray-200 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="text-sm font-medium text-gray-900">{days[v.dayOfWeek] || v.dayOfWeek}</div>
+                      return (
+                        <div key={dayLabel} className="p-4">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                                <input
+                                  type="checkbox"
+                                  checked={isActive}
+                                  onChange={(e) => {
+                                    if (!row) return;
+                                    setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), isActive: e.target.checked } }));
+                                  }}
+                                  disabled={!row || !canOps}
+                                />
+                                {dayLabel}
+                              </label>
+                              {isWeekend && (
+                                <span className="text-xs px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-700">
+                                  Weekend
+                                </span>
+                              )}
+                            </div>
+
+                            {row ? (
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:items-end">
+                                <div>
+                                  <label className="block text-xs text-gray-600">From</label>
+                                  <input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) =>
+                                      setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), startTime: e.target.value } }))
+                                    }
+                                    disabled={!canOps}
+                                    className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600">To</label>
+                                  <input
+                                    type="time"
+                                    value={endTime}
+                                    onChange={(e) =>
+                                      setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), endTime: e.target.value } }))
+                                    }
+                                    disabled={!canOps}
+                                    className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-gray-600">Location</label>
+                                  <select
+                                    value={location}
+                                    onChange={(e) =>
+                                      setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), location: e.target.value } }))
+                                    }
+                                    disabled={!canOps}
+                                    className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                  >
+                                    <option value="">Any</option>
+                                    {['MOA', 'Espace', 'SODIC', 'PalmHills'].map((loc) => (
+                                      <option key={loc} value={loc}>{loc}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="flex gap-2">
                                   {canOps && (
-                                    <div className="flex items-center gap-2">
+                                    <>
                                       <button
                                         type="button"
-                                        className="px-2 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
-                                        onClick={() => {
-                                          setNewSlot({
-                                            dayOfWeek: v.dayOfWeek,
-                                            startTime: v.startTime,
-                                            endTime: v.endTime,
-                                            location: v.location || '',
-                                            isActive: true,
-                                            effectiveFrom: '',
-                                            effectiveTo: '',
-                                          });
+                                        className="flex-1 px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+                                        onClick={async () => {
+                                          try {
+                                            setTabError('');
+                                            await instructorsService.updateAvailability(row.id, {
+                                              isActive,
+                                              startTime,
+                                              endTime,
+                                              location: location || null,
+                                            });
+                                            setAvailabilityDrafts((s) => {
+                                              const next = { ...s };
+                                              delete next[row.id];
+                                              return next;
+                                            });
+                                            await refreshAvailability();
+                                          } catch (e: any) {
+                                            setTabError(e?.response?.data?.message || 'Failed to save');
+                                          }
                                         }}
                                       >
-                                        Extend (date window)
+                                        Save
                                       </button>
                                       <button
                                         type="button"
-                                        className="px-2 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700"
+                                        className="flex-1 px-3 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700"
                                         onClick={async () => {
-                                          if (!confirm('Delete this availability?')) return;
+                                          if (!confirm('Delete this day availability?')) return;
                                           try {
                                             await instructorsService.deleteAvailability(row.id);
                                             await refreshAvailability();
                                           } catch (e: any) {
-                                            setTabError(e?.response?.data?.message || 'Failed to delete availability');
+                                            setTabError(e?.response?.data?.message || 'Failed to delete');
                                           }
                                         }}
                                       >
                                         Delete
                                       </button>
-                                    </div>
+                                    </>
                                   )}
                                 </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                  <div>
-                                    <label className="block text-xs text-gray-600">From</label>
-                                    <input
-                                      type="time"
-                                      value={v.startTime}
-                                      onChange={(e) =>
-                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), startTime: e.target.value } }))
-                                      }
-                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs text-gray-600">To</label>
-                                    <input
-                                      type="time"
-                                      value={v.endTime}
-                                      onChange={(e) =>
-                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), endTime: e.target.value } }))
-                                      }
-                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs text-gray-600">Location</label>
-                                    <select
-                                      value={v.location || ''}
-                                      onChange={(e) =>
-                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), location: e.target.value } }))
-                                      }
-                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                    >
-                                      <option value="">Any</option>
-                                      {['MOA', 'Espace', 'SODIC', 'PalmHills'].map((loc) => (
-                                        <option key={loc} value={loc}>
-                                          {loc}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="flex items-end">
-                                    <label className="flex items-center gap-2 text-sm text-gray-700">
-                                      <input
-                                        type="checkbox"
-                                        checked={Boolean(v.isActive)}
-                                        onChange={(e) =>
-                                          setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), isActive: e.target.checked } }))
-                                        }
-                                      />
-                                      Active
-                                    </label>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                  <div>
-                                    <label className="block text-xs text-gray-600">Effective from (optional)</label>
-                                    <input
-                                      type="date"
-                                      value={(v.effectiveFrom || '').slice(0, 10)}
-                                      onChange={(e) =>
-                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), effectiveFrom: e.target.value } }))
-                                      }
-                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs text-gray-600">Effective to (optional)</label>
-                                    <input
-                                      type="date"
-                                      value={(v.effectiveTo || '').slice(0, 10)}
-                                      onChange={(e) =>
-                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), effectiveTo: e.target.value } }))
-                                      }
-                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                    />
-                                  </div>
-                                </div>
-
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-500">
+                                No slot for this day.
                                 {canOps && (
-                                  <div className="flex justify-end gap-2 mt-3">
-                                    <button
-                                      type="button"
-                                      className="px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
-                                      onClick={() => setAvailabilityDrafts((s) => {
-                                        const next = { ...s };
-                                        delete next[row.id];
-                                        return next;
-                                      })}
-                                    >
-                                      Reset
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="px-3 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700"
-                                      onClick={async () => {
-                                        try {
-                                          setTabError('');
-                                          const payload: any = {
-                                            dayOfWeek: v.dayOfWeek,
-                                            startTime: v.startTime,
-                                            endTime: v.endTime,
-                                            location: v.location || undefined,
-                                            isActive: Boolean(v.isActive),
-                                            effectiveFrom: v.effectiveFrom || null,
-                                            effectiveTo: v.effectiveTo || null,
-                                          };
-                                          await instructorsService.updateAvailability(row.id, payload);
-                                          setAvailabilityDrafts((s) => {
-                                            const next = { ...s };
-                                            delete next[row.id];
-                                            return next;
-                                          });
-                                          await refreshAvailability();
-                                        } catch (e: any) {
-                                          setTabError(e?.response?.data?.message || 'Failed to save availability');
-                                        }
-                                      }}
-                                    >
-                                      Save
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    className="ml-2 text-sm text-indigo-600 hover:text-indigo-900"
+                                    onClick={async () => {
+                                      if (!id) return;
+                                      try {
+                                        setTabError('');
+                                        await instructorsService.addAvailability(String(id), {
+                                          dayOfWeek,
+                                          startTime: '09:00',
+                                          endTime: '17:00',
+                                          isActive: true,
+                                        });
+                                        await refreshAvailability();
+                                      } catch (e: any) {
+                                        setTabError(e?.response?.data?.message || 'Failed to add day slot');
+                                      }
+                                    }}
+                                  >
+                                    Add
+                                  </button>
                                 )}
                               </div>
-                            );
-                          })}
-
-                        {canOps && (
-                          <div className="border border-dashed border-gray-300 rounded-lg p-3">
-                            <div className="text-sm font-medium text-gray-900 mb-2">Add slot</div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                              <div>
-                                <label className="block text-xs text-gray-600">Day</label>
-                                <select
-                                  value={String(newSlot.dayOfWeek ?? 1)}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, dayOfWeek: Number(e.target.value) }))}
-                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                >
-                                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
-                                    <option key={d} value={String(idx)}>{d}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600">From</label>
-                                <input
-                                  type="time"
-                                  value={String(newSlot.startTime || '09:00')}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, startTime: e.target.value }))}
-                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600">To</label>
-                                <input
-                                  type="time"
-                                  value={String(newSlot.endTime || '17:00')}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, endTime: e.target.value }))}
-                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600">Location</label>
-                                <select
-                                  value={String(newSlot.location || '')}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, location: e.target.value }))}
-                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                >
-                                  <option value="">Any</option>
-                                  {['MOA', 'Espace', 'SODIC', 'PalmHills'].map((loc) => (
-                                    <option key={loc} value={loc}>{loc}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <div>
-                                <label className="block text-xs text-gray-600">Effective from (optional)</label>
-                                <input
-                                  type="date"
-                                  value={String(newSlot.effectiveFrom || '')}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, effectiveFrom: e.target.value }))}
-                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-gray-600">Effective to (optional)</label>
-                                <input
-                                  type="date"
-                                  value={String(newSlot.effectiveTo || '')}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, effectiveTo: e.target.value }))}
-                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between mt-3">
-                              <label className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(newSlot.isActive ?? true)}
-                                  onChange={(e) => setNewSlot((s) => ({ ...s, isActive: e.target.checked }))}
-                                />
-                                Active
-                              </label>
-                              <button
-                                type="button"
-                                className="px-3 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700"
-                                onClick={async () => {
-                                  if (!id) return;
-                                  try {
-                                    setTabError('');
-                                    await instructorsService.addAvailability(String(id), {
-                                      dayOfWeek: Number(newSlot.dayOfWeek ?? 1),
-                                      startTime: newSlot.startTime || '09:00',
-                                      endTime: newSlot.endTime || '17:00',
-                                      location: (newSlot.location as any) || undefined,
-                                      isActive: Boolean(newSlot.isActive ?? true),
-                                      effectiveFrom: (newSlot.effectiveFrom as any) || undefined,
-                                      effectiveTo: (newSlot.effectiveTo as any) || undefined,
-                                    });
-                                    setNewSlot((s) => ({ ...s, effectiveFrom: '', effectiveTo: '' }));
-                                    await refreshAvailability();
-                                  } catch (e: any) {
-                                    setTabError(e?.response?.data?.message || 'Failed to add availability');
-                                  }
-                                }}
-                              >
-                                Add
-                              </button>
-                            </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ),
