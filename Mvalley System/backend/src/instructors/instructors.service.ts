@@ -91,7 +91,17 @@ export class InstructorsService {
             email: true,
             firstName: true,
             lastName: true,
+            status: true,
           },
+        },
+        skills: {
+          where: { deletedAt: null },
+          orderBy: [{ name: 'asc' }],
+        },
+        contracts: {
+          where: { deletedAt: null },
+          orderBy: [{ startDate: 'desc' }],
+          take: 5,
         },
         classes: {
           where: { deletedAt: null },

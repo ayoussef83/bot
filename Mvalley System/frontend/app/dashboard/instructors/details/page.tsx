@@ -104,6 +104,62 @@ export default function InstructorDetailPage() {
   const [payrollYear, setPayrollYear] = useState<number>(now.getFullYear());
   const [payrollMonth, setPayrollMonth] = useState<number>(now.getMonth() + 1);
 
+  const monthRange = useMemo(() => {
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const start = new Date(y, m, 1, 0, 0, 0, 0);
+    const end = new Date(y, m + 1, 1, 0, 0, 0, 0);
+    return { start, end };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const utilization = useMemo(() => {
+    // Utilization for current month: scheduled minutes / available minutes.
+    const avail = availability || [];
+    const sess = sessions || [];
+    if (avail.length === 0) return null;
+
+    const { start, end } = monthRange;
+    const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+    const occurrencesByDow = Array(7).fill(0);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(start.getFullYear(), start.getMonth(), d);
+      occurrencesByDow[dt.getDay()]++;
+    }
+    const toMin = (hhmm: string) => {
+      const m = /^(\d{2}):(\d{2})$/.exec(hhmm || '');
+      if (!m) return null;
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+      return hh * 60 + mm;
+    };
+
+    let availableMinutes = 0;
+    for (const a of avail) {
+      if (!a.isActive) continue;
+      const s = toMin(a.startTime);
+      const e = toMin(a.endTime);
+      if (s == null || e == null || s >= e) continue;
+      availableMinutes += (e - s) * (occurrencesByDow[a.dayOfWeek] || 0);
+    }
+
+    let scheduledMinutes = 0;
+    for (const s of sess) {
+      const dt = new Date(s.scheduledDate);
+      if (dt < start || dt >= end) continue;
+      scheduledMinutes += Math.max(0, (new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000);
+    }
+
+    if (availableMinutes <= 0) return null;
+    const pct = Math.min(999, (scheduledMinutes / availableMinutes) * 100);
+    return {
+      pct,
+      scheduledMinutes: Math.round(scheduledMinutes),
+      availableMinutes: Math.round(availableMinutes),
+    };
+  }, [availability, sessions, monthRange]);
+
   const user = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const str = localStorage.getItem('user');
@@ -380,6 +436,21 @@ export default function InstructorDetailPage() {
               </>
             )}
             <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Status</h3>
+              <p className="text-lg text-gray-900 capitalize">{(instructor as any).user?.status || 'active'}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Utilization (this month)</h3>
+              <p className="text-lg text-gray-900">
+                {utilization ? `${utilization.pct.toFixed(0)}%` : '—'}
+              </p>
+              {utilization && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {Math.round(utilization.scheduledMinutes / 60)}h scheduled / {Math.round(utilization.availableMinutes / 60)}h available
+                </p>
+              )}
+            </div>
+            <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
                 Fees Type (legacy)
@@ -396,6 +467,42 @@ export default function InstructorDetailPage() {
                 EGP {instructor.costAmount.toLocaleString()}
                 {instructor.costType === 'hourly' && ' / hour'}
               </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Skills & Domains</h3>
+              {((instructor as any).skills || []).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {(instructor as any).skills.map((s: any) => (
+                    <span key={s.id} className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 border border-gray-200">
+                      {s.name}{s.level ? ` • ${String(s.level).replace('_',' ')}` : ''}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No skills recorded.</div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Contract Summary</h3>
+              {((instructor as any).contracts || []).length > 0 ? (
+                <div className="space-y-2">
+                  {((instructor as any).contracts || []).slice(0, 2).map((c: any) => (
+                    <div key={c.id} className="text-sm text-gray-700">
+                      <span className="font-medium">{c.contractType}</span>{' '}
+                      <span className="text-gray-500">
+                        ({new Date(c.startDate).toLocaleDateString()}
+                        {c.endDate ? ` → ${new Date(c.endDate).toLocaleDateString()}` : ''})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No contracts recorded.</div>
+              )}
             </div>
           </div>
         </div>
