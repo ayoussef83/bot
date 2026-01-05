@@ -7,7 +7,7 @@ import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
-import { FiEdit, FiTrash2, FiUserCheck, FiBookOpen, FiCalendar, FiDollarSign, FiUsers, FiClock, FiFileText, FiAlertTriangle } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiUserCheck, FiBookOpen, FiCalendar, FiDollarSign, FiUsers, FiClock, FiFileText, FiAlertTriangle, FiPlus } from 'react-icons/fi';
 
 interface Class {
   id: string;
@@ -42,6 +42,25 @@ interface PayrollRow {
   generatedAt: string;
 }
 
+interface AvailabilityRow {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  location?: string | null;
+  isActive: boolean;
+}
+
+interface CostModelRow {
+  id: string;
+  type: string;
+  amount: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  notes?: string | null;
+}
+
 export default function InstructorDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,8 +70,39 @@ export default function InstructorDetailPage() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [payroll, setPayroll] = useState<PayrollRow[]>([]);
+  const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
+  const [costModels, setCostModels] = useState<CostModelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tabError, setTabError] = useState<string>('');
+
+  // Availability modal
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
+  const [editingAvailability, setEditingAvailability] = useState<AvailabilityRow | null>(null);
+  const [availabilityForm, setAvailabilityForm] = useState({
+    dayOfWeek: '0',
+    startTime: '09:00',
+    endTime: '17:00',
+    location: '',
+    isActive: true,
+  });
+
+  // Cost model modal
+  const [showCostModelModal, setShowCostModelModal] = useState(false);
+  const [editingCostModel, setEditingCostModel] = useState<CostModelRow | null>(null);
+  const [costModelForm, setCostModelForm] = useState({
+    type: 'hourly',
+    amount: '',
+    currency: 'EGP',
+    effectiveFrom: new Date().toISOString().slice(0, 10),
+    effectiveTo: '',
+    notes: '',
+  });
+
+  // Payroll generation
+  const now = new Date();
+  const [payrollYear, setPayrollYear] = useState<number>(now.getFullYear());
+  const [payrollMonth, setPayrollMonth] = useState<number>(now.getMonth() + 1);
 
   const user = useMemo(() => {
     if (typeof window === 'undefined') return null;
@@ -77,6 +127,8 @@ export default function InstructorDetailPage() {
       setInstructor(response.data);
       setClasses((response.data as any).classes || []);
       setSessions((response.data as any).sessions || []);
+      setAvailability((response.data as any).availability || []);
+      setCostModels((response.data as any).costModels || []);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load instructor');
@@ -91,6 +143,26 @@ export default function InstructorDetailPage() {
       setPayroll(response.data || []);
     } catch (err: any) {
       // ignore (role-based access)
+    }
+  };
+
+  const refreshAvailability = async () => {
+    if (!id) return;
+    try {
+      const res = await instructorsService.listAvailability(String(id));
+      setAvailability(res.data || []);
+    } catch (e: any) {
+      setTabError(e?.response?.data?.message || 'Failed to load availability');
+    }
+  };
+
+  const refreshCostModels = async () => {
+    if (!id) return;
+    try {
+      const res = await instructorsService.listCostModels(String(id));
+      setCostModels(res.data || []);
+    } catch (e: any) {
+      setTabError(e?.response?.data?.message || 'Failed to load cost models');
     }
   };
 
@@ -269,6 +341,8 @@ export default function InstructorDetailPage() {
   ];
 
   const show = (roles: string[]) => !user?.role || roles.includes(user.role) || user.role === 'super_admin';
+  const canOps = show(['operations', 'super_admin']);
+  const canAccounting = show(['accounting', 'super_admin']);
 
   // Tabs
   const tabs: Tab[] = [
@@ -334,13 +408,191 @@ export default function InstructorDetailPage() {
             label: 'Availability',
             icon: <FiClock className="w-4 h-4" />,
             content: (
-              <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
-                <div className="text-sm text-gray-600">
-                  Sessions are blocked if scheduled outside availability/blackout dates.
+              <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+                {tabError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                    {tabError}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Sessions are blocked if scheduled outside availability/blackout dates.
+                  </div>
+                  {canOps && (
+                    <button
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                      onClick={() => {
+                        setEditingAvailability(null);
+                        setAvailabilityForm({ dayOfWeek: '0', startTime: '09:00', endTime: '17:00', location: '', isActive: true });
+                        setShowAvailabilityModal(true);
+                      }}
+                    >
+                      <FiPlus className="w-4 h-4" />
+                      Add Availability
+                    </button>
+                  )}
                 </div>
-                <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
-{JSON.stringify((instructor as any).availability || [], null, 2)}
-                </pre>
+
+                <DataTable
+                  columns={[
+                    {
+                      key: 'dayOfWeek',
+                      label: 'Day',
+                      render: (v) => {
+                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        return <span className="text-sm">{days[Number(v)] || v}</span>;
+                      },
+                    },
+                    { key: 'startTime', label: 'From', render: (v) => <span className="text-sm">{v}</span> },
+                    { key: 'endTime', label: 'To', render: (v) => <span className="text-sm">{v}</span> },
+                    { key: 'location', label: 'Location', render: (v) => <span className="text-sm text-gray-600">{v || 'Any'}</span> },
+                    { key: 'isActive', label: 'Active', render: (v) => <span className="text-sm text-gray-600">{v ? 'Yes' : 'No'}</span> },
+                  ]}
+                  data={availability}
+                  emptyMessage="No availability set"
+                  actions={
+                    canOps
+                      ? (row: any) => [
+                          {
+                            label: 'Edit',
+                            onClick: () => {
+                              setEditingAvailability(row);
+                              setAvailabilityForm({
+                                dayOfWeek: String(row.dayOfWeek ?? '0'),
+                                startTime: row.startTime || '09:00',
+                                endTime: row.endTime || '17:00',
+                                location: row.location || '',
+                                isActive: Boolean(row.isActive),
+                              });
+                              setShowAvailabilityModal(true);
+                            },
+                            icon: <FiEdit className="w-4 h-4" />,
+                          },
+                          {
+                            label: 'Delete',
+                            variant: 'danger',
+                            onClick: async () => {
+                              if (!confirm('Delete this availability?')) return;
+                              try {
+                                await instructorsService.deleteAvailability(row.id);
+                                await refreshAvailability();
+                              } catch (e: any) {
+                                setTabError(e?.response?.data?.message || 'Failed to delete availability');
+                              }
+                            },
+                            icon: <FiTrash2 className="w-4 h-4" />,
+                          },
+                        ]
+                      : undefined
+                  }
+                />
+
+                {showAvailabilityModal && (
+                  <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowAvailabilityModal(false)} />
+                      <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                        <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
+                          <h2 className="text-xl font-semibold">{editingAvailability ? 'Edit Availability' : 'Add Availability'}</h2>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Day</label>
+                              <select
+                                value={availabilityForm.dayOfWeek}
+                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, dayOfWeek: e.target.value })}
+                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                              >
+                                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, idx) => (
+                                  <option key={d} value={String(idx)}>{d}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Location</label>
+                              <select
+                                value={availabilityForm.location}
+                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, location: e.target.value })}
+                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                              >
+                                <option value="">Any</option>
+                                {['MOA','Espace','SODIC','PalmHills'].map((loc) => (
+                                  <option key={loc} value={loc}>{loc}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">From</label>
+                              <input
+                                type="time"
+                                value={availabilityForm.startTime}
+                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, startTime: e.target.value })}
+                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">To</label>
+                              <input
+                                type="time"
+                                value={availabilityForm.endTime}
+                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, endTime: e.target.value })}
+                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                              />
+                            </div>
+                          </div>
+                          <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={availabilityForm.isActive}
+                              onChange={(e) => setAvailabilityForm({ ...availabilityForm, isActive: e.target.checked })}
+                              className="rounded border-gray-300"
+                            />
+                            Active
+                          </label>
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowAvailabilityModal(false)}
+                              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  setTabError('');
+                                  const payload: any = {
+                                    dayOfWeek: parseInt(availabilityForm.dayOfWeek),
+                                    startTime: availabilityForm.startTime,
+                                    endTime: availabilityForm.endTime,
+                                    location: availabilityForm.location || undefined,
+                                    isActive: availabilityForm.isActive,
+                                  };
+                                  if (!id) return;
+                                  if (editingAvailability) {
+                                    await instructorsService.updateAvailability(editingAvailability.id, payload);
+                                  } else {
+                                    await instructorsService.addAvailability(String(id), payload);
+                                  }
+                                  setShowAvailabilityModal(false);
+                                  await refreshAvailability();
+                                } catch (e: any) {
+                                  setTabError(e?.response?.data?.message || 'Failed to save availability');
+                                }
+                              }}
+                              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ),
           },
@@ -393,7 +645,60 @@ export default function InstructorDetailPage() {
             label: 'Payroll',
             icon: <FiDollarSign className="w-4 h-4" />,
             content: (
-              <div>
+              <div className="space-y-6">
+                {tabError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                    {tabError}
+                  </div>
+                )}
+
+                {canAccounting && (
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Year</label>
+                        <input
+                          type="number"
+                          min="2000"
+                          max="2100"
+                          value={payrollYear}
+                          onChange={(e) => setPayrollYear(parseInt(e.target.value))}
+                          className="mt-1 block w-28 rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Month</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="12"
+                          value={payrollMonth}
+                          onChange={(e) => setPayrollMonth(parseInt(e.target.value))}
+                          className="mt-1 block w-24 rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                        />
+                      </div>
+                      <button
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                        onClick={async () => {
+                          if (!id) return;
+                          try {
+                            setTabError('');
+                            await instructorsService.generatePayroll({ year: payrollYear, month: payrollMonth, instructorId: String(id) });
+                            await fetchPayroll(String(id));
+                          } catch (e: any) {
+                            setTabError(e?.response?.data?.message || 'Failed to generate payroll');
+                          }
+                        }}
+                      >
+                        Generate Payroll
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Payroll generation requires attendance for all included sessions.
+                    </p>
+                  </div>
+                )}
+
                 <DataTable
                   columns={[
                     {
@@ -424,6 +729,195 @@ export default function InstructorDetailPage() {
                   data={payroll}
                   emptyMessage="No payroll snapshots yet"
                 />
+
+                <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium text-gray-700">Cost Models</div>
+                    {canAccounting && (
+                      <button
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                        onClick={() => {
+                          setEditingCostModel(null);
+                          setCostModelForm({
+                            type: 'hourly',
+                            amount: '',
+                            currency: 'EGP',
+                            effectiveFrom: new Date().toISOString().slice(0, 10),
+                            effectiveTo: '',
+                            notes: '',
+                          });
+                          setShowCostModelModal(true);
+                        }}
+                      >
+                        <FiPlus className="w-4 h-4" />
+                        Add Cost Model
+                      </button>
+                    )}
+                  </div>
+
+                  <DataTable
+                    columns={[
+                      { key: 'type', label: 'Type', render: (v) => <span className="text-sm capitalize">{String(v).replace('_',' ')}</span> },
+                      { key: 'amount', label: 'Amount', render: (v, r: any) => <span className="text-sm">{r.currency} {Number(v || 0).toLocaleString()}</span> },
+                      { key: 'effectiveFrom', label: 'From', render: (v) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString() : '—'}</span> },
+                      { key: 'effectiveTo', label: 'To', render: (v) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString() : '—'}</span> },
+                      { key: 'notes', label: 'Notes', render: (v) => <span className="text-sm text-gray-600">{v || '—'}</span> },
+                    ]}
+                    data={costModels}
+                    emptyMessage="No cost models"
+                    actions={
+                      canAccounting
+                        ? (row: any) => [
+                            {
+                              label: 'Edit',
+                              onClick: () => {
+                                setEditingCostModel(row);
+                                setCostModelForm({
+                                  type: row.type || 'hourly',
+                                  amount: String(row.amount ?? ''),
+                                  currency: row.currency || 'EGP',
+                                  effectiveFrom: row.effectiveFrom ? String(row.effectiveFrom).slice(0, 10) : new Date().toISOString().slice(0, 10),
+                                  effectiveTo: row.effectiveTo ? String(row.effectiveTo).slice(0, 10) : '',
+                                  notes: row.notes || '',
+                                });
+                                setShowCostModelModal(true);
+                              },
+                              icon: <FiEdit className="w-4 h-4" />,
+                            },
+                            {
+                              label: 'Delete',
+                              variant: 'danger',
+                              onClick: async () => {
+                                if (!confirm('Delete this cost model?')) return;
+                                try {
+                                  await instructorsService.deleteCostModel(row.id);
+                                  await refreshCostModels();
+                                } catch (e: any) {
+                                  setTabError(e?.response?.data?.message || 'Failed to delete cost model');
+                                }
+                              },
+                              icon: <FiTrash2 className="w-4 h-4" />,
+                            },
+                          ]
+                        : undefined
+                    }
+                  />
+
+                  {showCostModelModal && (
+                    <div className="fixed inset-0 z-50 overflow-y-auto">
+                      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowCostModelModal(false)} />
+                        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
+                            <h2 className="text-xl font-semibold">{editingCostModel ? 'Edit Cost Model' : 'Add Cost Model'}</h2>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Type</label>
+                                <select
+                                  value={costModelForm.type}
+                                  onChange={(e) => setCostModelForm({ ...costModelForm, type: e.target.value })}
+                                  className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                >
+                                  <option value="hourly">Hourly</option>
+                                  <option value="per_session">Per Session</option>
+                                  <option value="monthly">Monthly</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Currency</label>
+                                <input
+                                  value={costModelForm.currency}
+                                  onChange={(e) => setCostModelForm({ ...costModelForm, currency: e.target.value })}
+                                  className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Amount</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={costModelForm.amount}
+                                  onChange={(e) => setCostModelForm({ ...costModelForm, amount: e.target.value })}
+                                  className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                />
+                              </div>
+                              <div />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Effective From</label>
+                                <input
+                                  type="date"
+                                  value={costModelForm.effectiveFrom}
+                                  onChange={(e) => setCostModelForm({ ...costModelForm, effectiveFrom: e.target.value })}
+                                  className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Effective To (optional)</label>
+                                <input
+                                  type="date"
+                                  value={costModelForm.effectiveTo}
+                                  onChange={(e) => setCostModelForm({ ...costModelForm, effectiveTo: e.target.value })}
+                                  className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Notes</label>
+                              <textarea
+                                value={costModelForm.notes}
+                                onChange={(e) => setCostModelForm({ ...costModelForm, notes: e.target.value })}
+                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                rows={3}
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowCostModelModal(false)}
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!id) return;
+                                  try {
+                                    setTabError('');
+                                    const payload: any = {
+                                      type: costModelForm.type,
+                                      amount: parseFloat(String(costModelForm.amount || 0)),
+                                      currency: costModelForm.currency,
+                                      effectiveFrom: costModelForm.effectiveFrom,
+                                      effectiveTo: costModelForm.effectiveTo ? costModelForm.effectiveTo : undefined,
+                                      notes: costModelForm.notes || undefined,
+                                    };
+                                    if (editingCostModel) {
+                                      await instructorsService.updateCostModel(editingCostModel.id, payload);
+                                    } else {
+                                      await instructorsService.createCostModel(String(id), payload);
+                                    }
+                                    setShowCostModelModal(false);
+                                    await refreshCostModels();
+                                  } catch (e: any) {
+                                    setTabError(e?.response?.data?.message || 'Failed to save cost model');
+                                  }
+                                }}
+                                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             ),
           },
