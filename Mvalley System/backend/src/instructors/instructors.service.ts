@@ -66,6 +66,8 @@ export class InstructorsService {
           select: {
             classes: true,
             sessions: true,
+            availability: true,
+            payrolls: true,
           },
         },
       },
@@ -91,6 +93,32 @@ export class InstructorsService {
               where: { deletedAt: null },
             },
           },
+        },
+        availability: {
+          where: { deletedAt: null },
+          orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+        },
+        blackoutDates: {
+          where: { deletedAt: null },
+          orderBy: [{ startDate: 'asc' }],
+        },
+        costModels: {
+          where: { deletedAt: null },
+          orderBy: [{ effectiveFrom: 'desc' }],
+        },
+        payrolls: {
+          where: { deletedAt: null },
+          orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+          take: 12,
+        },
+        documents: {
+          where: { deletedAt: null },
+          orderBy: [{ createdAt: 'desc' }],
+        },
+        feedbackSummaries: {
+          where: { deletedAt: null },
+          orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+          take: 12,
         },
         sessions: {
           orderBy: { scheduledDate: 'desc' },

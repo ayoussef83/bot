@@ -8,6 +8,12 @@ export interface Instructor {
   user?: any;
   classes?: any[];
   sessions?: any[];
+  availability?: any[];
+  blackoutDates?: any[];
+  costModels?: any[];
+  payrolls?: any[];
+  documents?: any[];
+  feedbackSummaries?: any[];
 }
 
 export const instructorsService = {
@@ -17,6 +23,11 @@ export const instructorsService = {
   update: (id: string, data: Partial<Instructor>) =>
     api.patch<Instructor>(`/instructors/${id}`, data),
   delete: (id: string) => api.delete(`/instructors/${id}`),
+
+  getPayroll: (id: string) => api.get(`/instructors/${id}/payroll`),
+  addAvailability: (id: string, data: any) => api.post(`/instructors/${id}/availability`, data),
+  generatePayroll: (data: { year: number; month: number; instructorId?: string }) =>
+    api.post(`/payroll/generate`, data),
 };
 
 

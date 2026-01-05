@@ -1,24 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { instructorsService, Instructor } from '@/lib/services';
-import api from '@/lib/api';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
 import DataTable from '@/components/DataTable';
-import { FiEdit, FiTrash2, FiUserCheck, FiBookOpen, FiCalendar, FiDollarSign, FiUsers, FiClock } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiUserCheck, FiBookOpen, FiCalendar, FiDollarSign, FiUsers, FiClock, FiFileText, FiAlertTriangle } from 'react-icons/fi';
 
 interface Class {
   id: string;
   name: string;
   location: string;
   capacity: number;
+  minCapacity?: number;
+  maxCapacity?: number;
   students?: any[];
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
   utilizationPercentage?: number;
 }
 
@@ -34,6 +32,16 @@ interface Session {
   };
 }
 
+interface PayrollRow {
+  id: string;
+  periodYear: number;
+  periodMonth: number;
+  status: string;
+  currency: string;
+  totalAmount: number;
+  generatedAt: string;
+}
+
 export default function InstructorDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,14 +50,20 @@ export default function InstructorDetailPage() {
   const [instructor, setInstructor] = useState<Instructor | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [payroll, setPayroll] = useState<PayrollRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const str = localStorage.getItem('user');
+    return str ? JSON.parse(str) : null;
+  }, []);
 
   useEffect(() => {
     if (id) {
       fetchInstructor(id);
-      fetchClasses(id);
-      fetchSessions(id);
+      fetchPayroll(id);
     } else {
       setError('Missing instructor id');
       setLoading(false);
@@ -61,6 +75,8 @@ export default function InstructorDetailPage() {
     try {
       const response = await instructorsService.getById(instructorId);
       setInstructor(response.data);
+      setClasses((response.data as any).classes || []);
+      setSessions((response.data as any).sessions || []);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load instructor');
@@ -69,29 +85,12 @@ export default function InstructorDetailPage() {
     }
   };
 
-  const fetchClasses = async (instructorId: string) => {
+  const fetchPayroll = async (instructorId: string) => {
     try {
-      const response = await api.get(`/instructors/${instructorId}/classes`);
-      setClasses(response.data);
+      const response = await instructorsService.getPayroll(instructorId);
+      setPayroll(response.data || []);
     } catch (err: any) {
-      console.error('Failed to load classes', err);
-      // If endpoint doesn't exist, try to get from instructor data
-      if (instructor?.classes) {
-        setClasses(instructor.classes);
-      }
-    }
-  };
-
-  const fetchSessions = async (instructorId: string) => {
-    try {
-      const response = await api.get(`/instructors/${instructorId}/sessions`);
-      setSessions(response.data);
-    } catch (err: any) {
-      console.error('Failed to load sessions', err);
-      // If endpoint doesn't exist, try to get from instructor data
-      if (instructor?.sessions) {
-        setSessions(instructor.sessions);
-      }
+      // ignore (role-based access)
     }
   };
 
@@ -140,21 +139,29 @@ export default function InstructorDetailPage() {
     { label: instructorName, href: `/dashboard/instructors/details?id=${id}` },
   ];
 
-  // Action buttons
+  // Action buttons (role-based)
   const actions: ActionButton[] = [
-    {
-      label: 'Edit',
-      onClick: () => {
-        router.push(`/dashboard/instructors/edit?id=${id}`);
-      },
-      icon: <FiEdit className="w-4 h-4" />,
-    },
-    {
-      label: 'Delete',
-      onClick: handleDelete,
-      variant: 'danger',
-      icon: <FiTrash2 className="w-4 h-4" />,
-    },
+    ...(user?.role !== 'instructor'
+      ? [
+          {
+            label: 'Edit',
+            onClick: () => {
+              router.push(`/dashboard/instructors/edit?id=${id}`);
+            },
+            icon: <FiEdit className="w-4 h-4" />,
+          } as ActionButton,
+        ]
+      : []),
+    ...(user?.role === 'super_admin'
+      ? [
+          {
+            label: 'Delete',
+            onClick: handleDelete,
+            variant: 'danger',
+            icon: <FiTrash2 className="w-4 h-4" />,
+          } as ActionButton,
+        ]
+      : []),
   ];
 
   // Class columns
@@ -185,21 +192,10 @@ export default function InstructorDetailPage() {
       label: 'Capacity',
       render: (_, row) => (
         <span className="text-sm text-gray-500">
-          {row.students?.length || 0} / {row.capacity}
+          {row.students?.length || 0} / {(row.maxCapacity ?? row.capacity)}
+          {row.minCapacity != null ? ` (min ${row.minCapacity})` : ''}
         </span>
       ),
-    },
-    {
-      key: 'schedule',
-      label: 'Schedule',
-      render: (_, row) => {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        return (
-          <span className="text-sm text-gray-500">
-            {days[row.dayOfWeek]} {row.startTime} - {row.endTime}
-          </span>
-        );
-      },
     },
     {
       key: 'utilization',
@@ -272,6 +268,8 @@ export default function InstructorDetailPage() {
     },
   ];
 
+  const show = (roles: string[]) => !user?.role || roles.includes(user.role) || user.role === 'super_admin';
+
   // Tabs
   const tabs: Tab[] = [
     {
@@ -280,6 +278,16 @@ export default function InstructorDetailPage() {
       icon: <FiUserCheck className="w-4 h-4" />,
       content: (
         <div className="space-y-6">
+          {(((instructor as any).availability?.length || 0) === 0) && show(['operations', 'management', 'super_admin']) && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+              <FiAlertTriangle className="w-5 h-5 text-yellow-700 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-yellow-800">Utilization risk</div>
+                <div className="text-sm text-yellow-700">No availability is defined for this instructor.</div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-6">
             {instructor.user && (
               <>
@@ -295,84 +303,164 @@ export default function InstructorDetailPage() {
                     <p className="text-lg text-gray-900">{instructor.user.email}</p>
                   </div>
                 )}
-                {instructor.user.phone && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Phone</h3>
-                    <p className="text-lg text-gray-900">{instructor.user.phone}</p>
-                  </div>
-                )}
               </>
             )}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Fees Type
+                Fees Type (legacy)
               </h3>
               <p className="text-lg text-gray-900 capitalize">{instructor.costType}</p>
+              <p className="text-xs text-gray-400 mt-1">Accounting cost models are the source of truth.</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Fees
+                Fees (legacy)
               </h3>
               <p className="text-lg text-gray-900">
                 EGP {instructor.costAmount.toLocaleString()}
                 {instructor.costType === 'hourly' && ' / hour'}
-                {instructor.costType === 'session' && ' / session'}
               </p>
             </div>
           </div>
         </div>
       ),
     },
+    ...(show(['operations', 'management', 'super_admin'])
+      ? [
+          {
+            id: 'availability',
+            label: 'Availability',
+            icon: <FiClock className="w-4 h-4" />,
+            content: (
+              <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+                <div className="text-sm text-gray-600">
+                  Sessions are blocked if scheduled outside availability/blackout dates.
+                </div>
+                <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+{JSON.stringify((instructor as any).availability || [], null, 2)}
+                </pre>
+              </div>
+            ),
+          },
+        ]
+      : []),
     {
-      id: 'classes',
-      label: 'Courses',
-      count: classes.length,
-      icon: <FiBookOpen className="w-4 h-4" />,
-      content: (
-        <div>
-          {classes.length > 0 ? (
-            <DataTable
-              columns={classColumns}
-              data={classes}
-              emptyMessage="No courses assigned"
-              onRowClick={(row) => {
-                router.push(`/dashboard/courses/details?id=${row.id}`);
-              }}
-            />
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>No courses assigned</p>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'sessions',
-      label: 'Sessions',
-      count: sessions.length,
+      id: 'assignments',
+      label: 'Assignments',
       icon: <FiCalendar className="w-4 h-4" />,
       content: (
-        <div>
-          {sessions.length > 0 ? (
-            <DataTable
-              columns={sessionColumns}
-              data={sessions}
-              emptyMessage="No sessions found"
-              onRowClick={(row) => {
-                router.push(`/dashboard/sessions/details?id=${row.id}`);
-              }}
-            />
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>No sessions found</p>
-            </div>
-          )}
+        <div className="space-y-6">
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Courses</div>
+            {classes.length > 0 ? (
+              <DataTable
+                columns={classColumns}
+                data={classes}
+                emptyMessage="No courses assigned"
+                onRowClick={(row) => router.push(`/dashboard/courses/details?id=${row.id}`)}
+              />
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No courses assigned</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Sessions</div>
+            {sessions.length > 0 ? (
+              <DataTable
+                columns={sessionColumns}
+                data={sessions}
+                emptyMessage="No sessions found"
+                onRowClick={(row) => router.push(`/dashboard/sessions/details?id=${row.id}`)}
+              />
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No sessions found</p>
+              </div>
+            )}
+          </div>
         </div>
       ),
     },
+    ...(show(['accounting', 'management', 'instructor', 'super_admin'])
+      ? [
+          {
+            id: 'payroll',
+            label: 'Payroll',
+            icon: <FiDollarSign className="w-4 h-4" />,
+            content: (
+              <div>
+                <DataTable
+                  columns={[
+                    {
+                      key: 'period',
+                      label: 'Period',
+                      render: (_, r: any) => (
+                        <span className="text-sm">
+                          {r.periodYear}-{String(r.periodMonth).padStart(2, '0')}
+                        </span>
+                      ),
+                    },
+                    { key: 'status', label: 'Status', render: (v: any) => <span className="text-sm text-gray-600">{v}</span> },
+                    {
+                      key: 'total',
+                      label: 'Total',
+                      render: (_, r: any) => (
+                        <span className="text-sm">
+                          {r.currency} {Number(r.totalAmount || 0).toLocaleString()}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'generatedAt',
+                      label: 'Generated',
+                      render: (v: any) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString() : '—'}</span>,
+                    },
+                  ]}
+                  data={payroll}
+                  emptyMessage="No payroll snapshots yet"
+                />
+              </div>
+            ),
+          },
+        ]
+      : []),
+    ...(show(['management', 'super_admin'])
+      ? [
+          {
+            id: 'performance',
+            label: 'Performance',
+            icon: <FiUsers className="w-4 h-4" />,
+            content: (
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+{JSON.stringify((instructor as any).feedbackSummaries || [], null, 2)}
+                </pre>
+              </div>
+            ),
+          },
+        ]
+      : []),
+    ...(show(['hr', 'management', 'super_admin'])
+      ? [
+          {
+            id: 'documents',
+            label: 'Documents',
+            icon: <FiFileText className="w-4 h-4" />,
+            content: (
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+{JSON.stringify((instructor as any).documents || [], null, 2)}
+                </pre>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   // Sidebar with quick actions

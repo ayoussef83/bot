@@ -31,6 +31,10 @@ const rolePermissions: { [key: string]: { access: string[]; restrictions: string
     access: ['Dashboard', 'Students', 'Classes', 'Sessions', 'Communications', 'Scheduling'],
     restrictions: ['No finance access', 'No delete permissions'],
   },
+  hr: {
+    access: ['Dashboard', 'HR', 'People', 'Contracts', 'Documents'],
+    restrictions: ['No finance access', 'No user management', 'No system settings'],
+  },
   accounting: {
     access: ['Dashboard', 'Finance', 'Payments', 'Reports'],
     restrictions: ['No user management', 'No system settings'],
@@ -73,6 +77,7 @@ export default function UsersRolesPage() {
       super_admin: 'active',
       management: 'active',
       operations: 'active',
+    hr: 'active',
       accounting: 'active',
       sales: 'active',
       instructor: 'inactive',

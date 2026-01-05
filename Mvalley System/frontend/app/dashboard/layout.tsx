@@ -48,6 +48,8 @@ export default function DashboardLayout({
       case 'super_admin':
       case 'management':
         return '/dashboard/management';
+      case 'hr':
+        return '/dashboard/hr';
       case 'operations':
         return '/dashboard/ops';
       case 'accounting':
