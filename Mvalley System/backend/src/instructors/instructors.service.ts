@@ -1,9 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { randomUUID } from 'crypto';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   CreateInstructorAvailabilityDto,
   CreateInstructorCostModelDto,
   CreateInstructorDto,
+  PresignInstructorDocumentUploadDto,
   UpdateInstructorAvailabilityDto,
   UpdateInstructorCostModelDto,
   UpdateInstructorDto,
@@ -12,6 +16,33 @@ import {
 @Injectable()
 export class InstructorsService {
   constructor(private prisma: PrismaService) {}
+
+  private getDocsBucket() {
+    const bucket = process.env.INSTRUCTOR_DOCS_BUCKET;
+    if (!bucket) {
+      throw new BadRequestException('INSTRUCTOR_DOCS_BUCKET is not configured');
+    }
+    return bucket;
+  }
+
+  private getDocsPrefix() {
+    const prefix = (process.env.INSTRUCTOR_DOCS_PREFIX || 'mv-os').trim().replace(/^\/+|\/+$/g, '');
+    return prefix;
+  }
+
+  private getS3() {
+    const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+    return new S3Client({ region });
+  }
+
+  private sanitizeKeyPart(value: string) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
 
   async create(data: CreateInstructorDto, createdBy: string) {
     const instructor = await this.prisma.instructor.create({
@@ -160,6 +191,117 @@ export class InstructorsService {
       throw new NotFoundException('Instructor not found');
     }
     return instructor;
+  }
+
+  async listDocuments(instructorId: string, user: any) {
+    const instructor = await this.prisma.instructor.findFirst({
+      where: { id: instructorId, deletedAt: null },
+      select: { id: true, userId: true },
+    });
+    if (!instructor) throw new NotFoundException('Instructor not found');
+    if (user?.role === 'instructor' && instructor.userId !== user.id) {
+      throw new NotFoundException('Instructor not found');
+    }
+
+    const docs = await this.prisma.instructorDocument.findMany({
+      where: { instructorId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (user?.role !== 'instructor') return docs;
+    // Instructor only sees documents explicitly marked visible.
+    return docs.filter((d: any) => Boolean((d?.metadata as any)?.visibleToInstructor));
+  }
+
+  async presignDocumentUpload(instructorId: string, dto: PresignInstructorDocumentUploadDto, userId: string) {
+    const instructor = await this.prisma.instructor.findFirst({
+      where: { id: instructorId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!instructor) throw new NotFoundException('Instructor not found');
+
+    const bucket = this.getDocsBucket();
+    const prefix = this.getDocsPrefix();
+    const typePart = this.sanitizeKeyPart(dto.type || 'other') || 'other';
+    const namePart = this.sanitizeKeyPart(dto.name || 'document') || 'document';
+    const key = `${prefix}/instructors/${instructorId}/${typePart}/${randomUUID()}-${namePart}`;
+
+    const doc = await this.prisma.instructorDocument.create({
+      data: {
+        instructorId,
+        type: dto.type,
+        name: dto.name,
+        url: `s3://${bucket}/${key}`,
+        metadata: {
+          bucket,
+          key,
+          contentType: dto.contentType,
+          visibleToInstructor: dto.visibleToInstructor ?? false,
+          createdBy: userId,
+        },
+      },
+    });
+
+    const s3 = this.getS3();
+    const uploadUrl = await getSignedUrl(
+      s3,
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ContentType: dto.contentType,
+      }),
+      { expiresIn: 15 * 60 },
+    );
+
+    return { document: doc, uploadUrl };
+  }
+
+  async presignDocumentDownload(documentId: string, user: any) {
+    const doc = await this.prisma.instructorDocument.findFirst({
+      where: { id: documentId, deletedAt: null },
+      include: { instructor: { select: { userId: true } } },
+    });
+    if (!doc) throw new NotFoundException('Document not found');
+
+    if (user?.role === 'instructor') {
+      if (doc.instructor?.userId !== user.id) throw new NotFoundException('Document not found');
+      if (!Boolean((doc?.metadata as any)?.visibleToInstructor)) throw new NotFoundException('Document not found');
+    }
+
+    const meta: any = doc.metadata || {};
+    const bucket = meta.bucket || this.getDocsBucket();
+    const key = meta.key || String(doc.url || '').replace(`s3://${bucket}/`, '');
+    if (!key) throw new BadRequestException('Document storage key is missing');
+
+    const s3 = this.getS3();
+    const url = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      }),
+      { expiresIn: 15 * 60 },
+    );
+
+    return { url };
+  }
+
+  async deleteDocument(documentId: string, deletedBy: string) {
+    const doc = await this.prisma.instructorDocument.update({
+      where: { id: documentId },
+      data: { deletedAt: new Date() },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: deletedBy,
+        action: 'delete',
+        entityType: 'InstructorDocument',
+        entityId: documentId,
+      },
+    });
+
+    return doc;
   }
 
   async update(id: string, data: UpdateInstructorDto, updatedBy: string) {

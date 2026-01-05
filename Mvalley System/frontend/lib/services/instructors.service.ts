@@ -16,6 +16,18 @@ export interface Instructor {
   feedbackSummaries?: any[];
 }
 
+export interface InstructorDocument {
+  id: string;
+  instructorId: string;
+  type: string;
+  name: string;
+  url: string;
+  issuedAt?: string | null;
+  expiresAt?: string | null;
+  metadata?: any;
+  createdAt?: string;
+}
+
 export const instructorsService = {
   getAll: () => api.get<Instructor[]>('/instructors'),
   getById: (id: string) => api.get<Instructor>(`/instructors/${id}`),
@@ -37,6 +49,15 @@ export const instructorsService = {
   deleteCostModel: (costModelId: string) => api.delete(`/instructors/cost-models/${costModelId}`),
   generatePayroll: (data: { year: number; month: number; instructorId?: string }) =>
     api.post(`/payroll/generate`, data),
+
+  listDocuments: (id: string) => api.get<InstructorDocument[]>(`/instructors/${id}/documents`),
+  presignDocumentUpload: (
+    id: string,
+    data: { type: string; name: string; contentType: string; visibleToInstructor?: boolean },
+  ) => api.post<{ document: InstructorDocument; uploadUrl: string }>(`/instructors/${id}/documents/presign-upload`, data),
+  presignDocumentDownload: (documentId: string) =>
+    api.get<{ url: string }>(`/instructors/documents/${documentId}/presign-download`),
+  deleteDocument: (documentId: string) => api.delete(`/instructors/documents/${documentId}`),
 };
 
 

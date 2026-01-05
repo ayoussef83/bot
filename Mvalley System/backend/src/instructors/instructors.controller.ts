@@ -18,6 +18,7 @@ import {
   CreateInstructorAvailabilityDto,
   CreateInstructorCostModelDto,
   CreateInstructorDto,
+  PresignInstructorDocumentUploadDto,
   UpdateInstructorAvailabilityDto,
   UpdateInstructorCostModelDto,
   UpdateInstructorDto,
@@ -52,6 +53,25 @@ export class InstructorsController {
     return this.instructorsService.findAll();
   }
 
+  @Get('documents/:documentId/presign-download')
+  @Roles(
+    UserRole.super_admin,
+    UserRole.management,
+    UserRole.operations,
+    UserRole.accounting,
+    UserRole.hr,
+    UserRole.instructor,
+  )
+  presignDocumentDownload(@Param('documentId') documentId: string, @CurrentUser() user: any) {
+    return this.instructorsService.presignDocumentDownload(documentId, user);
+  }
+
+  @Delete('documents/:documentId')
+  @Roles(UserRole.super_admin, UserRole.hr)
+  deleteDocument(@Param('documentId') documentId: string, @CurrentUser() user: any) {
+    return this.instructorsService.deleteDocument(documentId, user.id);
+  }
+
   @Get(':id')
   @Roles(
     UserRole.super_admin,
@@ -62,6 +82,29 @@ export class InstructorsController {
   )
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     return this.instructorsService.findOneForUser(id, user);
+  }
+
+  @Get(':id/documents')
+  @Roles(
+    UserRole.super_admin,
+    UserRole.management,
+    UserRole.operations,
+    UserRole.accounting,
+    UserRole.hr,
+    UserRole.instructor,
+  )
+  listDocuments(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.instructorsService.listDocuments(id, user);
+  }
+
+  @Post(':id/documents/presign-upload')
+  @Roles(UserRole.super_admin, UserRole.hr)
+  presignDocumentUpload(
+    @Param('id') id: string,
+    @Body() dto: PresignInstructorDocumentUploadDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.instructorsService.presignDocumentUpload(id, dto, user.id);
   }
 
   @Patch(':id')

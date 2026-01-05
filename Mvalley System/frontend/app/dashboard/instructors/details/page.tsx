@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { instructorsService, Instructor } from '@/lib/services';
+import { instructorsService, Instructor, InstructorDocument } from '@/lib/services';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
@@ -72,6 +72,7 @@ export default function InstructorDetailPage() {
   const [payroll, setPayroll] = useState<PayrollRow[]>([]);
   const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
   const [costModels, setCostModels] = useState<CostModelRow[]>([]);
+  const [documents, setDocuments] = useState<InstructorDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tabError, setTabError] = useState<string>('');
@@ -98,6 +99,12 @@ export default function InstructorDetailPage() {
     effectiveTo: '',
     notes: '',
   });
+
+  // Documents
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docType, setDocType] = useState('contract');
+  const [docVisibleToInstructor, setDocVisibleToInstructor] = useState(false);
 
   // Payroll generation
   const now = new Date();
@@ -185,6 +192,7 @@ export default function InstructorDetailPage() {
       setSessions((response.data as any).sessions || []);
       setAvailability((response.data as any).availability || []);
       setCostModels((response.data as any).costModels || []);
+      setDocuments((response.data as any).documents || []);
       setError('');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load instructor');
@@ -219,6 +227,16 @@ export default function InstructorDetailPage() {
       setCostModels(res.data || []);
     } catch (e: any) {
       setTabError(e?.response?.data?.message || 'Failed to load cost models');
+    }
+  };
+
+  const refreshDocuments = async () => {
+    if (!id) return;
+    try {
+      const res = await instructorsService.listDocuments(String(id));
+      setDocuments(res.data || []);
+    } catch (e: any) {
+      setTabError(e?.response?.data?.message || 'Failed to load documents');
     }
   };
 
@@ -396,9 +414,15 @@ export default function InstructorDetailPage() {
     },
   ];
 
-  const show = (roles: string[]) => !user?.role || roles.includes(user.role) || user.role === 'super_admin';
+  const normalizedRole = String(user?.role || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  const show = (roles: string[]) =>
+    !user?.role || roles.includes(normalizedRole) || normalizedRole === 'super_admin';
   const canOps = show(['operations', 'super_admin']);
   const canAccounting = show(['accounting', 'super_admin']);
+  const canHr = show(['hr', 'super_admin']);
 
   // Tabs
   const tabs: Tab[] = [
@@ -1053,10 +1077,162 @@ export default function InstructorDetailPage() {
             label: 'Documents',
             icon: <FiFileText className="w-4 h-4" />,
             content: (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
-{JSON.stringify((instructor as any).documents || [], null, 2)}
-                </pre>
+              <div className="space-y-4">
+                {tabError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                    {tabError}
+                  </div>
+                )}
+
+                {canHr && (
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-sm font-semibold text-gray-900">Upload document</div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!id || !docFile) return;
+                          try {
+                            setUploadingDoc(true);
+                            setTabError('');
+                            const presign = await instructorsService.presignDocumentUpload(String(id), {
+                              type: docType,
+                              name: docFile.name,
+                              contentType: docFile.type || 'application/octet-stream',
+                              visibleToInstructor: docVisibleToInstructor,
+                            });
+                            const uploadUrl = presign.data?.uploadUrl;
+                            if (!uploadUrl) throw new Error('Upload URL missing');
+                            await fetch(uploadUrl, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': docFile.type || 'application/octet-stream' },
+                              body: docFile,
+                            });
+                            setDocFile(null);
+                            await refreshDocuments();
+                          } catch (e: any) {
+                            setTabError(e?.response?.data?.message || e?.message || 'Failed to upload document');
+                          } finally {
+                            setUploadingDoc(false);
+                          }
+                        }}
+                        disabled={!docFile || uploadingDoc}
+                        className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${
+                          !docFile || uploadingDoc
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}
+                      >
+                        <FiPlus className="w-4 h-4" />
+                        {uploadingDoc ? 'Uploading…' : 'Upload'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700">Type</label>
+                        <select
+                          value={docType}
+                          onChange={(e) => setDocType(e.target.value)}
+                          className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600 text-sm"
+                        >
+                          <option value="id">ID</option>
+                          <option value="contract">Contract</option>
+                          <option value="certificate">Certificate</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700">File</label>
+                        <input
+                          type="file"
+                          onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                          className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600 text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={docVisibleToInstructor}
+                            onChange={(e) => setDocVisibleToInstructor(e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          Visible to instructor
+                        </label>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      Files are uploaded to S3 using a short-lived secure link.
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-gray-900">Documents</div>
+                    <button
+                      type="button"
+                      onClick={refreshDocuments}
+                      className="text-sm text-indigo-600 hover:text-indigo-900"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  {documents.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-500">No documents uploaded.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-200">
+                      {documents.map((d) => (
+                        <div key={d.id} className="p-4 flex items-start justify-between gap-4">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{d.name}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              <span className="capitalize">{d.type}</span>
+                              {d.expiresAt ? ` • Expires ${new Date(d.expiresAt).toLocaleDateString()}` : ''}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  setTabError('');
+                                  const res = await instructorsService.presignDocumentDownload(d.id);
+                                  const url = res.data?.url;
+                                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                                } catch (e: any) {
+                                  setTabError(e?.response?.data?.message || 'Failed to open document');
+                                }
+                              }}
+                              className="px-3 py-2 text-sm font-medium rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            >
+                              View / Download
+                            </button>
+                            {canHr && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!confirm('Delete this document?')) return;
+                                  try {
+                                    setTabError('');
+                                    await instructorsService.deleteDocument(d.id);
+                                    await refreshDocuments();
+                                  } catch (e: any) {
+                                    setTabError(e?.response?.data?.message || 'Failed to delete document');
+                                  }
+                                }}
+                                className="px-3 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ),
           },
