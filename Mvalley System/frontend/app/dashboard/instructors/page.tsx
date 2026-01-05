@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { instructorsService, Instructor } from '@/lib/services';
 import api from '@/lib/api';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
@@ -13,6 +13,7 @@ import { FiPlus, FiEdit, FiTrash2, FiUserCheck, FiUsers } from 'react-icons/fi';
 
 export default function InstructorsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,16 @@ export default function InstructorsPage() {
   useEffect(() => {
     fetchInstructors();
   }, []);
+
+  // If only one instructor exists, go straight to the profile (student-card style) from the sidebar.
+  useEffect(() => {
+    if (loading) return;
+    const stayList = searchParams?.get('stayList') === 'true';
+    if (stayList) return;
+    if (instructors.length === 1) {
+      router.replace(`/dashboard/instructors/details?id=${instructors[0].id}`);
+    }
+  }, [instructors, loading, router, searchParams]);
 
   useEffect(() => {
     if (instructors.length > 0) {
