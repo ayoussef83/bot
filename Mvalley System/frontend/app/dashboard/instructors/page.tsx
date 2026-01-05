@@ -32,15 +32,7 @@ export default function InstructorsPage() {
     fetchInstructors();
   }, []);
 
-  // If only one instructor exists, go straight to the profile (student-card style) from the sidebar.
-  useEffect(() => {
-    if (loading) return;
-    const stayList = searchParams?.get('stayList') === 'true';
-    if (stayList) return;
-    if (instructors.length === 1) {
-      router.replace(`/dashboard/instructors/details?id=${instructors[0].id}`);
-    }
-  }, [instructors, loading, router, searchParams]);
+  // Keep the list as the default view (no auto-redirect). Deep-links can still route to details.
 
   useEffect(() => {
     if (instructors.length > 0) {

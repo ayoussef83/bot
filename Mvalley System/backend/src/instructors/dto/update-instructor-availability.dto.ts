@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Location } from '@prisma/client';
 
 export class UpdateInstructorAvailabilityDto {
@@ -23,6 +23,14 @@ export class UpdateInstructorAvailabilityDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveFrom?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveTo?: string | null;
 }
 
 

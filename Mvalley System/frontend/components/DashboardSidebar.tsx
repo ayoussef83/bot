@@ -98,7 +98,7 @@ const navigationSections: NavigationSection[] = [
         id: 'instructors',
         label: 'Instructors',
         icon: <RiPresentationFill className="w-4 h-4" />,
-        path: '/dashboard/instructors',
+        path: '/dashboard/instructors?stayList=true',
         roles: ['super_admin', 'operations', 'management', 'accounting'],
       },
       {

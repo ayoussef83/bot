@@ -57,21 +57,27 @@ export class SessionsService {
     const eMin = this.timeToMinutes(this.cairoHHMM(end));
     if (sMin === null || eMin === null || sMin >= eMin) throw new BadRequestException('Invalid session time');
 
-    const avail = await this.prisma.instructorAvailability.findFirst({
+    const avails = await this.prisma.instructorAvailability.findMany({
       where: {
         instructorId,
         deletedAt: null,
         isActive: true,
         dayOfWeek: day,
         OR: [{ location: null }, { location: cls.location }],
+        AND: [
+          { OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: start } }] },
+          { OR: [{ effectiveTo: null }, { effectiveTo: { gte: end } }] },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     });
-    if (!avail) throw new BadRequestException('Instructor is not available (no availability defined)');
+    if (!avails || avails.length === 0) throw new BadRequestException('Instructor is not available (no availability defined)');
 
-    const aStart = this.timeToMinutes(avail.startTime) ?? 0;
-    const aEnd = this.timeToMinutes(avail.endTime) ?? 0;
-    const ok = aStart <= sMin && eMin <= aEnd;
+    const ok = avails.some((avail) => {
+      const aStart = this.timeToMinutes(avail.startTime) ?? 0;
+      const aEnd = this.timeToMinutes(avail.endTime) ?? 0;
+      return aStart <= sMin && eMin <= aEnd;
+    });
     if (!ok) throw new BadRequestException('Instructor is not available at this time');
   }
 

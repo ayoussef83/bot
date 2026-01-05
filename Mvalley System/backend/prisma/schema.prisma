@@ -540,6 +540,8 @@ model InstructorAvailability {
   endTime   String // HH:mm
   location  Location?
   isActive  Boolean @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -548,6 +550,8 @@ model InstructorAvailability {
   @@index([instructorId])
   @@index([dayOfWeek])
   @@index([location])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
   @@map("instructor_availabilities")
 }
 

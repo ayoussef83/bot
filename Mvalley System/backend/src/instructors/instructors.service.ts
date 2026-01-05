@@ -373,8 +373,14 @@ export class InstructorsService {
       throw new BadRequestException('Invalid availability time range');
     }
 
-    // Prevent overlapping active availabilities for same day + (same location or both null)
-    const overlaps = await this.prisma.instructorAvailability.findFirst({
+    const effectiveFrom = dto.effectiveFrom ? this.parseDateOrThrow(dto.effectiveFrom, 'effectiveFrom') : null;
+    const effectiveTo = dto.effectiveTo ? this.parseDateOrThrow(dto.effectiveTo, 'effectiveTo') : null;
+    if (effectiveFrom && effectiveTo && effectiveFrom > effectiveTo) {
+      throw new BadRequestException('effectiveFrom must be before effectiveTo');
+    }
+
+    // Prevent overlapping active availabilities for same day + (same location or both null) + overlapping effective window
+    const candidates = await this.prisma.instructorAvailability.findMany({
       where: {
         instructorId,
         deletedAt: null,
@@ -388,7 +394,10 @@ export class InstructorsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (overlaps) {
+    for (const overlaps of candidates) {
+      if (!this.windowsOverlap(effectiveFrom, effectiveTo, (overlaps as any).effectiveFrom ?? null, (overlaps as any).effectiveTo ?? null)) {
+        continue;
+      }
       const oStart = this.parseTimeToMinutes(overlaps.startTime) ?? 0;
       const oEnd = this.parseTimeToMinutes(overlaps.endTime) ?? 0;
       const isOverlap = Math.max(start, oStart) < Math.min(end, oEnd);
@@ -403,6 +412,8 @@ export class InstructorsService {
         endTime: dto.endTime,
         location: dto.location ?? null,
         isActive: dto.isActive ?? true,
+        effectiveFrom,
+        effectiveTo,
       },
     });
 
@@ -437,6 +448,37 @@ export class InstructorsService {
     const end = this.parseTimeToMinutes(endTime);
     if (start === null || end === null || start >= end) throw new BadRequestException('Invalid availability time range');
 
+    const nextEffectiveFrom = this.parseOptionalDate(dto.effectiveFrom, 'effectiveFrom');
+    const nextEffectiveTo = this.parseOptionalDate(dto.effectiveTo, 'effectiveTo');
+    const effectiveFrom = nextEffectiveFrom === undefined ? ((existing as any).effectiveFrom ?? null) : nextEffectiveFrom;
+    const effectiveTo = nextEffectiveTo === undefined ? ((existing as any).effectiveTo ?? null) : nextEffectiveTo;
+    if (effectiveFrom && effectiveTo && effectiveFrom > effectiveTo) {
+      throw new BadRequestException('effectiveFrom must be before effectiveTo');
+    }
+
+    const nextDay = dto.dayOfWeek ?? existing.dayOfWeek;
+    const nextLocation = dto.location === undefined ? (existing.location ?? null) : (dto.location as any);
+    const candidates = await this.prisma.instructorAvailability.findMany({
+      where: {
+        instructorId: existing.instructorId,
+        deletedAt: null,
+        isActive: true,
+        dayOfWeek: nextDay,
+        id: { not: existing.id },
+        OR: [
+          { location: nextLocation ?? null },
+          ...(nextLocation ? [{ location: null }] : []),
+        ],
+      },
+    });
+    for (const row of candidates) {
+      if (!this.windowsOverlap(effectiveFrom, effectiveTo, (row as any).effectiveFrom ?? null, (row as any).effectiveTo ?? null)) continue;
+      const oStart = this.parseTimeToMinutes(row.startTime) ?? 0;
+      const oEnd = this.parseTimeToMinutes(row.endTime) ?? 0;
+      const isOverlap = Math.max(start, oStart) < Math.min(end, oEnd);
+      if (isOverlap) throw new BadRequestException('Availability overlaps an existing availability');
+    }
+
     const updated = await this.prisma.instructorAvailability.update({
       where: { id: availabilityId },
       data: {
@@ -444,6 +486,8 @@ export class InstructorsService {
         startTime,
         endTime,
         location: dto.location === undefined ? existing.location : dto.location,
+        effectiveFrom,
+        effectiveTo,
       },
     });
 
@@ -482,6 +526,22 @@ export class InstructorsService {
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) throw new BadRequestException(`Invalid ${label}`);
     return d;
+  }
+
+  private parseOptionalDate(value: any, label: string) {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException(`Invalid ${label}`);
+    return d;
+  }
+
+  private windowsOverlap(aFrom: Date | null, aTo: Date | null, bFrom: Date | null, bTo: Date | null) {
+    const aStart = aFrom ? aFrom.getTime() : -Infinity;
+    const aEnd = aTo ? aTo.getTime() : Infinity;
+    const bStart = bFrom ? bFrom.getTime() : -Infinity;
+    const bEnd = bTo ? bTo.getTime() : Infinity;
+    return Math.max(aStart, bStart) <= Math.min(aEnd, bEnd);
   }
 
   async listCostModels(instructorId: string, user: any) {

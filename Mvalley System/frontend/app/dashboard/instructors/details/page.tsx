@@ -49,6 +49,8 @@ interface AvailabilityRow {
   endTime: string;
   location?: string | null;
   isActive: boolean;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
 }
 
 interface CostModelRow {
@@ -73,19 +75,27 @@ export default function InstructorDetailPage() {
   const [availability, setAvailability] = useState<AvailabilityRow[]>([]);
   const [costModels, setCostModels] = useState<CostModelRow[]>([]);
   const [documents, setDocuments] = useState<InstructorDocument[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [docPreviewUrl, setDocPreviewUrl] = useState<string>('');
+  const [docPreviewContentType, setDocPreviewContentType] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tabError, setTabError] = useState<string>('');
 
-  // Availability modal
-  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
-  const [editingAvailability, setEditingAvailability] = useState<AvailabilityRow | null>(null);
-  const [availabilityForm, setAvailabilityForm] = useState({
-    dayOfWeek: '0',
+  // Inline edit (avoid old list modal)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ costType: 'hourly', costAmount: '' });
+
+  // Availability fast editor
+  const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, Partial<AvailabilityRow>>>({});
+  const [newSlot, setNewSlot] = useState<Partial<AvailabilityRow>>({
+    dayOfWeek: 1,
     startTime: '09:00',
     endTime: '17:00',
     location: '',
     isActive: true,
+    effectiveFrom: '',
+    effectiveTo: '',
   });
 
   // Cost model modal
@@ -166,6 +176,46 @@ export default function InstructorDetailPage() {
       availableMinutes: Math.round(availableMinutes),
     };
   }, [availability, sessions, monthRange]);
+
+  const currentMonthFees = useMemo(() => {
+    const { start, end } = monthRange;
+    const monthSessions = (sessions || []).filter((s) => {
+      const d = new Date(s.scheduledDate);
+      return d >= start && d < end;
+    });
+
+    const cm = (costModels || []) as any[];
+    const pickCostModel = (at: Date) => {
+      const ms = at.getTime();
+      const matches = cm.filter((m) => {
+        const from = new Date(m.effectiveFrom).getTime();
+        const to = m.effectiveTo ? new Date(m.effectiveTo).getTime() : Infinity;
+        return from <= ms && ms <= to;
+      });
+      matches.sort((a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime());
+      return matches[0] || null;
+    };
+
+    let total = 0;
+    for (const s of monthSessions) {
+      const model = pickCostModel(new Date(s.scheduledDate));
+      const type = model?.type || (instructor as any)?.costType || 'hourly';
+      const amount = Number(model?.amount ?? (instructor as any)?.costAmount ?? 0);
+      if (!Number.isFinite(amount)) continue;
+      if (type === 'per_session') {
+        total += amount;
+      } else if (type === 'monthly') {
+        // Show monthly once (not per session)
+        total = amount;
+        break;
+      } else {
+        const hours = Math.max(0, (new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 3600000);
+        total += hours * amount;
+      }
+    }
+
+    return Math.round(total * 100) / 100;
+  }, [sessions, costModels, monthRange, instructor]);
 
   const user = useMemo(() => {
     if (typeof window === 'undefined') return null;
@@ -292,7 +342,11 @@ export default function InstructorDetailPage() {
           {
             label: 'Edit',
             onClick: () => {
-              router.push(`/dashboard/instructors?editId=${encodeURIComponent(String(id || ''))}&stayList=true`);
+              setEditForm({
+                costType: (instructor as any).costType || 'hourly',
+                costAmount: String((instructor as any).costAmount ?? ''),
+              });
+              setShowEditModal(true);
             },
             icon: <FiEdit className="w-4 h-4" />,
           } as ActionButton,
@@ -539,191 +593,377 @@ export default function InstructorDetailPage() {
             label: 'Availability',
             icon: <FiClock className="w-4 h-4" />,
             content: (
-              <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+              <div className="space-y-4">
                 {tabError && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
                     {tabError}
                   </div>
                 )}
 
-                <div className="flex items-center justify-between">
+                <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div className="text-sm text-gray-600">
-                    Sessions are blocked if scheduled outside availability/blackout dates.
+                    Fast edit availability (no wizard). Weekdays and weekends are shown separately. Optional date-window = “extended availability”.
                   </div>
                   {canOps && (
-                    <button
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
-                      onClick={() => {
-                        setEditingAvailability(null);
-                        setAvailabilityForm({ dayOfWeek: '0', startTime: '09:00', endTime: '17:00', location: '', isActive: true });
-                        setShowAvailabilityModal(true);
-                      }}
-                    >
-                      <FiPlus className="w-4 h-4" />
-                      Add Availability
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="px-3 py-2 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
+                        onClick={async () => {
+                          if (!id) return;
+                          try {
+                            setTabError('');
+                            const days = [1, 2, 3, 4, 5];
+                            await Promise.all(
+                              days.map((d) =>
+                                instructorsService.addAvailability(String(id), {
+                                  dayOfWeek: d,
+                                  startTime: '09:00',
+                                  endTime: '17:00',
+                                  isActive: true,
+                                }),
+                              ),
+                            );
+                            await refreshAvailability();
+                          } catch (e: any) {
+                            setTabError(e?.response?.data?.message || 'Failed to apply weekdays preset');
+                          }
+                        }}
+                      >
+                        Apply Weekdays 09:00–17:00
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-2 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
+                        onClick={async () => {
+                          if (!id) return;
+                          try {
+                            setTabError('');
+                            const days = [0, 6];
+                            await Promise.all(
+                              days.map((d) =>
+                                instructorsService.addAvailability(String(id), {
+                                  dayOfWeek: d,
+                                  startTime: '10:00',
+                                  endTime: '14:00',
+                                  isActive: true,
+                                }),
+                              ),
+                            );
+                            await refreshAvailability();
+                          } catch (e: any) {
+                            setTabError(e?.response?.data?.message || 'Failed to apply weekend preset');
+                          }
+                        }}
+                      >
+                        Apply Weekend 10:00–14:00
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                <DataTable
-                  columns={[
-                    {
-                      key: 'dayOfWeek',
-                      label: 'Day',
-                      render: (v) => {
-                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                        return <span className="text-sm">{days[Number(v)] || v}</span>;
-                      },
-                    },
-                    { key: 'startTime', label: 'From', render: (v) => <span className="text-sm">{v}</span> },
-                    { key: 'endTime', label: 'To', render: (v) => <span className="text-sm">{v}</span> },
-                    { key: 'location', label: 'Location', render: (v) => <span className="text-sm text-gray-600">{v || 'Any'}</span> },
-                    { key: 'isActive', label: 'Active', render: (v) => <span className="text-sm text-gray-600">{v ? 'Yes' : 'No'}</span> },
-                  ]}
-                  data={availability}
-                  emptyMessage="No availability set"
-                  actions={
-                    canOps
-                      ? (row: any) => [
-                          {
-                            label: 'Edit',
-                            onClick: () => {
-                              setEditingAvailability(row);
-                              setAvailabilityForm({
-                                dayOfWeek: String(row.dayOfWeek ?? '0'),
-                                startTime: row.startTime || '09:00',
-                                endTime: row.endTime || '17:00',
-                                location: row.location || '',
-                                isActive: Boolean(row.isActive),
-                              });
-                              setShowAvailabilityModal(true);
-                            },
-                            icon: <FiEdit className="w-4 h-4" />,
-                          },
-                          {
-                            label: 'Delete',
-                            variant: 'danger',
-                            onClick: async () => {
-                              if (!confirm('Delete this availability?')) return;
-                              try {
-                                await instructorsService.deleteAvailability(row.id);
-                                await refreshAvailability();
-                              } catch (e: any) {
-                                setTabError(e?.response?.data?.message || 'Failed to delete availability');
-                              }
-                            },
-                            icon: <FiTrash2 className="w-4 h-4" />,
-                          },
-                        ]
-                      : undefined
-                  }
-                />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {[
+                    { title: 'Weekdays (Mon–Fri)', days: [1, 2, 3, 4, 5] },
+                    { title: 'Weekend (Sat/Sun)', days: [6, 0] },
+                  ].map((section) => (
+                    <div key={section.title} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                        <div className="text-sm font-semibold text-gray-900">{section.title}</div>
+                        <button
+                          type="button"
+                          className="text-sm text-indigo-600 hover:text-indigo-900"
+                          onClick={refreshAvailability}
+                        >
+                          Refresh
+                        </button>
+                      </div>
 
-                {showAvailabilityModal && (
-                  <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowAvailabilityModal(false)} />
-                      <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                        <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
-                          <h2 className="text-xl font-semibold">{editingAvailability ? 'Edit Availability' : 'Add Availability'}</h2>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Day</label>
-                              <select
-                                value={availabilityForm.dayOfWeek}
-                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, dayOfWeek: e.target.value })}
-                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
-                              >
-                                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, idx) => (
-                                  <option key={d} value={String(idx)}>{d}</option>
-                                ))}
-                              </select>
+                      <div className="p-4 space-y-3">
+                        {availability
+                          .filter((a) => section.days.includes(Number(a.dayOfWeek)))
+                          .map((row) => {
+                            const draft = availabilityDrafts[row.id] || {};
+                            const v = { ...row, ...draft } as AvailabilityRow;
+                            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                            return (
+                              <div key={row.id} className="border border-gray-200 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-sm font-medium text-gray-900">{days[v.dayOfWeek] || v.dayOfWeek}</div>
+                                  {canOps && (
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        className="px-2 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
+                                        onClick={() => {
+                                          setNewSlot({
+                                            dayOfWeek: v.dayOfWeek,
+                                            startTime: v.startTime,
+                                            endTime: v.endTime,
+                                            location: v.location || '',
+                                            isActive: true,
+                                            effectiveFrom: '',
+                                            effectiveTo: '',
+                                          });
+                                        }}
+                                      >
+                                        Extend (date window)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="px-2 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700"
+                                        onClick={async () => {
+                                          if (!confirm('Delete this availability?')) return;
+                                          try {
+                                            await instructorsService.deleteAvailability(row.id);
+                                            await refreshAvailability();
+                                          } catch (e: any) {
+                                            setTabError(e?.response?.data?.message || 'Failed to delete availability');
+                                          }
+                                        }}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  <div>
+                                    <label className="block text-xs text-gray-600">From</label>
+                                    <input
+                                      type="time"
+                                      value={v.startTime}
+                                      onChange={(e) =>
+                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), startTime: e.target.value } }))
+                                      }
+                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600">To</label>
+                                    <input
+                                      type="time"
+                                      value={v.endTime}
+                                      onChange={(e) =>
+                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), endTime: e.target.value } }))
+                                      }
+                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600">Location</label>
+                                    <select
+                                      value={v.location || ''}
+                                      onChange={(e) =>
+                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), location: e.target.value } }))
+                                      }
+                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                    >
+                                      <option value="">Any</option>
+                                      {['MOA', 'Espace', 'SODIC', 'PalmHills'].map((loc) => (
+                                        <option key={loc} value={loc}>
+                                          {loc}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="flex items-end">
+                                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(v.isActive)}
+                                        onChange={(e) =>
+                                          setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), isActive: e.target.checked } }))
+                                        }
+                                      />
+                                      Active
+                                    </label>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                  <div>
+                                    <label className="block text-xs text-gray-600">Effective from (optional)</label>
+                                    <input
+                                      type="date"
+                                      value={(v.effectiveFrom || '').slice(0, 10)}
+                                      onChange={(e) =>
+                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), effectiveFrom: e.target.value } }))
+                                      }
+                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600">Effective to (optional)</label>
+                                    <input
+                                      type="date"
+                                      value={(v.effectiveTo || '').slice(0, 10)}
+                                      onChange={(e) =>
+                                        setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), effectiveTo: e.target.value } }))
+                                      }
+                                      className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                    />
+                                  </div>
+                                </div>
+
+                                {canOps && (
+                                  <div className="flex justify-end gap-2 mt-3">
+                                    <button
+                                      type="button"
+                                      className="px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+                                      onClick={() => setAvailabilityDrafts((s) => {
+                                        const next = { ...s };
+                                        delete next[row.id];
+                                        return next;
+                                      })}
+                                    >
+                                      Reset
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="px-3 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                                      onClick={async () => {
+                                        try {
+                                          setTabError('');
+                                          const payload: any = {
+                                            dayOfWeek: v.dayOfWeek,
+                                            startTime: v.startTime,
+                                            endTime: v.endTime,
+                                            location: v.location || undefined,
+                                            isActive: Boolean(v.isActive),
+                                            effectiveFrom: v.effectiveFrom || null,
+                                            effectiveTo: v.effectiveTo || null,
+                                          };
+                                          await instructorsService.updateAvailability(row.id, payload);
+                                          setAvailabilityDrafts((s) => {
+                                            const next = { ...s };
+                                            delete next[row.id];
+                                            return next;
+                                          });
+                                          await refreshAvailability();
+                                        } catch (e: any) {
+                                          setTabError(e?.response?.data?.message || 'Failed to save availability');
+                                        }
+                                      }}
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                        {canOps && (
+                          <div className="border border-dashed border-gray-300 rounded-lg p-3">
+                            <div className="text-sm font-medium text-gray-900 mb-2">Add slot</div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <div>
+                                <label className="block text-xs text-gray-600">Day</label>
+                                <select
+                                  value={String(newSlot.dayOfWeek ?? 1)}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, dayOfWeek: Number(e.target.value) }))}
+                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                >
+                                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
+                                    <option key={d} value={String(idx)}>{d}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600">From</label>
+                                <input
+                                  type="time"
+                                  value={String(newSlot.startTime || '09:00')}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, startTime: e.target.value }))}
+                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600">To</label>
+                                <input
+                                  type="time"
+                                  value={String(newSlot.endTime || '17:00')}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, endTime: e.target.value }))}
+                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600">Location</label>
+                                <select
+                                  value={String(newSlot.location || '')}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, location: e.target.value }))}
+                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                >
+                                  <option value="">Any</option>
+                                  {['MOA', 'Espace', 'SODIC', 'PalmHills'].map((loc) => (
+                                    <option key={loc} value={loc}>{loc}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">Location</label>
-                              <select
-                                value={availabilityForm.location}
-                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, location: e.target.value })}
-                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
-                              >
-                                <option value="">Any</option>
-                                {['MOA','Espace','SODIC','PalmHills'].map((loc) => (
-                                  <option key={loc} value={loc}>{loc}</option>
-                                ))}
-                              </select>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div>
+                                <label className="block text-xs text-gray-600">Effective from (optional)</label>
+                                <input
+                                  type="date"
+                                  value={String(newSlot.effectiveFrom || '')}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, effectiveFrom: e.target.value }))}
+                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600">Effective to (optional)</label>
+                                <input
+                                  type="date"
+                                  value={String(newSlot.effectiveTo || '')}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, effectiveTo: e.target.value }))}
+                                  className="mt-1 w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
+                                />
+                              </div>
                             </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">From</label>
-                              <input
-                                type="time"
-                                value={availabilityForm.startTime}
-                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, startTime: e.target.value })}
-                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">To</label>
-                              <input
-                                type="time"
-                                value={availabilityForm.endTime}
-                                onChange={(e) => setAvailabilityForm({ ...availabilityForm, endTime: e.target.value })}
-                                className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
-                              />
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 text-sm text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={availabilityForm.isActive}
-                              onChange={(e) => setAvailabilityForm({ ...availabilityForm, isActive: e.target.checked })}
-                              className="rounded border-gray-300"
-                            />
-                            Active
-                          </label>
-                          <div className="flex gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowAvailabilityModal(false)}
-                              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  setTabError('');
-                                  const payload: any = {
-                                    dayOfWeek: parseInt(availabilityForm.dayOfWeek),
-                                    startTime: availabilityForm.startTime,
-                                    endTime: availabilityForm.endTime,
-                                    location: availabilityForm.location || undefined,
-                                    isActive: availabilityForm.isActive,
-                                  };
+                            <div className="flex items-center justify-between mt-3">
+                              <label className="flex items-center gap-2 text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(newSlot.isActive ?? true)}
+                                  onChange={(e) => setNewSlot((s) => ({ ...s, isActive: e.target.checked }))}
+                                />
+                                Active
+                              </label>
+                              <button
+                                type="button"
+                                className="px-3 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                                onClick={async () => {
                                   if (!id) return;
-                                  if (editingAvailability) {
-                                    await instructorsService.updateAvailability(editingAvailability.id, payload);
-                                  } else {
-                                    await instructorsService.addAvailability(String(id), payload);
+                                  try {
+                                    setTabError('');
+                                    await instructorsService.addAvailability(String(id), {
+                                      dayOfWeek: Number(newSlot.dayOfWeek ?? 1),
+                                      startTime: newSlot.startTime || '09:00',
+                                      endTime: newSlot.endTime || '17:00',
+                                      location: (newSlot.location as any) || undefined,
+                                      isActive: Boolean(newSlot.isActive ?? true),
+                                      effectiveFrom: (newSlot.effectiveFrom as any) || undefined,
+                                      effectiveTo: (newSlot.effectiveTo as any) || undefined,
+                                    });
+                                    setNewSlot((s) => ({ ...s, effectiveFrom: '', effectiveTo: '' }));
+                                    await refreshAvailability();
+                                  } catch (e: any) {
+                                    setTabError(e?.response?.data?.message || 'Failed to add availability');
                                   }
-                                  setShowAvailabilityModal(false);
-                                  await refreshAvailability();
-                                } catch (e: any) {
-                                  setTabError(e?.response?.data?.message || 'Failed to save availability');
-                                }
-                              }}
-                              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
-                            >
-                              Save
-                            </button>
+                                }}
+                              >
+                                Add
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             ),
           },
@@ -1054,190 +1294,225 @@ export default function InstructorDetailPage() {
           },
         ]
       : []),
-    ...(show(['management', 'super_admin'])
-      ? [
-          {
-            id: 'performance',
-            label: 'Performance',
-            icon: <FiUsers className="w-4 h-4" />,
-            content: (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+    {
+      id: 'performance',
+      label: 'Performance',
+      icon: <FiUsers className="w-4 h-4" />,
+      content: show(['management', 'super_admin']) ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
 {JSON.stringify((instructor as any).feedbackSummaries || [], null, 2)}
-                </pre>
+          </pre>
+        </div>
+      ) : (
+        <div className="text-sm text-gray-500">Not available for your role.</div>
+      ),
+    },
+    {
+      id: 'documents',
+      label: 'Documents',
+      icon: <FiFileText className="w-4 h-4" />,
+      content: show(['hr', 'management', 'super_admin']) ? (
+        <div className="space-y-4">
+          {tabError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+              {tabError}
+            </div>
+          )}
+
+          {canHr && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-semibold text-gray-900">Upload document</div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!id || !docFile) return;
+                    try {
+                      setUploadingDoc(true);
+                      setTabError('');
+                      const presign = await instructorsService.presignDocumentUpload(String(id), {
+                        type: docType,
+                        name: docFile.name,
+                        contentType: docFile.type || 'application/octet-stream',
+                        visibleToInstructor: docVisibleToInstructor,
+                      });
+                      const uploadUrl = presign.data?.uploadUrl;
+                      if (!uploadUrl) throw new Error('Upload URL missing');
+                      await fetch(uploadUrl, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': docFile.type || 'application/octet-stream' },
+                        body: docFile,
+                      });
+                      setDocFile(null);
+                      await refreshDocuments();
+                    } catch (e: any) {
+                      setTabError(e?.response?.data?.message || e?.message || 'Failed to upload document');
+                    } finally {
+                      setUploadingDoc(false);
+                    }
+                  }}
+                  disabled={!docFile || uploadingDoc}
+                  className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${
+                    !docFile || uploadingDoc
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                >
+                  <FiPlus className="w-4 h-4" />
+                  {uploadingDoc ? 'Uploading…' : 'Upload'}
+                </button>
               </div>
-            ),
-          },
-        ]
-      : []),
-    ...(show(['hr', 'management', 'super_admin'])
-      ? [
-          {
-            id: 'documents',
-            label: 'Documents',
-            icon: <FiFileText className="w-4 h-4" />,
-            content: (
-              <div className="space-y-4">
-                {tabError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
-                    {tabError}
-                  </div>
-                )}
 
-                {canHr && (
-                  <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-sm font-semibold text-gray-900">Upload document</div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!id || !docFile) return;
-                          try {
-                            setUploadingDoc(true);
-                            setTabError('');
-                            const presign = await instructorsService.presignDocumentUpload(String(id), {
-                              type: docType,
-                              name: docFile.name,
-                              contentType: docFile.type || 'application/octet-stream',
-                              visibleToInstructor: docVisibleToInstructor,
-                            });
-                            const uploadUrl = presign.data?.uploadUrl;
-                            if (!uploadUrl) throw new Error('Upload URL missing');
-                            await fetch(uploadUrl, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': docFile.type || 'application/octet-stream' },
-                              body: docFile,
-                            });
-                            setDocFile(null);
-                            await refreshDocuments();
-                          } catch (e: any) {
-                            setTabError(e?.response?.data?.message || e?.message || 'Failed to upload document');
-                          } finally {
-                            setUploadingDoc(false);
-                          }
-                        }}
-                        disabled={!docFile || uploadingDoc}
-                        className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md ${
-                          !docFile || uploadingDoc
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                        }`}
-                      >
-                        <FiPlus className="w-4 h-4" />
-                        {uploadingDoc ? 'Uploading…' : 'Upload'}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700">Type</label>
-                        <select
-                          value={docType}
-                          onChange={(e) => setDocType(e.target.value)}
-                          className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600 text-sm"
-                        >
-                          <option value="id">ID</option>
-                          <option value="contract">Contract</option>
-                          <option value="certificate">Certificate</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700">File</label>
-                        <input
-                          type="file"
-                          onChange={(e) => setDocFile(e.target.files?.[0] || null)}
-                          className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600 text-sm"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={docVisibleToInstructor}
-                            onChange={(e) => setDocVisibleToInstructor(e.target.checked)}
-                            className="rounded border-gray-300"
-                          />
-                          Visible to instructor
-                        </label>
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      Files are uploaded to S3 using a short-lived secure link.
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-gray-900">Documents</div>
-                    <button
-                      type="button"
-                      onClick={refreshDocuments}
-                      className="text-sm text-indigo-600 hover:text-indigo-900"
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                  {documents.length === 0 ? (
-                    <div className="p-4 text-sm text-gray-500">No documents uploaded.</div>
-                  ) : (
-                    <div className="divide-y divide-gray-200">
-                      {documents.map((d) => (
-                        <div key={d.id} className="p-4 flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{d.name}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              <span className="capitalize">{d.type}</span>
-                              {d.expiresAt ? ` • Expires ${new Date(d.expiresAt).toLocaleDateString()}` : ''}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  setTabError('');
-                                  const res = await instructorsService.presignDocumentDownload(d.id);
-                                  const url = res.data?.url;
-                                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                                } catch (e: any) {
-                                  setTabError(e?.response?.data?.message || 'Failed to open document');
-                                }
-                              }}
-                              className="px-3 py-2 text-sm font-medium rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              View / Download
-                            </button>
-                            {canHr && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!confirm('Delete this document?')) return;
-                                  try {
-                                    setTabError('');
-                                    await instructorsService.deleteDocument(d.id);
-                                    await refreshDocuments();
-                                  } catch (e: any) {
-                                    setTabError(e?.response?.data?.message || 'Failed to delete document');
-                                  }
-                                }}
-                                className="px-3 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">Type</label>
+                  <select
+                    value={docType}
+                    onChange={(e) => setDocType(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600 text-sm"
+                  >
+                    <option value="id">ID</option>
+                    <option value="contract">Contract</option>
+                    <option value="certificate">Certificate</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">File</label>
+                  <input
+                    type="file"
+                    onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                    className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600 text-sm"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={docVisibleToInstructor}
+                      onChange={(e) => setDocVisibleToInstructor(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Visible to instructor
+                  </label>
                 </div>
               </div>
-            ),
-          },
-        ]
-      : []),
+              <div className="text-xs text-gray-500 mt-2">
+                Files are uploaded to S3 using a short-lived secure link.
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <div className="text-sm font-semibold text-gray-900">Documents</div>
+              <button
+                type="button"
+                onClick={refreshDocuments}
+                className="text-sm text-indigo-600 hover:text-indigo-900"
+              >
+                Refresh
+              </button>
+            </div>
+            {documents.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500">No documents uploaded.</div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {documents.map((d) => (
+                  <div key={d.id} className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{d.name}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          <span className="capitalize">{d.type}</span>
+                          {d.expiresAt ? ` • Expires ${new Date(d.expiresAt).toLocaleDateString()}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setTabError('');
+                              const res = await instructorsService.presignDocumentDownload(d.id);
+                              const url = res.data?.url;
+                              if (!url) throw new Error('Download URL missing');
+                              setSelectedDocId(d.id);
+                              setDocPreviewUrl(url);
+                              setDocPreviewContentType(String((d.metadata as any)?.contentType || ''));
+                            } catch (e: any) {
+                              setTabError(e?.response?.data?.message || e?.message || 'Failed to load document');
+                            }
+                          }}
+                          className="px-3 py-2 text-sm font-medium rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
+                          Preview
+                        </button>
+                        {selectedDocId === d.id && docPreviewUrl && (
+                          <a
+                            href={docPreviewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                          >
+                            Open
+                          </a>
+                        )}
+                        {canHr && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!confirm('Delete this document?')) return;
+                              try {
+                                setTabError('');
+                                await instructorsService.deleteDocument(d.id);
+                                await refreshDocuments();
+                              } catch (e: any) {
+                                setTabError(e?.response?.data?.message || 'Failed to delete document');
+                              }
+                            }}
+                            className="px-3 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {selectedDocId === d.id && docPreviewUrl && (
+                      <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="px-3 py-2 bg-gray-50 text-xs text-gray-600 flex items-center justify-between">
+                          <span>Preview</span>
+                          <span className="text-gray-400">{docPreviewContentType}</span>
+                        </div>
+                        <div className="p-3">
+                          {docPreviewContentType.startsWith('image/') ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={docPreviewUrl} alt={d.name} className="max-h-64 w-auto border border-gray-200 rounded" />
+                          ) : docPreviewContentType.includes('pdf') ? (
+                            <iframe
+                              src={docPreviewUrl}
+                              className="w-full h-64 border border-gray-200 rounded"
+                              title={`preview-${d.id}`}
+                            />
+                          ) : (
+                            <div className="text-sm text-gray-600">
+                              No inline preview for this file type. Use <span className="font-medium">Open</span>.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm text-gray-500">Not available for your role.</div>
+      ),
+    },
   ];
 
   // Sidebar with quick actions
@@ -1277,6 +1552,10 @@ export default function InstructorDetailPage() {
               {classes.reduce((sum, c) => sum + (c.students?.length || 0), 0)}
             </span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Fees (this month):</span>
+            <span className="font-medium text-gray-900">EGP {Number(currentMonthFees || 0).toLocaleString()}</span>
+          </div>
           <div className="flex justify-between pt-2 border-t border-gray-200">
             <span className="text-gray-500">Fees Type:</span>
             <span className="font-medium text-gray-900 capitalize">{instructor.costType}</span>
@@ -1287,14 +1566,81 @@ export default function InstructorDetailPage() {
   );
 
   return (
-    <StandardDetailView
-      title={instructorName}
-      subtitle={instructor.user?.email || 'Instructor Profile'}
-      actions={actions}
-      tabs={tabs}
-      breadcrumbs={breadcrumbs}
-      sidebar={sidebar}
-    />
+    <>
+      <StandardDetailView
+        title={instructorName}
+        subtitle={instructor.user?.email || 'Instructor Profile'}
+        actions={actions}
+        tabs={tabs}
+        breadcrumbs={breadcrumbs}
+        sidebar={sidebar}
+      />
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowEditModal(false)} />
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
+                <h2 className="text-xl font-semibold">Edit Instructor</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Fees Type</label>
+                    <select
+                      value={editForm.costType}
+                      onChange={(e) => setEditForm({ ...editForm, costType: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                    >
+                      <option value="hourly">Hourly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Fees Amount</label>
+                    <input
+                      value={editForm.costAmount}
+                      onChange={(e) => setEditForm({ ...editForm, costAmount: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                      inputMode="decimal"
+                    />
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500">
+                  Skills, contracts, availability, cost models, payroll, and documents are edited inside their tabs.
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setError('');
+                        await instructorsService.update(String(id), {
+                          costType: editForm.costType,
+                          costAmount: parseFloat(editForm.costAmount || '0'),
+                        });
+                        setShowEditModal(false);
+                        await fetchInstructor(String(id));
+                      } catch (e: any) {
+                        setError(e?.response?.data?.message || 'Failed to update instructor');
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
