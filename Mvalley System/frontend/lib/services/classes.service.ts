@@ -5,6 +5,8 @@ export interface Class {
   name: string;
   location: string;
   capacity: number;
+  minCapacity?: number | null;
+  maxCapacity?: number | null;
   code?: string | null;
   logoUrl?: string | null;
   ageMin?: number | null;

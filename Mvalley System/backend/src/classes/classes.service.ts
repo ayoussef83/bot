@@ -33,6 +33,15 @@ export class ClassesService {
     const startTime = (data as any).startTime || '00:00';
     const endTime = (data as any).endTime || '00:00';
 
+    const minCapacity = Number((data as any).minCapacity);
+    const maxCapacity = Number((data as any).maxCapacity);
+    if (!Number.isFinite(minCapacity) || !Number.isFinite(maxCapacity) || minCapacity < 1 || maxCapacity < 1) {
+      throw new BadRequestException('Minimum and maximum capacity are required');
+    }
+    if (minCapacity > maxCapacity) {
+      throw new BadRequestException('Minimum capacity cannot be greater than maximum capacity');
+    }
+
     // Map (Course name + Level number) -> CourseLevel. Auto-create if missing.
     const course = await this.prisma.course.upsert({
       where: { name: courseName },
@@ -49,6 +58,9 @@ export class ClassesService {
     const classEntity = await this.prisma.class.create({
       data: {
         ...data,
+        capacity: maxCapacity,
+        minCapacity,
+        maxCapacity,
         courseLevelId: level.id,
         levelNumber,
         dayOfWeek,
@@ -188,6 +200,18 @@ export class ClassesService {
       throw new BadRequestException('Invalid level number');
     }
 
+    const nextMinCapacity = (data as any).minCapacity !== undefined ? Number((data as any).minCapacity) : undefined;
+    const nextMaxCapacity = (data as any).maxCapacity !== undefined ? Number((data as any).maxCapacity) : undefined;
+    if (nextMinCapacity !== undefined && (!Number.isFinite(nextMinCapacity) || nextMinCapacity < 1)) {
+      throw new BadRequestException('Invalid minimum capacity');
+    }
+    if (nextMaxCapacity !== undefined && (!Number.isFinite(nextMaxCapacity) || nextMaxCapacity < 1)) {
+      throw new BadRequestException('Invalid maximum capacity');
+    }
+    if (nextMinCapacity !== undefined && nextMaxCapacity !== undefined && nextMinCapacity > nextMaxCapacity) {
+      throw new BadRequestException('Minimum capacity cannot be greater than maximum capacity');
+    }
+
     // If name or levelNumber changes, remap to CourseLevel (auto-create).
     let courseLevelIdToSet: string | undefined = undefined;
     if (nextName !== undefined || nextLevelNumber !== undefined) {
@@ -217,6 +241,15 @@ export class ClassesService {
       where: { id },
       data: {
         ...data,
+        ...(data.maxCapacity !== undefined
+          ? {
+              capacity: Number(data.maxCapacity),
+              maxCapacity: Number(data.maxCapacity),
+              ...(data.minCapacity !== undefined ? { minCapacity: Number(data.minCapacity) } : {}),
+            }
+          : data.minCapacity !== undefined
+            ? { minCapacity: Number(data.minCapacity) }
+            : {}),
         ...(courseLevelIdToSet ? { courseLevelId: courseLevelIdToSet } : {}),
         instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
         startDate,

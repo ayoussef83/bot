@@ -264,7 +264,10 @@ export default function ClassDetailPage() {
                 Capacity
               </h3>
               <p className="text-lg text-gray-900">
-                {students.length} / {classItem.capacity}
+                {students.length} / {(classItem as any).maxCapacity || classItem.capacity}
+                {(classItem as any).minCapacity != null && (
+                  <span className="text-sm text-gray-500"> (min {(classItem as any).minCapacity})</span>
+                )}
               </p>
             </div>
             <div>

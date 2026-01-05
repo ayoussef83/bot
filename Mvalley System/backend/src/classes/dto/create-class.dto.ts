@@ -21,10 +21,21 @@ export class CreateClassDto {
   @IsEnum(Location)
   location: Location;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(50)
-  capacity: number;
+  capacity?: number; // deprecated (kept for backward compatibility)
+
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  minCapacity: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  maxCapacity: number;
 
   @IsOptional()
   @IsString()

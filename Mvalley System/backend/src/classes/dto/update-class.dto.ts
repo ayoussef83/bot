@@ -31,6 +31,18 @@ export class UpdateClassDto {
   capacity?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  minCapacity?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  maxCapacity?: number;
+
+  @IsOptional()
   @IsString()
   code?: string;
 

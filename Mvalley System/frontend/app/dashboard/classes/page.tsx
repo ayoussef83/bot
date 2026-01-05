@@ -25,7 +25,8 @@ export default function ClassesPage() {
   const [formData, setFormData] = useState({
     name: '',
     location: 'MOA',
-    capacity: '',
+    minCapacity: '',
+    maxCapacity: '',
     levelNumber: '',
     code: '',
     logoUrl: '',
@@ -52,7 +53,14 @@ export default function ClassesPage() {
     setFormData({
       name: found.name,
       location: (found as any).location || 'MOA',
-      capacity: String(found.capacity || ''),
+      minCapacity:
+        (found as any).minCapacity !== null && (found as any).minCapacity !== undefined
+          ? String((found as any).minCapacity)
+          : '',
+      maxCapacity:
+        (found as any).maxCapacity !== null && (found as any).maxCapacity !== undefined
+          ? String((found as any).maxCapacity)
+          : String((found as any).capacity || ''),
       levelNumber:
         (found as any).levelNumber !== null && (found as any).levelNumber !== undefined
           ? String((found as any).levelNumber)
@@ -88,7 +96,8 @@ export default function ClassesPage() {
     setFormData({
       name: '',
       location: 'MOA',
-      capacity: '',
+      minCapacity: '',
+      maxCapacity: '',
       levelNumber: '',
       code: '',
       logoUrl: '',
@@ -107,10 +116,20 @@ export default function ClassesPage() {
         setError('Level is required');
         return;
       }
+      if (!formData.minCapacity || !formData.maxCapacity) {
+        setError('Minimum and maximum capacity are required');
+        return;
+      }
+      if (parseInt(formData.minCapacity) > parseInt(formData.maxCapacity)) {
+        setError('Minimum capacity cannot be greater than maximum capacity');
+        return;
+      }
       if (editingClass) {
         await classesService.update(editingClass.id, {
           ...formData,
-          capacity: parseInt(formData.capacity),
+          minCapacity: parseInt(formData.minCapacity),
+          maxCapacity: parseInt(formData.maxCapacity),
+          capacity: parseInt(formData.maxCapacity), // keep compatibility with backend/other screens
           levelNumber: parseInt(formData.levelNumber),
           ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
           ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
@@ -120,7 +139,9 @@ export default function ClassesPage() {
       } else {
         await classesService.create({
           ...formData,
-          capacity: parseInt(formData.capacity),
+          minCapacity: parseInt(formData.minCapacity),
+          maxCapacity: parseInt(formData.maxCapacity),
+          capacity: parseInt(formData.maxCapacity), // keep compatibility with backend/other screens
           levelNumber: parseInt(formData.levelNumber),
           ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
           ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
@@ -142,7 +163,14 @@ export default function ClassesPage() {
     setFormData({
       name: classItem.name,
       location: classItem.location,
-      capacity: classItem.capacity.toString(),
+      minCapacity:
+        (classItem as any).minCapacity !== null && (classItem as any).minCapacity !== undefined
+          ? String((classItem as any).minCapacity)
+          : '',
+      maxCapacity:
+        (classItem as any).maxCapacity !== null && (classItem as any).maxCapacity !== undefined
+          ? String((classItem as any).maxCapacity)
+          : String((classItem as any).capacity || ''),
       levelNumber:
         (classItem as any).levelNumber !== null && (classItem as any).levelNumber !== undefined
           ? String((classItem as any).levelNumber)
@@ -241,7 +269,12 @@ export default function ClassesPage() {
       key: 'capacity',
       label: 'Capacity',
       sortable: true,
-      render: (value) => <span className="text-sm text-gray-500">{value}</span>,
+      render: (_, row: any) => {
+        const minC = row?.minCapacity;
+        const maxC = row?.maxCapacity ?? row?.capacity;
+        const txt = minC != null || maxC != null ? `${minC ?? '—'}-${maxC ?? '—'}` : '—';
+        return <span className="text-sm text-gray-500">{txt}</span>;
+      },
     },
     {
       key: 'age',
@@ -428,16 +461,30 @@ export default function ClassesPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Capacity</label>
+                      <label className="block text-sm font-medium text-gray-700">Minimum Capacity</label>
                       <input
                         type="number"
                         required
                         min="1"
-                        value={formData.capacity}
-                        onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                        value={formData.minCapacity}
+                        onChange={(e) => setFormData({ ...formData, minCapacity: e.target.value })}
                         className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Maximum Capacity</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={formData.maxCapacity}
+                        onChange={(e) => setFormData({ ...formData, maxCapacity: e.target.value })}
+                        className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700"># of Sessions</label>
                       <input
@@ -448,6 +495,7 @@ export default function ClassesPage() {
                         className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
                       />
                     </div>
+                    <div />
                   </div>
 
                   <div>
