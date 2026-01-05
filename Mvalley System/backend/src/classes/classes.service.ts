@@ -84,6 +84,11 @@ export class ClassesService {
     return this.prisma.class.findMany({
       where: { deletedAt: null },
       include: {
+        courseLevel: {
+          include: {
+            course: true,
+          },
+        },
         instructor: {
           include: {
             user: {
@@ -114,6 +119,11 @@ export class ClassesService {
     const classEntity = await this.prisma.class.findFirst({
       where: { id, deletedAt: null },
       include: {
+        courseLevel: {
+          include: {
+            course: true,
+          },
+        },
         instructor: {
           include: {
             user: {

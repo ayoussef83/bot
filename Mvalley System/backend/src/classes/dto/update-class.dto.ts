@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsDateString,
+  IsNumber,
   Min,
   Max,
 } from 'class-validator';
@@ -23,6 +24,29 @@ export class UpdateClassDto {
   @Min(1)
   @Max(50)
   capacity?: number;
+
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  ageMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  ageMax?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  price?: number;
 
   @IsOptional()
   @IsString()

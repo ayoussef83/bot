@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { classesService, Class } from '@/lib/services';
 import { instructorsService, Instructor } from '@/lib/services';
+import { coursesService } from '@/lib/services';
 import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import { Column, ActionButton } from '@/components/DataTable';
 import SummaryCard from '@/components/SummaryCard';
@@ -17,6 +18,7 @@ export default function ClassesPage() {
   const searchParams = useSearchParams();
   const [classes, setClasses] = useState<Class[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
+  const [levels, setLevels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -27,6 +29,12 @@ export default function ClassesPage() {
     name: '',
     location: 'MOA',
     capacity: '',
+    code: '',
+    logoUrl: '',
+    ageMin: '',
+    ageMax: '',
+    price: '',
+    courseLevelId: '',
     instructorId: '',
     dayOfWeek: '0',
     startTime: '',
@@ -38,6 +46,7 @@ export default function ClassesPage() {
   useEffect(() => {
     fetchClasses();
     fetchInstructors();
+    coursesService.listLevels().then((res: any) => setLevels(res.data || [])).catch(() => setLevels([]));
   }, []);
 
   // Support deep-link edit: /dashboard/courses?editId=...
@@ -51,6 +60,12 @@ export default function ClassesPage() {
       name: found.name,
       location: (found as any).location || 'MOA',
       capacity: String(found.capacity || ''),
+      code: String((found as any).code || ''),
+      logoUrl: String((found as any).logoUrl || ''),
+      ageMin: (found as any).ageMin !== null && (found as any).ageMin !== undefined ? String((found as any).ageMin) : '',
+      ageMax: (found as any).ageMax !== null && (found as any).ageMax !== undefined ? String((found as any).ageMax) : '',
+      price: (found as any).price !== null && (found as any).price !== undefined ? String((found as any).price) : '',
+      courseLevelId: String((found as any).courseLevelId || ''),
       instructorId: found.instructorId || '',
       dayOfWeek: String((found as any).dayOfWeek ?? '0'),
       startTime: (found as any).startTime || '',
@@ -89,6 +104,12 @@ export default function ClassesPage() {
       name: '',
       location: 'MOA',
       capacity: '',
+      code: '',
+      logoUrl: '',
+      ageMin: '',
+      ageMax: '',
+      price: '',
+      courseLevelId: '',
       instructorId: '',
       dayOfWeek: '0',
       startTime: '',
@@ -106,12 +127,20 @@ export default function ClassesPage() {
           ...formData,
           capacity: parseInt(formData.capacity),
           dayOfWeek: parseInt(formData.dayOfWeek),
+          ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
+          ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
+          price: formData.price ? parseFloat(formData.price) : null,
+          courseLevelId: formData.courseLevelId || null,
         });
       } else {
         await classesService.create({
           ...formData,
           capacity: parseInt(formData.capacity),
           dayOfWeek: parseInt(formData.dayOfWeek),
+          ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
+          ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
+          price: formData.price ? parseFloat(formData.price) : null,
+          courseLevelId: formData.courseLevelId || null,
         });
       }
       setShowForm(false);
@@ -129,6 +158,12 @@ export default function ClassesPage() {
       name: classItem.name,
       location: classItem.location,
       capacity: classItem.capacity.toString(),
+      code: String((classItem as any).code || ''),
+      logoUrl: String((classItem as any).logoUrl || ''),
+      ageMin: (classItem as any).ageMin !== null && (classItem as any).ageMin !== undefined ? String((classItem as any).ageMin) : '',
+      ageMax: (classItem as any).ageMax !== null && (classItem as any).ageMax !== undefined ? String((classItem as any).ageMax) : '',
+      price: (classItem as any).price !== null && (classItem as any).price !== undefined ? String((classItem as any).price) : '',
+      courseLevelId: String((classItem as any).courseLevelId || ''),
       instructorId: classItem.instructorId || '',
       dayOfWeek: classItem.dayOfWeek.toString(),
       startTime: classItem.startTime,
@@ -176,6 +211,17 @@ export default function ClassesPage() {
   // Column definitions
   const columns: Column<Class>[] = [
     {
+      key: 'logo',
+      label: 'Logo',
+      render: (_, row) =>
+        (row as any).logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={(row as any).logoUrl} alt="" className="w-8 h-8 rounded object-cover border border-gray-200" />
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        ),
+    },
+    {
       key: 'name',
       label: 'Name',
       sortable: true,
@@ -194,6 +240,21 @@ export default function ClassesPage() {
       ),
     },
     {
+      key: 'level',
+      label: 'Level',
+      render: (_, row: any) => <span className="text-sm text-gray-600">{row?.courseLevel?.name || '—'}</span>,
+    },
+    {
+      key: 'code',
+      label: 'Code',
+      render: (_, row: any) => <span className="text-sm text-gray-600">{row?.code || '—'}</span>,
+    },
+    {
+      key: 'sessions',
+      label: '# Sessions',
+      render: (_, row: any) => <span className="text-sm text-gray-600">{row?._count?.sessions ?? 0}</span>,
+    },
+    {
       key: 'location',
       label: 'Location',
       sortable: true,
@@ -204,6 +265,23 @@ export default function ClassesPage() {
       label: 'Capacity',
       sortable: true,
       render: (value) => <span className="text-sm text-gray-500">{value}</span>,
+    },
+    {
+      key: 'age',
+      label: 'Age',
+      render: (_, row: any) => {
+        const a = row?.ageMin;
+        const b = row?.ageMax;
+        const txt = a != null || b != null ? `${a ?? '—'}-${b ?? '—'}` : '—';
+        return <span className="text-sm text-gray-600">{txt}</span>;
+      },
+    },
+    {
+      key: 'price',
+      label: 'Price',
+      render: (_, row: any) => (
+        <span className="text-sm text-gray-600">{row?.price != null ? `EGP ${Number(row.price).toLocaleString()}` : '—'}</span>
+      ),
     },
     {
       key: 'students',
@@ -321,6 +399,80 @@ export default function ClassesPage() {
                           </option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Level</label>
+                      <select
+                        value={formData.courseLevelId}
+                        onChange={(e) => setFormData({ ...formData, courseLevelId: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="">(Auto: Level 1)</option>
+                        {levels.map((l: any) => (
+                          <option key={l.id} value={l.id}>
+                            {(l?.course?.name || 'Course') + ' — ' + (l?.name || 'Level')}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Code</label>
+                      <input
+                        type="text"
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="e.g. PY-01"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Age From</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.ageMin}
+                        onChange={(e) => setFormData({ ...formData, ageMin: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Age To</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.ageMax}
+                        onChange={(e) => setFormData({ ...formData, ageMax: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Price (EGP)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Logo URL</label>
+                      <input
+                        type="url"
+                        value={formData.logoUrl}
+                        onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="https://..."
+                      />
                     </div>
                   </div>
 

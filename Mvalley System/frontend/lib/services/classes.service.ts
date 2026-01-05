@@ -5,7 +5,13 @@ export interface Class {
   name: string;
   location: string;
   capacity: number;
+  code?: string | null;
+  logoUrl?: string | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
+  price?: number | null;
   instructorId?: string;
+  courseLevelId?: string | null;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -13,6 +19,8 @@ export interface Class {
   endDate?: string;
   instructor?: any;
   students?: any[];
+  courseLevel?: any; // includes course
+  _count?: { sessions?: number };
 
   // Computed fields returned by backend list endpoints (optional)
   utilizationPercentage?: number;
