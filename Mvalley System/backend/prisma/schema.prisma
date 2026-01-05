@@ -21,6 +21,7 @@ enum UserRole {
   super_admin
   management
   operations
+  hr
   accounting
   sales
   instructor
@@ -411,6 +412,7 @@ model Session {
 
   // Relations
   attendances SessionAttendance[]
+  instructorSession InstructorSession?
 
   // Audit
   createdAt DateTime  @default(now())
@@ -465,6 +467,15 @@ model Instructor {
   classes  Class[]
   sessions Session[]
   expenses Expense[]
+  skills   InstructorSkill[]
+  contracts InstructorContract[]
+  availability InstructorAvailability[]
+  blackoutDates InstructorBlackoutDate[]
+  costModels InstructorCostModel[]
+  instructorSessions InstructorSession[]
+  payrolls InstructorPayroll[]
+  feedbackSummaries InstructorFeedbackSummary[]
+  documents InstructorDocument[]
 
   // Audit
   createdAt DateTime  @default(now())
@@ -472,6 +483,233 @@ model Instructor {
   deletedAt DateTime?
 
   @@map("instructors")
+}
+
+enum InstructorSkillLevel {
+  beginner
+  intermediate
+  advanced
+  expert
+}
+
+model InstructorSkill {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  name  String
+  level InstructorSkillLevel @default(beginner)
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([name])
+  @@map("instructor_skills")
+}
+
+model InstructorContract {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  contractType String // e.g. full_time, part_time, freelance
+  startDate    DateTime
+  endDate      DateTime?
+  terms        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("instructor_contracts")
+}
+
+model InstructorAvailability {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  dayOfWeek Int // 0=Sun ... 6=Sat (Cairo local time)
+  startTime String // HH:mm
+  endTime   String // HH:mm
+  location  Location?
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([dayOfWeek])
+  @@index([location])
+  @@map("instructor_availabilities")
+}
+
+model InstructorBlackoutDate {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("instructor_blackout_dates")
+}
+
+enum InstructorCostModelType {
+  hourly
+  per_session
+  monthly
+}
+
+model InstructorCostModel {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  type         InstructorCostModelType
+  amount       Float
+  currency     String @default("EGP")
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  sessions InstructorSession[]
+
+  @@index([instructorId])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+  @@map("instructor_cost_models")
+}
+
+model InstructorSession {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+  sessionId    String @unique
+  session      Session @relation(fields: [sessionId], references: [id])
+
+  costModelId String?
+  costModel   InstructorCostModel? @relation(fields: [costModelId], references: [id])
+
+  costAmount Float @default(0)
+  currency   String @default("EGP")
+  durationMinutes Int @default(0)
+  attendanceComplete Boolean @default(false)
+  calculatedAt DateTime @default(now())
+
+  payrollId String?
+  payroll   InstructorPayroll? @relation(fields: [payrollId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([sessionId])
+  @@index([payrollId])
+  @@index([calculatedAt])
+  @@map("instructor_sessions")
+}
+
+enum InstructorPayrollStatus {
+  draft
+  approved
+  paid
+  void
+}
+
+model InstructorPayroll {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  periodYear  Int
+  periodMonth Int
+  status      InstructorPayrollStatus @default(draft)
+  currency    String @default("EGP")
+
+  totalAmount Float @default(0)
+  snapshot    Json // immutable snapshot of sessions + calculations
+
+  generatedAt DateTime @default(now())
+  generatedBy String
+
+  approvedAt DateTime?
+  approvedBy String?
+  paidAt     DateTime?
+  paidBy     String?
+
+  sessions InstructorSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([instructorId, periodYear, periodMonth])
+  @@index([instructorId])
+  @@index([periodYear, periodMonth])
+  @@map("instructor_payrolls")
+}
+
+model InstructorFeedbackSummary {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  periodYear  Int
+  periodMonth Int
+  avgRating   Float?
+  totalFeedback Int @default(0)
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([instructorId, periodYear, periodMonth])
+  @@index([instructorId])
+  @@index([periodYear, periodMonth])
+  @@map("instructor_feedback_summaries")
+}
+
+model InstructorDocument {
+  id           String @id @default(uuid())
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  type      String
+  name      String
+  url       String
+  issuedAt  DateTime?
+  expiresAt DateTime?
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([expiresAt])
+  @@map("instructor_documents")
 }
 
 // ============================================

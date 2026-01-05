@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSessionDto, UpdateSessionDto } from './dto';
 import { ClassesService } from './classes.service';
@@ -11,7 +11,79 @@ export class SessionsService {
     private classesService: ClassesService,
   ) {}
 
+  private timeToMinutes(hhmm: string) {
+    const m = /^(\d{2}):(\d{2})$/.exec(hhmm || '');
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    return hh * 60 + mm;
+  }
+
+  private cairoDayOfWeek(date: Date) {
+    const s = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', weekday: 'short' }).format(date);
+    const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return map[s] ?? date.getUTCDay();
+  }
+
+  private cairoHHMM(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Cairo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+    return parts; // "HH:mm"
+  }
+
+  private async assertInstructorAvailable(instructorId: string, classId: string, start: Date, end: Date) {
+    if (!instructorId) return;
+    const cls = await this.prisma.class.findFirst({ where: { id: classId, deletedAt: null }, select: { location: true } });
+    if (!cls) throw new BadRequestException('Invalid class');
+
+    // Blackout check
+    const blackout = await this.prisma.instructorBlackoutDate.findFirst({
+      where: {
+        instructorId,
+        deletedAt: null,
+        startDate: { lte: end },
+        endDate: { gte: start },
+      },
+    });
+    if (blackout) throw new BadRequestException('Instructor is not available (blackout date)');
+
+    const day = this.cairoDayOfWeek(start);
+    const sMin = this.timeToMinutes(this.cairoHHMM(start));
+    const eMin = this.timeToMinutes(this.cairoHHMM(end));
+    if (sMin === null || eMin === null || sMin >= eMin) throw new BadRequestException('Invalid session time');
+
+    const avail = await this.prisma.instructorAvailability.findFirst({
+      where: {
+        instructorId,
+        deletedAt: null,
+        isActive: true,
+        dayOfWeek: day,
+        OR: [{ location: null }, { location: cls.location }],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!avail) throw new BadRequestException('Instructor is not available (no availability defined)');
+
+    const aStart = this.timeToMinutes(avail.startTime) ?? 0;
+    const aEnd = this.timeToMinutes(avail.endTime) ?? 0;
+    const ok = aStart <= sMin && eMin <= aEnd;
+    if (!ok) throw new BadRequestException('Instructor is not available at this time');
+  }
+
   async create(data: CreateSessionDto, createdBy: string) {
+    if ((data as any).instructorId) {
+      await this.assertInstructorAvailable(
+        (data as any).instructorId,
+        (data as any).classId,
+        new Date((data as any).startTime),
+        new Date((data as any).endTime),
+      );
+    }
     const session = await this.prisma.session.create({
       data: {
         ...data,
@@ -168,6 +240,14 @@ export class SessionsService {
   }
 
   async update(id: string, data: UpdateSessionDto, updatedBy: string) {
+    if ((data as any).instructorId || (data as any).startTime || (data as any).endTime) {
+      const existing = await this.prisma.session.findFirst({ where: { id, deletedAt: null }, select: { classId: true, instructorId: true, startTime: true, endTime: true } });
+      if (!existing) throw new NotFoundException('Session not found');
+      const instructorId = (data as any).instructorId ?? existing.instructorId;
+      const start = new Date((data as any).startTime ?? existing.startTime);
+      const end = new Date((data as any).endTime ?? existing.endTime);
+      if (instructorId) await this.assertInstructorAvailable(instructorId, existing.classId, start, end);
+    }
     const session = await this.prisma.session.update({
       where: { id },
       data,
