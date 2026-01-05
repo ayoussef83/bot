@@ -12,8 +12,9 @@ import { Location } from '@prisma/client';
 
 export class UpdateClassDto {
   @IsOptional()
-  @IsString()
-  courseLevelId?: string;
+  @IsInt()
+  @Min(1)
+  levelNumber?: number;
 
   @IsOptional()
   @IsString()
@@ -51,6 +52,15 @@ export class UpdateClassDto {
   @IsNumber()
   @Min(0)
   price?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  plannedSessions?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsOptional()
   @IsString()

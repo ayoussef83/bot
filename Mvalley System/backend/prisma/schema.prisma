@@ -346,6 +346,9 @@ model Class {
   ageMin       Int?
   ageMax       Int?
   price        Float?
+  levelNumber  Int?
+  plannedSessions Int?
+  description  String?
   instructorId String?
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
 

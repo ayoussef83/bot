@@ -14,8 +14,9 @@ export class CreateClassDto {
   @IsString()
   name: string;
 
-  @IsString()
-  courseLevelId: string;
+  @IsInt()
+  @Min(1)
+  levelNumber: number;
 
   @IsEnum(Location)
   location: Location;
@@ -49,22 +50,35 @@ export class CreateClassDto {
   price?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(1)
+  plannedSessions?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
   @IsString()
   instructorId?: string;
 
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(6)
-  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
+  dayOfWeek?: number; // 0 = Sunday, 1 = Monday, etc.
 
+  @IsOptional()
   @IsString()
-  startTime: string; // HH:mm format
+  startTime?: string; // HH:mm format
 
+  @IsOptional()
   @IsString()
-  endTime: string; // HH:mm format
+  endTime?: string; // HH:mm format
 
+  @IsOptional()
   @IsDateString()
-  startDate: string;
+  startDate?: string;
 
   @IsOptional()
   @IsDateString()

@@ -236,9 +236,10 @@ export default function ClassDetailPage() {
   ];
 
   // Get day name
-  const getDayName = (dayOfWeek: number) => {
+  const getDayName = (dayOfWeek?: number) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[dayOfWeek] || 'Unknown';
+    if (typeof dayOfWeek !== 'number') return '—';
+    return days[dayOfWeek] || '—';
   };
 
   // Tabs
@@ -272,7 +273,7 @@ export default function ClassDetailPage() {
                 Schedule
               </h3>
               <p className="text-lg text-gray-900">
-                {getDayName(classItem.dayOfWeek)} • {classItem.startTime} - {classItem.endTime}
+                {getDayName(classItem.dayOfWeek)} • {(classItem as any).startTime || '—'} - {(classItem as any).endTime || '—'}
               </p>
             </div>
             {classItem.instructor && (

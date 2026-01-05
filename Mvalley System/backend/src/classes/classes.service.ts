@@ -18,21 +18,42 @@ export class ClassesService {
   }
 
   async create(data: CreateClassDto, createdBy: string) {
-    const startDate = this.normalizeDateInput(data.startDate);
-    const endDate = this.normalizeDateInput(data.endDate);
+    const courseName = (data.name || '').trim();
+    if (!courseName) throw new BadRequestException('Course name is required');
 
-    const courseLevelId = (data as any).courseLevelId?.trim();
-    if (!courseLevelId) throw new BadRequestException('Course level is required');
-    const level = await this.prisma.courseLevel.findFirst({
-      where: { id: courseLevelId, deletedAt: null, course: { deletedAt: null } },
-      select: { id: true },
+    const levelNumber = Number((data as any).levelNumber);
+    if (!Number.isFinite(levelNumber) || levelNumber < 1) {
+      throw new BadRequestException('Level number is required');
+    }
+
+    // Allow omitting schedule fields (course definition flow). Provide safe defaults.
+    const startDate = this.normalizeDateInput(data.startDate) || new Date();
+    const endDate = this.normalizeDateInput(data.endDate);
+    const dayOfWeek = (data as any).dayOfWeek ?? 0;
+    const startTime = (data as any).startTime || '00:00';
+    const endTime = (data as any).endTime || '00:00';
+
+    // Map (Course name + Level number) -> CourseLevel. Auto-create if missing.
+    const course = await this.prisma.course.upsert({
+      where: { name: courseName },
+      update: { deletedAt: null, isActive: true },
+      create: { name: courseName, isActive: true },
     });
-    if (!level) throw new BadRequestException('Invalid course level');
+    const levelName = `Level ${levelNumber}`;
+    const level = await this.prisma.courseLevel.upsert({
+      where: { courseId_name: { courseId: course.id, name: levelName } },
+      update: { deletedAt: null, isActive: true },
+      create: { courseId: course.id, name: levelName, sortOrder: levelNumber, isActive: true },
+    });
 
     const classEntity = await this.prisma.class.create({
       data: {
         ...data,
         courseLevelId: level.id,
+        levelNumber,
+        dayOfWeek,
+        startTime,
+        endTime,
         locationName: (data as any).locationName || String((data as any).location || ''),
         instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
         startDate,
@@ -160,19 +181,43 @@ export class ClassesService {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
 
-    const courseLevelId = (data as any).courseLevelId?.trim();
-    if (courseLevelId) {
-      const level = await this.prisma.courseLevel.findFirst({
-        where: { id: courseLevelId, deletedAt: null, course: { deletedAt: null } },
-        select: { id: true },
+    const nextName = typeof (data as any).name === 'string' ? (data as any).name.trim() : undefined;
+    const nextLevelNumber =
+      (data as any).levelNumber !== undefined ? Number((data as any).levelNumber) : undefined;
+    if (nextLevelNumber !== undefined && (!Number.isFinite(nextLevelNumber) || nextLevelNumber < 1)) {
+      throw new BadRequestException('Invalid level number');
+    }
+
+    // If name or levelNumber changes, remap to CourseLevel (auto-create).
+    let courseLevelIdToSet: string | undefined = undefined;
+    if (nextName !== undefined || nextLevelNumber !== undefined) {
+      const existing = await this.prisma.class.findFirst({
+        where: { id, deletedAt: null },
+        select: { name: true, levelNumber: true },
       });
-      if (!level) throw new BadRequestException('Invalid course level');
+      if (!existing) throw new NotFoundException('Class not found');
+      const courseName = (nextName ?? existing.name).trim();
+      const levelNumber = Number(nextLevelNumber ?? existing.levelNumber ?? 1);
+      const course = await this.prisma.course.upsert({
+        where: { name: courseName },
+        update: { deletedAt: null, isActive: true },
+        create: { name: courseName, isActive: true },
+      });
+      const levelName = `Level ${levelNumber}`;
+      const level = await this.prisma.courseLevel.upsert({
+        where: { courseId_name: { courseId: course.id, name: levelName } },
+        update: { deletedAt: null, isActive: true },
+        create: { courseId: course.id, name: levelName, sortOrder: levelNumber, isActive: true },
+      });
+      courseLevelIdToSet = level.id;
+      (data as any).levelNumber = levelNumber;
     }
 
     const classEntity = await this.prisma.class.update({
       where: { id },
       data: {
         ...data,
+        ...(courseLevelIdToSet ? { courseLevelId: courseLevelIdToSet } : {}),
         instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
         startDate,
         endDate,
