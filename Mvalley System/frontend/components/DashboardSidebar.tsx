@@ -46,6 +46,7 @@ import {
 import { MdContactPhone } from 'react-icons/md';
 import { TbCash } from 'react-icons/tb';
 import { AiTwotoneDashboard } from 'react-icons/ai';
+import { FaPeopleGroup } from 'react-icons/fa6';
 
 type NavigationSection = {
   id: string;
@@ -87,11 +88,11 @@ const navigationSections: NavigationSection[] = [
         roles: ['super_admin', 'operations', 'management', 'accounting', 'sales', 'instructor'],
       },
       {
-        id: 'sessions',
-        label: 'Sessions',
-        icon: <FiCalendar className="w-4 h-4" />,
-        path: '/dashboard/sessions',
-        roles: ['super_admin', 'operations', 'management', 'accounting', 'sales', 'instructor'],
+        id: 'groups',
+        label: 'Groups',
+        icon: <FaPeopleGroup className="w-4 h-4" />,
+        path: '/dashboard/academics/groups',
+        roles: ['super_admin', 'operations', 'management', 'sales'],
       },
       {
         id: 'instructors',
@@ -108,11 +109,11 @@ const navigationSections: NavigationSection[] = [
         roles: ['super_admin', 'operations', 'management', 'sales'],
       },
       {
-        id: 'groups',
-        label: 'Groups',
-        icon: <FiGitBranch className="w-4 h-4" />,
-        path: '/dashboard/academics/groups',
-        roles: ['super_admin', 'operations', 'management', 'sales'],
+        id: 'sessions',
+        label: 'Sessions',
+        icon: <FiCalendar className="w-4 h-4" />,
+        path: '/dashboard/sessions',
+        roles: ['super_admin', 'operations', 'management', 'accounting', 'sales', 'instructor'],
       },
     ],
   },
