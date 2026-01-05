@@ -373,7 +373,7 @@ export default function InstructorsPage() {
         }
         getRowId={(row) => row.id}
         onRowClick={(row) => {
-          router.push(`/dashboard/instructors/${row.id}`);
+          router.push(`/dashboard/instructors/details?id=${row.id}`);
         }}
       />
 

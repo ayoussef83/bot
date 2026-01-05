@@ -470,10 +470,10 @@ export default function InstructorDetailPage() {
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h3>
         <div className="space-y-2">
           <button
-            onClick={() => router.push(`/dashboard/instructors/${instructor.id}/assign-class`)}
+            onClick={() => router.push(`/dashboard/academics/allocations?instructorId=${encodeURIComponent(instructor.id)}`)}
             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
           >
-            📚 Assign Class
+            📚 Manage Allocations
           </button>
           <button
             onClick={() => router.push(`/dashboard/sessions?instructor=${instructor.id}`)}

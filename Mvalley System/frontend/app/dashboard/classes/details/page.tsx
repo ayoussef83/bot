@@ -286,11 +286,11 @@ export default function ClassDetailPage() {
                   Instructor
                 </h3>
                 <a
-                  href={`/dashboard/instructors/${classItem.instructorId}`}
+                  href={`/dashboard/instructors/details?id=${classItem.instructorId}`}
                   className="text-lg text-indigo-600 hover:text-indigo-900"
                   onClick={(e) => {
                     e.preventDefault();
-                    router.push(`/dashboard/instructors/${classItem.instructorId}`);
+                    router.push(`/dashboard/instructors/details?id=${classItem.instructorId}`);
                   }}
                 >
                   {classItem.instructor.user?.firstName} {classItem.instructor.user?.lastName}
