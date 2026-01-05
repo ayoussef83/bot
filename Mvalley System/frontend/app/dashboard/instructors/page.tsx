@@ -48,6 +48,23 @@ export default function InstructorsPage() {
     }
   }, [instructors]);
 
+  // Support deep-link edit: /dashboard/instructors?editId=...
+  useEffect(() => {
+    if (loading) return;
+    const editId = searchParams?.get('editId');
+    if (!editId) return;
+    const found = instructors.find((i) => i.id === editId);
+    if (!found) return;
+    setEditingInstructor(found);
+    setFormData({
+      userId: found.userId,
+      costType: found.costType,
+      costAmount: String(found.costAmount ?? ''),
+    });
+    setShowForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, instructors, loading]);
+
   const fetchInstructors = async () => {
     try {
       const response = await instructorsService.getAll();

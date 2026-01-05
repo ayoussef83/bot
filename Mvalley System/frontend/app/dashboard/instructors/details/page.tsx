@@ -146,7 +146,7 @@ export default function InstructorDetailPage() {
           {
             label: 'Edit',
             onClick: () => {
-              router.push(`/dashboard/instructors/edit?id=${id}`);
+              router.push(`/dashboard/instructors?editId=${encodeURIComponent(String(id || ''))}&stayList=true`);
             },
             icon: <FiEdit className="w-4 h-4" />,
           } as ActionButton,
