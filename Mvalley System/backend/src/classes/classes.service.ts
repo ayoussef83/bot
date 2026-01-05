@@ -21,19 +21,13 @@ export class ClassesService {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
 
-    // Ensure a matching Course + default Level exists so "Courses" dropdowns show newly created courses like "Python".
-    const courseName = (data.name || '').trim();
-    if (!courseName) throw new BadRequestException('Course name is required');
-    const course = await this.prisma.course.upsert({
-      where: { name: courseName },
-      update: { deletedAt: null, isActive: true },
-      create: { name: courseName, isActive: true },
+    const courseLevelId = (data as any).courseLevelId?.trim();
+    if (!courseLevelId) throw new BadRequestException('Course level is required');
+    const level = await this.prisma.courseLevel.findFirst({
+      where: { id: courseLevelId, deletedAt: null, course: { deletedAt: null } },
+      select: { id: true },
     });
-    const level = await this.prisma.courseLevel.upsert({
-      where: { courseId_name: { courseId: course.id, name: 'Level 1' } },
-      update: { deletedAt: null, isActive: true, sortOrder: 1 },
-      create: { courseId: course.id, name: 'Level 1', sortOrder: 1, isActive: true },
-    });
+    if (!level) throw new BadRequestException('Invalid course level');
 
     const classEntity = await this.prisma.class.create({
       data: {
@@ -165,6 +159,16 @@ export class ClassesService {
   async update(id: string, data: UpdateClassDto, updatedBy: string) {
     const startDate = this.normalizeDateInput(data.startDate);
     const endDate = this.normalizeDateInput(data.endDate);
+
+    const courseLevelId = (data as any).courseLevelId?.trim();
+    if (courseLevelId) {
+      const level = await this.prisma.courseLevel.findFirst({
+        where: { id: courseLevelId, deletedAt: null, course: { deletedAt: null } },
+        select: { id: true },
+      });
+      if (!level) throw new BadRequestException('Invalid course level');
+    }
+
     const classEntity = await this.prisma.class.update({
       where: { id },
       data: {
@@ -174,6 +178,9 @@ export class ClassesService {
         endDate,
       },
       include: {
+        courseLevel: {
+          include: { course: true },
+        },
         instructor: {
           include: {
             user: {

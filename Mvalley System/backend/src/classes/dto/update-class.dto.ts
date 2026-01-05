@@ -13,6 +13,10 @@ import { Location } from '@prisma/client';
 export class UpdateClassDto {
   @IsOptional()
   @IsString()
+  courseLevelId?: string;
+
+  @IsOptional()
+  @IsString()
   name?: string;
 
   @IsOptional()

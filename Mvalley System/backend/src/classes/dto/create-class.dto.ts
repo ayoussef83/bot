@@ -14,6 +14,9 @@ export class CreateClassDto {
   @IsString()
   name: string;
 
+  @IsString()
+  courseLevelId: string;
+
   @IsEnum(Location)
   location: Location;
 

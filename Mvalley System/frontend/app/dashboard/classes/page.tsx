@@ -122,6 +122,10 @@ export default function ClassesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formData.courseLevelId) {
+        setError('Level is required');
+        return;
+      }
       if (editingClass) {
         await classesService.update(editingClass.id, {
           ...formData,
@@ -130,7 +134,7 @@ export default function ClassesPage() {
           ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
           ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
           price: formData.price ? parseFloat(formData.price) : null,
-          courseLevelId: formData.courseLevelId || null,
+          courseLevelId: formData.courseLevelId,
         });
       } else {
         await classesService.create({
@@ -140,7 +144,7 @@ export default function ClassesPage() {
           ageMin: formData.ageMin ? parseInt(formData.ageMin) : null,
           ageMax: formData.ageMax ? parseInt(formData.ageMax) : null,
           price: formData.price ? parseFloat(formData.price) : null,
-          courseLevelId: formData.courseLevelId || null,
+          courseLevelId: formData.courseLevelId,
         });
       }
       setShowForm(false);
@@ -409,8 +413,9 @@ export default function ClassesPage() {
                         value={formData.courseLevelId}
                         onChange={(e) => setFormData({ ...formData, courseLevelId: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        required
                       >
-                        <option value="">(Auto: Level 1)</option>
+                        <option value="">Select level...</option>
                         {levels.map((l: any) => (
                           <option key={l.id} value={l.id}>
                             {(l?.course?.name || 'Course') + ' — ' + (l?.name || 'Level')}
