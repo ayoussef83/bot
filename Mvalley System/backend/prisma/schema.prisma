@@ -51,6 +51,8 @@ model User {
   parentProfile     Parent?
   recordedPayments  Payment[]  @relation("PaymentRecordedBy")
   createdGroups     Group[]   @relation("GroupCreatedBy")
+  allocationRunsCreated AllocationRun[] @relation("AllocationRunCreatedBy")
+  candidateGroupsLocked CandidateGroup[] @relation("CandidateGroupLockedBy")
 
   // Audit
   createdAt DateTime  @default(now())
@@ -245,6 +247,21 @@ enum Location {
   PalmHills
 }
 
+enum AllocationRunStatus {
+  draft
+  running
+  completed
+  failed
+}
+
+enum CandidateGroupStatus {
+  draft       // created and ready for ops review
+  blocked     // missing requirements / not profitable
+  held        // ops hold (needs changes)
+  confirmed   // became a real Group + Class (locked)
+  rejected    // ops rejected
+}
+
 model Course {
   id       String @id @default(uuid())
   name     String @unique
@@ -273,6 +290,8 @@ model CourseLevel {
   classes      Class[]
   enrollments  StudentEnrollment[]
   groups       Group[]
+  demands      CourseDemand[]
+  candidateGroups CandidateGroup[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -325,6 +344,7 @@ model Group {
 
   // Relations
   enrollments StudentEnrollment[]
+  confirmedCandidateGroups CandidateGroup[] @relation("CandidateGroupConfirmedGroup")
 
   createdById String?
   createdBy   User? @relation("GroupCreatedBy", fields: [createdById], references: [id])
@@ -340,12 +360,223 @@ model Group {
   @@map("groups")
 }
 
+// ============================
+// ALLOCATION ENGINE
+// ============================
+
+model AllocationRun {
+  id        String @id @default(uuid())
+  status    AllocationRunStatus @default(draft)
+
+  // Run parameters (for explainability & reproducibility)
+  fromDate  DateTime
+  toDate    DateTime
+  notes     String?
+  params    Json?
+
+  // Audit
+  createdById String?
+  createdBy   User? @relation("AllocationRunCreatedBy", fields: [createdById], references: [id])
+  startedAt DateTime?
+  finishedAt DateTime?
+  error     String?
+
+  // Relations
+  demands         CourseDemand[]
+  timeClusters    TimeCluster[]
+  candidateGroups CandidateGroup[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([createdById])
+  @@index([deletedAt])
+  @@map("allocation_runs")
+}
+
+model CourseDemand {
+  id        String @id @default(uuid())
+  runId     String
+  run       AllocationRun @relation(fields: [runId], references: [id])
+
+  courseLevelId String
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
+
+  // Demand inputs
+  studentIds          Json    // string[]
+  studentAvailability Json?   // engine input: free-form but expected weekly slots
+  requiredSkills      Json?   // string[]
+
+  // Course rules / expected economics
+  minCapacity   Int
+  maxCapacity   Int
+  plannedSessions Int
+  sessionDurationMins Int
+  pricePerStudent Float
+  preferredLocation Location?
+
+  // Relations
+  timeClusters    TimeCluster[]
+  candidateGroups CandidateGroup[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([runId])
+  @@index([courseLevelId])
+  @@index([deletedAt])
+  @@map("course_demands")
+}
+
+// Computed availability cluster (persisted for explainability)
+model TimeCluster {
+  id       String @id @default(uuid())
+  runId    String
+  run      AllocationRun @relation(fields: [runId], references: [id])
+  demandId String?
+  demand   CourseDemand? @relation(fields: [demandId], references: [id])
+
+  dayOfWeek Int
+  startTime String
+  endTime   String
+
+  studentCount Int
+  studentIds   Json
+
+  score        Float @default(0)
+  explanation  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([runId])
+  @@index([demandId])
+  @@index([deletedAt])
+  @@map("time_clusters")
+}
+
+model CandidateGroup {
+  id       String @id @default(uuid())
+  runId    String
+  run      AllocationRun @relation(fields: [runId], references: [id])
+  demandId String
+  demand   CourseDemand @relation(fields: [demandId], references: [id])
+
+  name         String
+  status       CandidateGroupStatus @default(draft)
+  blockReason  String?
+
+  courseLevelId String
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
+
+  // Proposed schedule
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  startDate DateTime
+  endDate   DateTime?
+
+  // Proposed assignment
+  instructorId String?
+  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+
+  roomId String?
+  room   Room? @relation(fields: [roomId], references: [id])
+
+  // Proposed students
+  studentCount Int
+  studentIds   Json
+
+  // Rules & economics
+  minCapacity Int
+  maxCapacity Int
+  expectedRevenue Float
+  expectedCost    Float
+  expectedMargin  Float
+  currency        String @default("EGP")
+
+  // Explainability
+  explanation Json?
+
+  // Lifecycle / safety
+  lockedAt DateTime?
+  lockedById String?
+  lockedBy   User? @relation("CandidateGroupLockedBy", fields: [lockedById], references: [id])
+
+  confirmedGroupId String?
+  confirmedGroup   Group? @relation("CandidateGroupConfirmedGroup", fields: [confirmedGroupId], references: [id])
+  confirmedClassId String?
+  confirmedClass   Class? @relation("CandidateGroupConfirmedClass", fields: [confirmedClassId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([runId])
+  @@index([demandId])
+  @@index([courseLevelId])
+  @@index([status])
+  @@index([instructorId])
+  @@index([roomId])
+  @@index([deletedAt])
+  @@map("candidate_groups")
+}
+
+model Room {
+  id       String @id @default(uuid())
+  name     String
+  location Location
+  capacity Int
+  isActive Boolean @default(true)
+
+  availabilities RoomAvailability[]
+  classes        Class[]
+  candidateGroups CandidateGroup[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([location])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@unique([name, location])
+  @@map("rooms")
+}
+
+model RoomAvailability {
+  id        String @id @default(uuid())
+  roomId    String
+  room      Room @relation(fields: [roomId], references: [id])
+
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([roomId])
+  @@index([dayOfWeek])
+  @@index([deletedAt])
+  @@map("room_availabilities")
+}
+
 model Class {
   id           String      @id @default(uuid())
   name         String
   location     Location
   // Dynamic location (user-managed). Backfilled from enum `location`.
   locationName String?
+  roomId       String?
+  room         Room? @relation(fields: [roomId], references: [id])
   capacity     Int
   minCapacity  Int?
   maxCapacity  Int?
@@ -379,6 +610,7 @@ model Class {
   sessions Session[]
   enrollments StudentEnrollment[]
   defaultForGroups Group[] @relation("GroupDefaultClass")
+  confirmedCandidateGroups CandidateGroup[] @relation("CandidateGroupConfirmedClass")
 
   // Auto-calculated (cached)
   avgStudentsPerSession Float?  @default(0)
@@ -393,6 +625,7 @@ model Class {
   @@index([instructorId])
   @@index([location])
   @@index([code])
+  @@index([roomId])
   @@map("classes")
 }
 
@@ -486,6 +719,7 @@ model Instructor {
   payrolls InstructorPayroll[]
   feedbackSummaries InstructorFeedbackSummary[]
   documents InstructorDocument[]
+  candidateGroups CandidateGroup[]
 
   // Audit
   createdAt DateTime  @default(now())

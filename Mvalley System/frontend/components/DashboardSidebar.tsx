@@ -37,6 +37,7 @@ import {
   FiBriefcase,
   FiTarget,
   FiRadio,
+  FiCpu,
 } from 'react-icons/fi';
 import {
   RiTeamFill,
@@ -107,6 +108,13 @@ const navigationSections: NavigationSection[] = [
         icon: <FiLayers className="w-4 h-4" />,
         path: '/dashboard/academics/allocations',
         roles: ['super_admin', 'operations', 'management', 'sales'],
+      },
+      {
+        id: 'allocation-engine',
+        label: 'Allocation Engine',
+        icon: <FiCpu className="w-4 h-4" />,
+        path: '/dashboard/academics/allocation-engine',
+        roles: ['super_admin', 'operations', 'management'],
       },
       {
         id: 'sessions',

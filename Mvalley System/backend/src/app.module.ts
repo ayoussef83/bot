@@ -20,6 +20,8 @@ import { ParentsModule } from './parents/parents.module';
 import { CoursesModule } from './courses/courses.module';
 import { GroupsModule } from './groups/groups.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { AllocationModule } from './allocation/allocation.module';
+import { RoomsModule } from './rooms/rooms.module';
 
 @Module({
   imports: [
@@ -45,6 +47,8 @@ import { PayrollModule } from './payroll/payroll.module';
     ParentsModule,
     GroupsModule,
     PayrollModule,
+    AllocationModule,
+    RoomsModule,
   ],
   controllers: [HealthController],
 })
