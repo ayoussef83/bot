@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
-import { GeneratePayrollDto } from './dto/generate-payroll.dto';
+import { GeneratePayrollDto, UpdatePayrollDto } from './dto';
 
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,6 +28,30 @@ export class PayrollController {
   )
   listInstructorPayroll(@Param('id') id: string, @CurrentUser() user: any) {
     return this.payrollService.listInstructorPayroll(id, user);
+  }
+
+  @Get(':id')
+  @Roles(
+    UserRole.super_admin,
+    UserRole.management,
+    UserRole.accounting,
+    UserRole.operations,
+    UserRole.instructor,
+  )
+  getOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.payrollService.getPayroll(id, user);
+  }
+
+  @Patch(':id')
+  @Roles(UserRole.super_admin, UserRole.accounting)
+  update(@Param('id') id: string, @Body() dto: UpdatePayrollDto, @CurrentUser() user: any) {
+    return this.payrollService.updatePayroll(id, dto, user.id);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.super_admin, UserRole.accounting)
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.payrollService.deletePayroll(id, user.id);
   }
 }
 

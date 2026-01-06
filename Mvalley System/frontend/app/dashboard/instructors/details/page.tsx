@@ -41,6 +41,7 @@ interface PayrollRow {
   currency: string;
   totalAmount: number;
   generatedAt: string;
+  snapshot?: any;
 }
 
 interface AvailabilityRow {
@@ -101,6 +102,12 @@ export default function InstructorDetailPage() {
     educationLevel: 'undergraduate',
     livingArea: '',
   });
+
+  // Payroll actions
+  const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [payrollModalMode, setPayrollModalMode] = useState<'view' | 'edit'>('view');
+  const [selectedPayroll, setSelectedPayroll] = useState<PayrollRow | null>(null);
+  const [payrollStatusDraft, setPayrollStatusDraft] = useState('draft');
 
   // Sidebar summary range
   const [summaryPreset, setSummaryPreset] = useState<'7d' | 'month' | 'year' | 'all' | 'custom'>('month');
@@ -286,7 +293,8 @@ export default function InstructorDetailPage() {
     const rangeFrom =
       from ||
       (cm[0]?.effectiveFrom ? new Date(cm[0].effectiveFrom) : (sessions[0]?.scheduledDate ? new Date(sessions[0].scheduledDate) : null));
-    const rangeTo = to || now;
+    // For 'all', treat "to" as exclusive end-of-today to avoid partial month confusion
+    const rangeTo = to || new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     if (!rangeFrom || !rangeTo || Number.isNaN(rangeFrom.getTime()) || Number.isNaN(rangeTo.getTime())) return 0;
 
     // Helper: iterate month starts between two dates (inclusive)
@@ -324,24 +332,28 @@ export default function InstructorDetailPage() {
     const type = sampleModel?.type || legacyType;
 
     if (type === 'monthly') {
+      // Month-based forecasting: count months overlapped by the selected [from, to) window.
+      // If "to" is a YYYY-MM-DD, treat it as exclusive start-of-day.
+      const fromEx = startOfDay(rangeFrom);
+      const toEx = startOfDay(rangeTo);
+      if (toEx <= fromEx) return 0;
+
       let total = 0;
       for (const ms of monthStarts) {
         const y = ms.getFullYear();
         const m = ms.getMonth();
         const monthStart = new Date(y, m, 1);
-        const monthEnd = new Date(y, m, daysInMonth(y, m), 23, 59, 59, 999);
-        const overlapStart = maxDate(monthStart, rangeFrom);
-        const overlapEnd = minDate(monthEnd, rangeTo);
-        if (overlapStart > overlapEnd) continue;
+        const monthEndExclusive = new Date(y, m + 1, 1);
+        const overlapStart = maxDate(monthStart, fromEx);
+        const overlapEnd = minDate(monthEndExclusive, toEx);
+        if (overlapStart >= overlapEnd) continue;
 
-        const model = pickModelAt(overlapStart) || pickModelAt(overlapEnd) || null;
+        const model = pickModelAt(overlapStart) || pickModelAt(new Date(overlapEnd.getTime() - 1)) || null;
         const amt = Number(model?.amount ?? legacyAmount ?? 0);
         if (!Number.isFinite(amt) || amt <= 0) continue;
-
-        const days = diffDaysInclusive(overlapStart, overlapEnd);
-        total += (amt * days) / daysInMonth(y, m);
+        total += amt;
       }
-      return Math.round(total * 100) / 100;
+      return Math.round(total); // whole numbers only
     }
 
     // Hourly/per_session: compute from completed sessions within range
@@ -365,7 +377,7 @@ export default function InstructorDetailPage() {
         if (Number.isFinite(hours)) total += Math.max(0, hours) * amt;
       }
     }
-    return Math.round(total * 100) / 100;
+    return Math.round(total); // whole numbers only
   }, [summaryRange, costModels, instructor, sessions]);
 
   const currentEffectiveCostModel = useMemo(() => {
@@ -493,6 +505,12 @@ export default function InstructorDetailPage() {
     const mm = n2;
     if (y < 1900 || mm < 1 || mm > 12 || dd < 1 || dd > 31) return '';
     return `${String(y).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  };
+
+  const isoToDmy = (iso: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+    if (!m) return '';
+    return `${m[3]}/${m[2]}/${m[1]}`;
   };
 
   const refreshCostModels = async () => {
@@ -1295,19 +1313,140 @@ export default function InstructorDetailPage() {
                       label: 'Total',
                       render: (_, r: any) => (
                         <span className="text-sm">
-                          {r.currency} {Number(r.totalAmount || 0).toLocaleString()}
+                          {r.currency} {Number(r.totalAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       ),
                     },
                     {
                       key: 'generatedAt',
                       label: 'Generated',
-                      render: (v: any) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString() : '—'}</span>,
+                      render: (v: any) => (
+                        <span className="text-sm text-gray-600">
+                          {v ? new Date(v).toLocaleDateString('en-GB') : '—'}
+                        </span>
+                      ),
                     },
                   ]}
                   data={payroll}
                   emptyMessage="No payroll snapshots yet"
+                  actions={
+                    canAccounting
+                      ? (row: any) => [
+                          {
+                            label: 'View',
+                            onClick: () => {
+                              setSelectedPayroll(row);
+                              setPayrollModalMode('view');
+                              setShowPayrollModal(true);
+                            },
+                          },
+                          {
+                            label: 'Edit',
+                            onClick: () => {
+                              setSelectedPayroll(row);
+                              setPayrollStatusDraft(String(row.status || 'draft'));
+                              setPayrollModalMode('edit');
+                              setShowPayrollModal(true);
+                            },
+                          },
+                          {
+                            label: 'Delete',
+                            variant: 'danger',
+                            onClick: async () => {
+                              if (!confirm('Delete this payroll snapshot?')) return;
+                              try {
+                                clearTabError('payroll');
+                                await api.delete(`/payroll/${row.id}`);
+                                await fetchPayroll(String(id));
+                              } catch (e: any) {
+                                setTabError('payroll', e?.response?.data?.message || 'Failed to delete payroll');
+                              }
+                            },
+                          },
+                        ]
+                      : undefined
+                  }
                 />
+
+                {showPayrollModal && selectedPayroll && (
+                  <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowPayrollModal(false)} />
+                      <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+                        <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h2 className="text-xl font-semibold">
+                                Payroll {selectedPayroll.periodYear}-{String(selectedPayroll.periodMonth).padStart(2, '0')}
+                              </h2>
+                              <div className="text-sm text-gray-500 mt-1">
+                                Status: <span className="capitalize">{String(selectedPayroll.status)}</span> • Total:{' '}
+                                {selectedPayroll.currency}{' '}
+                                {Number(selectedPayroll.totalAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowPayrollModal(false)}
+                              className="px-3 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+                            >
+                              Close
+                            </button>
+                          </div>
+
+                          {payrollModalMode === 'edit' ? (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                                  <select
+                                    value={payrollStatusDraft}
+                                    onChange={(e) => setPayrollStatusDraft(e.target.value)}
+                                    className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                                  >
+                                    <option value="draft">Draft</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="void">Void</option>
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPayrollModal(false)}
+                                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      clearTabError('payroll');
+                                      await api.patch(`/payroll/${selectedPayroll.id}`, { status: payrollStatusDraft });
+                                      setShowPayrollModal(false);
+                                      await fetchPayroll(String(id));
+                                    } catch (e: any) {
+                                      setTabError('payroll', e?.response?.data?.message || 'Failed to update payroll');
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+                              <pre className="text-xs">{JSON.stringify(selectedPayroll.snapshot || {}, null, 2)}</pre>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
                   <div className="flex items-center justify-between">
@@ -1338,8 +1477,8 @@ export default function InstructorDetailPage() {
                     columns={[
                       { key: 'type', label: 'Type', render: (v) => <span className="text-sm capitalize">{String(v).replace('_',' ')}</span> },
                       { key: 'amount', label: 'Amount', render: (v, r: any) => <span className="text-sm">{r.currency} {Number(v || 0).toLocaleString()}</span> },
-                      { key: 'effectiveFrom', label: 'From', render: (v) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString() : '—'}</span> },
-                      { key: 'effectiveTo', label: 'To', render: (v) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString() : '—'}</span> },
+                      { key: 'effectiveFrom', label: 'From', render: (v) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString('en-GB') : '—'}</span> },
+                      { key: 'effectiveTo', label: 'To', render: (v) => <span className="text-sm text-gray-600">{v ? new Date(v).toLocaleDateString('en-GB') : '—'}</span> },
                       { key: 'notes', label: 'Notes', render: (v) => <span className="text-sm text-gray-600">{v || '—'}</span> },
                     ]}
                     data={costModels}
@@ -1830,49 +1969,75 @@ export default function InstructorDetailPage() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs text-gray-500">From</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="1/1/2025 or 2025-01-01"
-                  value={summaryFromText || summaryFrom}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setSummaryFromText(v);
-                    const iso = parseFlexibleDateToISO(v);
-                    if (iso) setSummaryFrom(iso);
-                  }}
-                  onBlur={() => {
-                    const iso = parseFlexibleDateToISO(summaryFromText || summaryFrom);
-                    if (iso) {
+                <div className="mt-1 grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    placeholder="dd/mm/yyyy"
+                    value={summaryFromText || (summaryFrom ? isoToDmy(summaryFrom) : '')}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSummaryFromText(v);
+                      const iso = parseFlexibleDateToISO(v);
+                      if (iso) setSummaryFrom(iso);
+                    }}
+                    onBlur={() => {
+                      const iso = parseFlexibleDateToISO(summaryFromText || summaryFrom);
+                      if (iso) {
+                        setSummaryFrom(iso);
+                        setSummaryFromText(isoToDmy(iso));
+                      }
+                    }}
+                    className="col-span-2 w-full rounded-md border border-gray-300 text-sm px-2 py-1"
+                  />
+                  <input
+                    type="date"
+                    value={summaryFrom}
+                    onChange={(e) => {
+                      const iso = e.target.value;
                       setSummaryFrom(iso);
-                      setSummaryFromText(iso);
-                    }
-                  }}
-                  className="mt-1 w-full rounded-md border border-gray-300 text-sm"
-                />
+                      setSummaryFromText(iso ? isoToDmy(iso) : '');
+                    }}
+                    className="w-full rounded-md border border-gray-300 text-sm"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500">To</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="1/1/2026 or 2026-01-01"
-                  value={summaryToText || summaryTo}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setSummaryToText(v);
-                    const iso = parseFlexibleDateToISO(v);
-                    if (iso) setSummaryTo(iso);
-                  }}
-                  onBlur={() => {
-                    const iso = parseFlexibleDateToISO(summaryToText || summaryTo);
-                    if (iso) {
+                <div className="mt-1 grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    placeholder="dd/mm/yyyy"
+                    value={summaryToText || (summaryTo ? isoToDmy(summaryTo) : '')}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSummaryToText(v);
+                      const iso = parseFlexibleDateToISO(v);
+                      if (iso) setSummaryTo(iso);
+                    }}
+                    onBlur={() => {
+                      const iso = parseFlexibleDateToISO(summaryToText || summaryTo);
+                      if (iso) {
+                        setSummaryTo(iso);
+                        setSummaryToText(isoToDmy(iso));
+                      }
+                    }}
+                    className="col-span-2 w-full rounded-md border border-gray-300 text-sm px-2 py-1"
+                  />
+                  <input
+                    type="date"
+                    value={summaryTo}
+                    onChange={(e) => {
+                      const iso = e.target.value;
                       setSummaryTo(iso);
-                      setSummaryToText(iso);
-                    }
-                  }}
-                  className="mt-1 w-full rounded-md border border-gray-300 text-sm"
-                />
+                      setSummaryToText(iso ? isoToDmy(iso) : '');
+                    }}
+                    className="w-full rounded-md border border-gray-300 text-sm"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1895,7 +2060,8 @@ export default function InstructorDetailPage() {
           <div className="flex justify-between">
             <span className="text-gray-500">Fees:</span>
             <span className="font-medium text-gray-900">
-              {(currentEffectiveCostModel?.currency || 'EGP').toUpperCase()} {Number(feesInSummaryRange || 0).toLocaleString()}
+              {(currentEffectiveCostModel?.currency || 'EGP').toUpperCase()}{' '}
+              {Number(feesInSummaryRange || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
           </div>
           <div className="flex justify-between pt-2 border-t border-gray-200">

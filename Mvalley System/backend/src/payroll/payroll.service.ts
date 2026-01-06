@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { InstructorCostModelType, InstructorPayrollStatus } from '@prisma/client';
 import { GeneratePayrollDto } from './dto/generate-payroll.dto';
+import { UpdatePayrollDto } from './dto/update-payroll.dto';
 
 @Injectable()
 export class PayrollService {
@@ -263,6 +264,78 @@ export class PayrollService {
       where: { instructorId, deletedAt: null },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
     });
+  }
+
+  async getPayroll(payrollId: string, user: any) {
+    const payroll = await this.prisma.instructorPayroll.findFirst({
+      where: { id: payrollId, deletedAt: null },
+      include: { instructor: { include: { user: { select: { id: true } } } } },
+    });
+    if (!payroll) throw new NotFoundException('Payroll not found');
+    if (user?.role === 'instructor' && payroll.instructor?.user?.id !== user.id) {
+      throw new NotFoundException('Payroll not found');
+    }
+    return payroll;
+  }
+
+  async updatePayroll(payrollId: string, dto: UpdatePayrollDto, userId: string) {
+    const existing = await this.prisma.instructorPayroll.findFirst({
+      where: { id: payrollId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Payroll not found');
+
+    const data: any = { status: dto.status };
+    if (dto.status === InstructorPayrollStatus.approved) {
+      data.approvedAt = new Date();
+      data.approvedBy = userId;
+    }
+    if (dto.status === InstructorPayrollStatus.paid) {
+      data.paidAt = new Date();
+      data.paidBy = userId;
+    }
+    if (dto.status === InstructorPayrollStatus.void) {
+      data.deletedAt = new Date();
+    }
+
+    const updated = await this.prisma.instructorPayroll.update({
+      where: { id: payrollId },
+      data,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'update',
+        entityType: 'InstructorPayroll',
+        entityId: payrollId,
+        changes: JSON.stringify(dto),
+      },
+    });
+
+    return updated;
+  }
+
+  async deletePayroll(payrollId: string, userId: string) {
+    const existing = await this.prisma.instructorPayroll.findFirst({
+      where: { id: payrollId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Payroll not found');
+
+    const updated = await this.prisma.instructorPayroll.update({
+      where: { id: payrollId },
+      data: { deletedAt: new Date(), status: InstructorPayrollStatus.void },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'delete',
+        entityType: 'InstructorPayroll',
+        entityId: payrollId,
+      },
+    });
+
+    return updated;
   }
 }
 
