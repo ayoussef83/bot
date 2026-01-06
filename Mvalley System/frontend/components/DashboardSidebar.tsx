@@ -103,6 +103,13 @@ const navigationSections: NavigationSection[] = [
         roles: ['super_admin', 'operations', 'management', 'accounting'],
       },
       {
+        id: 'rooms',
+        label: 'Rooms',
+        icon: <FiHome className="w-4 h-4" />,
+        path: '/dashboard/academics/rooms',
+        roles: ['super_admin', 'operations', 'management'],
+      },
+      {
         id: 'allocations',
         label: 'Allocations',
         icon: <FiLayers className="w-4 h-4" />,
@@ -144,13 +151,6 @@ const navigationSections: NavigationSection[] = [
         label: 'Teaching Slots',
         icon: <FiClock className="w-4 h-4" />,
         path: '/dashboard/ops/teaching-slots',
-        roles: ['super_admin', 'operations', 'management'],
-      },
-      {
-        id: 'rooms',
-        label: 'Rooms',
-        icon: <FiHome className="w-4 h-4" />,
-        path: '/dashboard/ops/rooms',
         roles: ['super_admin', 'operations', 'management'],
       },
     ],

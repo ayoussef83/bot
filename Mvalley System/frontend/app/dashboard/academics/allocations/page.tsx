@@ -4,7 +4,19 @@ import { useEffect, useMemo, useState } from 'react';
 import StandardListView from '@/components/StandardListView';
 import { ActionButton, Column } from '@/components/DataTable';
 import EmptyState from '@/components/EmptyState';
-import { studentsService, classesService, groupsService, Student, Class, type StudentEnrollment, type Group } from '@/lib/services';
+import {
+  studentsService,
+  classesService,
+  groupsService,
+  roomsService,
+  teachingSlotsService,
+  Student,
+  Class,
+  type StudentEnrollment,
+  type Group,
+  type Room,
+  type TeachingSlot,
+} from '@/lib/services';
 import { FiEdit, FiSave, FiX } from 'react-icons/fi';
 import HighlightedText from '@/components/HighlightedText';
 import { useSearchParams } from 'next/navigation';
@@ -12,6 +24,8 @@ import { useSearchParams } from 'next/navigation';
 type Draft = {
   classId: string;
   groupId: string;
+  roomId: string;
+  teachingSlotId: string;
 };
 
 type EnrollmentRow = {
@@ -31,22 +45,32 @@ export default function AllocationsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [teachingSlots, setTeachingSlots] = useState<TeachingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ classId: '', groupId: '' });
+  const [draft, setDraft] = useState<Draft>({ classId: '', groupId: '', roomId: '', teachingSlotId: '' });
   const [saving, setSaving] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
     setError('');
     try {
-      const [s, c, g] = await Promise.all([studentsService.getAll(), classesService.getAll(), groupsService.getAll()]);
+      const [s, c, g, r, ts] = await Promise.all([
+        studentsService.getAll(),
+        classesService.getAll(),
+        groupsService.getAll(),
+        roomsService.getAll(),
+        teachingSlotsService.getAll(),
+      ]);
       setStudents(Array.isArray(s.data) ? s.data : []);
       setClasses(Array.isArray(c.data) ? c.data : []);
       setGroups(Array.isArray(g.data) ? g.data : []);
+      setRooms(Array.isArray(r.data) ? r.data : []);
+      setTeachingSlots(Array.isArray(ts.data) ? ts.data : []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load allocations');
     } finally {
@@ -60,6 +84,47 @@ export default function AllocationsPage() {
 
   // If coming from a class quick-action, preselect that class in the row editor when you click "Edit row"
   const preselectedClassId = searchParams?.get('classId') || '';
+
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const groupMembersMap = useMemo(() => {
+    const map = new Map<string, Student[]>();
+    for (const s of students as any[]) {
+      const ens = Array.isArray(s?.enrollments) ? s.enrollments : [];
+      for (const e of ens) {
+        const gid = String(e?.groupId || '').trim();
+        if (!gid) continue;
+        const arr = map.get(gid) || [];
+        arr.push(s as any);
+        map.set(gid, arr);
+      }
+    }
+    return map;
+  }, [students]);
+
+  const GroupMembersVisual = ({ groupId }: { groupId: string }) => {
+    const members = groupMembersMap.get(groupId) || [];
+    const top = members.slice(0, 3);
+    const rest = members.length - top.length;
+    if (!members.length) return null;
+    return (
+      <div className="flex items-center gap-1 mt-1">
+        {top.map((m: any) => {
+          const initials = `${String(m.firstName || '').slice(0, 1)}${String(m.lastName || '').slice(0, 1)}`.toUpperCase();
+          return (
+            <div
+              key={m.id}
+              className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold border border-indigo-200"
+              title={`${m.firstName} ${m.lastName}`}
+            >
+              {initials}
+            </div>
+          );
+        })}
+        {rest > 0 && <div className="text-xs text-gray-500">+{rest}</div>}
+      </div>
+    );
+  };
 
   const columns: Column<EnrollmentRow>[] = [
     {
@@ -107,9 +172,11 @@ export default function AllocationsPage() {
       render: (_, row) => {
         const isEditing = editingId === row.enrollmentId;
         if (!isEditing) {
+          const gid = String((row.enrollment as any)?.groupId || (row.enrollment as any)?.group?.id || '').trim();
           return (
             <span className="text-sm text-gray-700">
               <HighlightedText text={(row.enrollment as any)?.group?.name || '-'} query={searchTerm} />
+              {gid ? <GroupMembersVisual groupId={gid} /> : null}
             </span>
           );
         }
@@ -170,6 +237,100 @@ export default function AllocationsPage() {
       },
     },
     {
+      key: 'room',
+      label: 'Room',
+      render: (_, row) => {
+        const isEditing = editingId === row.enrollmentId;
+        const selectedClass: any = isEditing ? classes.find((c: any) => c.id === draft.classId) : row.enrollment?.class;
+        const currentRoomId = String(selectedClass?.roomId || '');
+        const currentRoom = rooms.find((r: any) => String(r.id) === currentRoomId);
+
+        if (!isEditing) {
+          return <span className="text-sm text-gray-600">{currentRoom?.name || '—'}</span>;
+        }
+
+        return (
+          <select
+            value={draft.roomId || currentRoomId || ''}
+            onChange={(e) => setDraft((d) => ({ ...d, roomId: e.target.value, teachingSlotId: '' }))}
+            className="w-full rounded-md border-gray-300 text-sm"
+          >
+            <option value="">Select…</option>
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name} ({r.location}) • cap {r.capacity}
+              </option>
+            ))}
+          </select>
+        );
+      },
+    },
+    {
+      key: 'slot',
+      label: 'Room available slot',
+      render: (_, row) => {
+        const isEditing = editingId === row.enrollmentId;
+        const selectedClass: any = isEditing ? classes.find((c: any) => c.id === draft.classId) : row.enrollment?.class;
+        const currentSlotId = String(selectedClass?.teachingSlotId || '');
+        const currentSlot = teachingSlots.find((ts: any) => String(ts.id) === currentSlotId);
+
+        if (!isEditing) {
+          if (!currentSlot) return <span className="text-sm text-gray-500">—</span>;
+          return (
+            <span className="text-sm text-gray-600">
+              {DOW[currentSlot.dayOfWeek]} {currentSlot.startTime}–{currentSlot.endTime}
+            </span>
+          );
+        }
+
+        const levelId = row.enrollment?.courseLevelId;
+        const options = teachingSlots.filter((ts: any) => {
+          if (levelId && String(ts.courseLevelId) !== String(levelId)) return false;
+          const roomId = draft.roomId || selectedClass?.roomId || '';
+          if (roomId && String(ts.roomId) !== String(roomId)) return false;
+          return true;
+        });
+
+        return (
+          <select
+            value={draft.teachingSlotId || currentSlotId || ''}
+            onChange={async (e) => {
+              const slotId = e.target.value;
+              const slot = teachingSlots.find((x: any) => String(x.id) === String(slotId));
+              if (!slot) {
+                setDraft((d) => ({ ...d, teachingSlotId: '', roomId: d.roomId }));
+                return;
+              }
+              try {
+                let classId = String(slot.currentClassId || '');
+                if (!classId) {
+                  const created = await classesService.createFromTeachingSlot({ teachingSlotId: slot.id });
+                  classId = String((created as any)?.data?.id || '');
+                  await fetchAll();
+                }
+                setDraft((d) => ({
+                  ...d,
+                  teachingSlotId: slot.id,
+                  roomId: slot.roomId,
+                  classId: classId || d.classId,
+                }));
+              } catch (err: any) {
+                setError(err?.response?.data?.message || 'Failed to create group from slot');
+              }
+            }}
+            className="w-full rounded-md border-gray-300 text-sm"
+          >
+            <option value="">Select…</option>
+            {options.map((ts: any) => (
+              <option key={ts.id} value={ts.id}>
+                {DOW[ts.dayOfWeek]} {ts.startTime}–{ts.endTime} • {ts.status}
+              </option>
+            ))}
+          </select>
+        );
+      },
+    },
+    {
       key: 'branch',
       label: 'Branch',
       render: (_, row) => {
@@ -190,11 +351,10 @@ export default function AllocationsPage() {
       label: 'Instructor',
       render: (_, row) => {
         const isEditing = editingId === row.enrollmentId;
-        const selected: any = isEditing ? classes.find((c) => c.id === draft.classId) : row.enrollment?.class;
-        const name =
-          selected?.instructor?.user
-            ? `${selected.instructor.user.firstName} ${selected.instructor.user.lastName}`
-            : '-';
+        const selected: any = isEditing ? classes.find((c: any) => c.id === draft.classId) : row.enrollment?.class;
+        const slot = selected?.teachingSlotId ? teachingSlots.find((ts: any) => String(ts.id) === String(selected.teachingSlotId)) : null;
+        const u = slot?.instructor?.user || selected?.instructor?.user;
+        const name = u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() : '-';
         return (
           <span className="text-sm text-gray-600">
             <HighlightedText text={name} query={searchTerm} />
@@ -213,9 +373,14 @@ export default function AllocationsPage() {
           icon: <FiEdit className="w-4 h-4" />,
           onClick: () => {
             setEditingId(row.enrollmentId);
+            const cls: any = row.enrollment?.class;
+            const slotId = cls?.teachingSlotId ? String(cls.teachingSlotId) : '';
+            const roomId = cls?.roomId ? String(cls.roomId) : '';
             setDraft({
               classId: row.enrollment.classId || preselectedClassId || '',
               groupId: (row.enrollment as any).groupId || '',
+              roomId,
+              teachingSlotId: slotId,
             });
           },
         },

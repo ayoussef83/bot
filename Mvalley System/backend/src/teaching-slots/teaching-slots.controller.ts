@@ -13,13 +13,13 @@ export class TeachingSlotsController {
   constructor(private readonly teachingSlotsService: TeachingSlotsService) {}
 
   @Get()
-  @Roles(UserRole.super_admin, UserRole.management, UserRole.operations)
+  @Roles(UserRole.super_admin, UserRole.management, UserRole.operations, UserRole.sales)
   findAll() {
     return this.teachingSlotsService.findAll();
   }
 
   @Get(':id')
-  @Roles(UserRole.super_admin, UserRole.management, UserRole.operations)
+  @Roles(UserRole.super_admin, UserRole.management, UserRole.operations, UserRole.sales)
   findOne(@Param('id') id: string) {
     return this.teachingSlotsService.findOne(id);
   }

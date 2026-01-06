@@ -5,13 +5,28 @@ import StandardListView from '@/components/StandardListView';
 import EmptyState from '@/components/EmptyState';
 import { roomsService, type Room } from '@/lib/services';
 import { ActionButton, Column } from '@/components/DataTable';
-import { FiEdit, FiPlus, FiSave, FiTrash2, FiX } from 'react-icons/fi';
+import { FiCalendar, FiEdit, FiPlus, FiSave, FiTrash2, FiX } from 'react-icons/fi';
 
 function toErrorString(err: any) {
   return err?.response?.data?.message || err?.message || String(err || 'Unknown error');
 }
 
 const LOCATIONS = ['MOA', 'Espace', 'SODIC', 'PalmHills'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const slotIndexToTime = (idx: number) => {
+  const mins = idx * 30;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+const timeToSlotIndex = (hhmm: string) => {
+  const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m) return 0;
+  const h = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  return Math.max(0, Math.min(47, Math.floor((h * 60 + mm) / 30)));
+};
 
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -23,6 +38,12 @@ export default function RoomsPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Room | null>(null);
   const [form, setForm] = useState({ name: '', location: 'MOA', capacity: '', isActive: true });
+
+  // Availability grid (7 days x 48 half-hours)
+  const [showAvailability, setShowAvailability] = useState(false);
+  const [availabilityRoom, setAvailabilityRoom] = useState<Room | null>(null);
+  const [grid, setGrid] = useState<boolean[][]>(() => Array.from({ length: 7 }, () => Array.from({ length: 48 }, () => false)));
+  const [savingGrid, setSavingGrid] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -113,6 +134,26 @@ export default function RoomsPage() {
   };
 
   const actions = (row: Room): ActionButton[] => [
+    {
+      label: 'Availability',
+      icon: <FiCalendar className="w-4 h-4" />,
+      onClick: () => {
+        // Build grid from existing availabilities
+        const next = Array.from({ length: 7 }, () => Array.from({ length: 48 }, () => false));
+        const avs = Array.isArray((row as any).availabilities) ? (row as any).availabilities : [];
+        for (const a of avs) {
+          const day = Number(a?.dayOfWeek);
+          if (!Number.isFinite(day) || day < 0 || day > 6) continue;
+          const startIdx = timeToSlotIndex(String(a?.startTime || '00:00'));
+          const endIdx = timeToSlotIndex(String(a?.endTime || '00:00'));
+          const endExclusive = Math.max(startIdx + 1, endIdx);
+          for (let i = startIdx; i < endExclusive; i++) next[day][i] = true;
+        }
+        setAvailabilityRoom(row);
+        setGrid(next);
+        setShowAvailability(true);
+      },
+    },
     { label: 'Edit', icon: <FiEdit className="w-4 h-4" />, onClick: () => openEdit(row) },
     { label: 'Delete', icon: <FiTrash2 className="w-4 h-4" />, variant: 'danger', onClick: () => remove(row) },
   ];
@@ -222,6 +263,134 @@ export default function RoomsPage() {
                       <span className="inline-flex items-center justify-center gap-2">
                         <FiSave className="w-4 h-4" /> {saving ? 'Saving…' : 'Save'}
                       </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAvailability && availabilityRoom && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowAvailability(false)} />
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Room Availability</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {availabilityRoom.name} • {availabilityRoom.location} • 30-minute grid (click to toggle)
+                    </p>
+                  </div>
+                  <button onClick={() => setShowAvailability(false)} className="text-gray-400 hover:text-gray-600">
+                    <FiX className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="border border-gray-200 rounded overflow-auto">
+                  <div className="min-w-[1200px]">
+                    <div className="grid" style={{ gridTemplateColumns: `140px repeat(48, minmax(0, 1fr))` }}>
+                      <div className="sticky left-0 z-10 bg-white border-b border-gray-200 p-2 text-xs text-gray-500">Day</div>
+                      {Array.from({ length: 48 }).map((_, i) => (
+                        <div key={i} className="border-b border-gray-200 p-1 text-[10px] text-gray-500 text-center">
+                          {i % 2 === 0 ? slotIndexToTime(i) : ''}
+                        </div>
+                      ))}
+
+                      {DOW.map((d, dayIdx) => (
+                        <div key={d} className="contents">
+                          <div className="sticky left-0 z-10 bg-white border-b border-gray-200 p-2 text-sm font-medium text-gray-900">
+                            {d}
+                          </div>
+                          {Array.from({ length: 48 }).map((_, slotIdx) => {
+                            const on = grid[dayIdx]?.[slotIdx];
+                            return (
+                              <button
+                                key={slotIdx}
+                                type="button"
+                                onClick={() => {
+                                  setGrid((g) => {
+                                    const copy = g.map((row) => row.slice());
+                                    copy[dayIdx][slotIdx] = !copy[dayIdx][slotIdx];
+                                    return copy;
+                                  });
+                                }}
+                                className={`border-b border-gray-200 h-7 ${on ? 'bg-green-200 hover:bg-green-300' : 'bg-white hover:bg-gray-50'}`}
+                                title={`${d} ${slotIndexToTime(slotIdx)}-${slotIndexToTime(slotIdx + 1)}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setGrid(Array.from({ length: 7 }, () => Array.from({ length: 48 }, () => false)))}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                  >
+                    Clear
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAvailability(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingGrid}
+                      onClick={async () => {
+                        setSavingGrid(true);
+                        setError('');
+                        try {
+                          const room = availabilityRoom as any;
+                          const existing = Array.isArray(room.availabilities) ? room.availabilities : [];
+                          // Remove old slots
+                          await Promise.all(existing.map((a: any) => roomsService.deleteAvailability(a.id)));
+
+                          // Build new contiguous ranges
+                          const create: any[] = [];
+                          for (let day = 0; day < 7; day++) {
+                            let runStart: number | null = null;
+                            for (let i = 0; i <= 48; i++) {
+                              const on = i < 48 ? !!grid[day][i] : false;
+                              if (on && runStart === null) runStart = i;
+                              if ((!on || i === 48) && runStart !== null) {
+                                const startTime = slotIndexToTime(runStart);
+                                const endTime = slotIndexToTime(i);
+                                create.push({ dayOfWeek: day, startTime, endTime });
+                                runStart = null;
+                              }
+                            }
+                          }
+
+                          for (const payload of create) {
+                            await roomsService.addAvailability(room.id, payload);
+                          }
+
+                          await fetchAll();
+                          // refresh modal state with updated room object
+                          const refreshed = (await roomsService.getAll()).data?.find((r: any) => r.id === room.id);
+                          setAvailabilityRoom(refreshed || room);
+                          setShowAvailability(false);
+                        } catch (e: any) {
+                          setError(toErrorString(e));
+                        } finally {
+                          setSavingGrid(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-60"
+                    >
+                      {savingGrid ? 'Saving…' : 'Save availability'}
                     </button>
                   </div>
                 </div>
