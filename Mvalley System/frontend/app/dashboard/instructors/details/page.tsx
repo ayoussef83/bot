@@ -106,6 +106,8 @@ export default function InstructorDetailPage() {
   const [summaryPreset, setSummaryPreset] = useState<'7d' | 'month' | 'year' | 'all' | 'custom'>('month');
   const [summaryFrom, setSummaryFrom] = useState<string>('');
   const [summaryTo, setSummaryTo] = useState<string>('');
+  const [summaryFromText, setSummaryFromText] = useState<string>('');
+  const [summaryToText, setSummaryToText] = useState<string>('');
 
   // Availability fast editor
   const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, Partial<AvailabilityRow>>>({});
@@ -268,55 +270,103 @@ export default function InstructorDetailPage() {
   }, [sessions, summaryRange]);
 
   const feesInSummaryRange = useMemo(() => {
+    // Fees are derived primarily from cost models (forecasting), not sessions.
+    // - Monthly: prorated by days in month across the selected range
+    // - Hourly/per_session: requires sessions to compute; we fallback to completed sessions only in that case.
     const { from, to } = summaryRange;
-    const rangeSessions = (sessions || []).filter((s) => {
-      if (s.status !== 'completed') return false;
-      const d = new Date(s.scheduledDate);
-      if (from && d < from) return false;
-      if (to && d > to) return false;
-      return true;
-    });
+    const now = new Date();
 
-    const cm = (costModels || []) as any[];
+    const cm = ((costModels || []) as any[]).slice().filter((m) => !m?.deletedAt);
+    cm.sort((a, b) => new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime());
+
+    const legacyType = (instructor as any)?.costType || 'hourly';
+    const legacyAmount = Number((instructor as any)?.costAmount ?? 0);
+
+    // Determine an actual range for 'all' when from/to are null
+    const rangeFrom =
+      from ||
+      (cm[0]?.effectiveFrom ? new Date(cm[0].effectiveFrom) : (sessions[0]?.scheduledDate ? new Date(sessions[0].scheduledDate) : null));
+    const rangeTo = to || now;
+    if (!rangeFrom || !rangeTo || Number.isNaN(rangeFrom.getTime()) || Number.isNaN(rangeTo.getTime())) return 0;
+
+    // Helper: iterate month starts between two dates (inclusive)
+    const monthStarts: Date[] = [];
+    const cursor = new Date(rangeFrom.getFullYear(), rangeFrom.getMonth(), 1);
+    const last = new Date(rangeTo.getFullYear(), rangeTo.getMonth(), 1);
+    while (cursor <= last) {
+      monthStarts.push(new Date(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const minDate = (a: Date, b: Date) => (a.getTime() < b.getTime() ? a : b);
+    const maxDate = (a: Date, b: Date) => (a.getTime() > b.getTime() ? a : b);
+    const diffDaysInclusive = (a: Date, b: Date) => {
+      const aa = startOfDay(a).getTime();
+      const bb = startOfDay(b).getTime();
+      return Math.floor((bb - aa) / 86400000) + 1;
+    };
+
+    // Pick model active at a point in time
     const pickModelAt = (at: Date) => {
-      const ms = at.getTime();
+      const t = at.getTime();
       const matches = cm.filter((m) => {
-        const from = new Date(m.effectiveFrom).getTime();
-        const to = m.effectiveTo ? new Date(m.effectiveTo).getTime() : Infinity;
-        return from <= ms && ms <= to;
+        const f = new Date(m.effectiveFrom).getTime();
+        const tt = m.effectiveTo ? new Date(m.effectiveTo).getTime() : Infinity;
+        return f <= t && t <= tt;
       });
       matches.sort((a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime());
       return matches[0] || null;
     };
 
-    const legacyType = (instructor as any)?.costType || 'hourly';
-    const legacyAmount = Number((instructor as any)?.costAmount ?? 0);
+    const sampleModel = pickModelAt(rangeFrom) || pickModelAt(rangeTo) || null;
+    const type = sampleModel?.type || legacyType;
 
+    if (type === 'monthly') {
+      let total = 0;
+      for (const ms of monthStarts) {
+        const y = ms.getFullYear();
+        const m = ms.getMonth();
+        const monthStart = new Date(y, m, 1);
+        const monthEnd = new Date(y, m, daysInMonth(y, m), 23, 59, 59, 999);
+        const overlapStart = maxDate(monthStart, rangeFrom);
+        const overlapEnd = minDate(monthEnd, rangeTo);
+        if (overlapStart > overlapEnd) continue;
+
+        const model = pickModelAt(overlapStart) || pickModelAt(overlapEnd) || null;
+        const amt = Number(model?.amount ?? legacyAmount ?? 0);
+        if (!Number.isFinite(amt) || amt <= 0) continue;
+
+        const days = diffDaysInclusive(overlapStart, overlapEnd);
+        total += (amt * days) / daysInMonth(y, m);
+      }
+      return Math.round(total * 100) / 100;
+    }
+
+    // Hourly/per_session: compute from completed sessions within range
     let total = 0;
+    const rangeSessions = (sessions || []).filter((s) => {
+      if (s.status !== 'completed') return false;
+      const d = new Date(s.scheduledDate);
+      if (d < rangeFrom) return false;
+      if (d > rangeTo) return false;
+      return true;
+    });
     for (const s of rangeSessions) {
       const at = new Date(s.startTime || s.scheduledDate);
       const model = pickModelAt(at);
-      const type = model?.type || legacyType;
-      const amount = Number(model?.amount ?? legacyAmount ?? 0);
-      if (!Number.isFinite(amount)) continue;
-      if (type === 'per_session') {
-        total += amount;
-      } else if (type === 'monthly') {
-        // For a custom range, monthly salary isn't well-defined. We show it only for Month/Year presets.
-        if (summaryPreset === 'month' || summaryPreset === 'year') {
-          total = amount;
-          break;
-        }
-      } else {
-        const durationMs = new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
-        const hours = durationMs / 3600000;
-        if (!Number.isFinite(hours)) continue;
-        total += Math.max(0, hours) * amount;
+      const t = model?.type || legacyType;
+      const amt = Number(model?.amount ?? legacyAmount ?? 0);
+      if (!Number.isFinite(amt)) continue;
+      if (t === 'per_session') total += amt;
+      else {
+        const hours = (new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 3600000;
+        if (Number.isFinite(hours)) total += Math.max(0, hours) * amt;
       }
     }
-
     return Math.round(total * 100) / 100;
-  }, [sessions, costModels, instructor, summaryRange, summaryPreset]);
+  }, [summaryRange, costModels, instructor, sessions]);
 
   const currentEffectiveCostModel = useMemo(() => {
     const now = new Date();
@@ -393,6 +443,56 @@ export default function InstructorDetailPage() {
     h = h % 12;
     if (h === 0) h = 12;
     return `${h}:${min} ${ampm}`;
+  };
+
+  const parseFlexibleDateToISO = (input: string) => {
+    const raw = String(input || '').trim();
+    if (!raw) return '';
+
+    // ISO yyyy-mm-dd
+    const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
+    if (iso) {
+      const y = Number(iso[1]);
+      const m = Number(iso[2]);
+      const d = Number(iso[3]);
+      if (y >= 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+      return '';
+    }
+
+    // Common fast formats: 1/1/2025, 1-1-2025, 1 1 2025
+    const parts = raw.split(/[\/\-\s]+/).filter(Boolean);
+    if (parts.length !== 3) return '';
+
+    const a = parts[0];
+    const b = parts[1];
+    const c = parts[2];
+
+    const n1 = Number(a);
+    const n2 = Number(b);
+    let y = Number(c);
+    if (!Number.isFinite(n1) || !Number.isFinite(n2) || !Number.isFinite(y)) return '';
+
+    // If year typed as 2 digits, assume 2000+
+    if (y >= 0 && y < 100) y = 2000 + y;
+
+    // If first token is a 4-digit year: yyyy/mm/dd
+    if (a.length === 4) {
+      const yy = Number(a);
+      const mm = Number(b);
+      const dd = Number(c);
+      if (yy >= 1900 && mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+        return `${String(yy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+      }
+      return '';
+    }
+
+    // Default: dd/mm/yyyy (Egypt)
+    const dd = n1;
+    const mm = n2;
+    if (y < 1900 || mm < 1 || mm > 12 || dd < 1 || dd > 31) return '';
+    return `${String(y).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   };
 
   const refreshCostModels = async () => {
@@ -1731,18 +1831,46 @@ export default function InstructorDetailPage() {
               <div>
                 <label className="block text-xs text-gray-500">From</label>
                 <input
-                  type="date"
-                  value={summaryFrom}
-                  onChange={(e) => setSummaryFrom(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="1/1/2025 or 2025-01-01"
+                  value={summaryFromText || summaryFrom}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSummaryFromText(v);
+                    const iso = parseFlexibleDateToISO(v);
+                    if (iso) setSummaryFrom(iso);
+                  }}
+                  onBlur={() => {
+                    const iso = parseFlexibleDateToISO(summaryFromText || summaryFrom);
+                    if (iso) {
+                      setSummaryFrom(iso);
+                      setSummaryFromText(iso);
+                    }
+                  }}
                   className="mt-1 w-full rounded-md border border-gray-300 text-sm"
                 />
               </div>
               <div>
                 <label className="block text-xs text-gray-500">To</label>
                 <input
-                  type="date"
-                  value={summaryTo}
-                  onChange={(e) => setSummaryTo(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="1/1/2026 or 2026-01-01"
+                  value={summaryToText || summaryTo}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSummaryToText(v);
+                    const iso = parseFlexibleDateToISO(v);
+                    if (iso) setSummaryTo(iso);
+                  }}
+                  onBlur={() => {
+                    const iso = parseFlexibleDateToISO(summaryToText || summaryTo);
+                    if (iso) {
+                      setSummaryTo(iso);
+                      setSummaryToText(iso);
+                    }
+                  }}
                   className="mt-1 w-full rounded-md border border-gray-300 text-sm"
                 />
               </div>
@@ -1755,7 +1883,7 @@ export default function InstructorDetailPage() {
             <span className="font-medium text-gray-900">{classes.length}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Sessions (range):</span>
+            <span className="text-gray-500">Sessions:</span>
             <span className="font-medium text-gray-900">{sessionsInSummaryRange.length}</span>
           </div>
           <div className="flex justify-between">
@@ -1765,7 +1893,7 @@ export default function InstructorDetailPage() {
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Fees (range):</span>
+            <span className="text-gray-500">Fees:</span>
             <span className="font-medium text-gray-900">
               {(currentEffectiveCostModel?.currency || 'EGP').toUpperCase()} {Number(feesInSummaryRange || 0).toLocaleString()}
             </span>
