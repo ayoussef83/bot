@@ -58,7 +58,9 @@ export class PayrollService {
         where: {
           deletedAt: null,
           instructorId: instructor.id,
-          status: 'completed',
+          // Some environments never mark sessions "completed". We treat scheduled+completed as payable,
+          // and exclude cancelled.
+          status: { in: ['scheduled', 'completed'] as any },
           scheduledDate: { gte: start, lt: end },
         },
         include: {
@@ -85,13 +87,7 @@ export class PayrollService {
         continue;
       }
 
-      // Validation: no payroll generation without attendance
       const missingAttendance = sessions.filter((s) => (s as any)._count?.attendances === 0);
-      if (missingAttendance.length > 0) {
-        throw new BadRequestException(
-          `Cannot generate payroll: ${missingAttendance.length} session(s) are missing attendance for instructor ${instructor.id}`,
-        );
-      }
 
       // Build InstructorSession rows (auto-calc cost)
       const instructorSessionRows: any[] = [];
@@ -151,6 +147,9 @@ export class PayrollService {
         generatedAt: new Date().toISOString(),
         currency,
         totals: { totalAmount },
+        warnings: {
+          missingAttendanceCount: missingAttendance.length,
+        },
         sessions: sessions.map((s) => ({
           id: s.id,
           scheduledDate: s.scheduledDate,

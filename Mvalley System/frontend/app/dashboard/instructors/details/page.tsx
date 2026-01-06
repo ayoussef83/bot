@@ -1012,7 +1012,7 @@ export default function InstructorDetailPage() {
                             const res = await instructorsService.generatePayroll({ year: payrollYear, month: payrollMonth, instructorId: String(id) });
                             const status = res.data?.results?.[0]?.status;
                             if (status === 'no_sessions') {
-                              setTabError('No completed sessions in this month (or sessions missing attendance). Payroll was not generated.');
+                              setTabError('No sessions found in this month to calculate payroll.');
                             }
                             await fetchPayroll(String(id));
                           } catch (e: any) {
