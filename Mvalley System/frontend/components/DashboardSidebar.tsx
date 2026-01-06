@@ -114,7 +114,7 @@ const navigationSections: NavigationSection[] = [
         label: 'Allocation Engine',
         icon: <FiCpu className="w-4 h-4" />,
         path: '/dashboard/academics/allocation-engine',
-        roles: ['super_admin', 'operations', 'management'],
+        roles: ['super_admin', 'operations', 'management', 'sales'],
       },
       {
         id: 'sessions',

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto, UpdateClassDto } from './dto';
+import { ClassLifecycleStatus, ProfitabilityStatus, TeachingSlotStatus } from '@prisma/client';
 
 @Injectable()
 export class ClassesService {
@@ -101,6 +102,82 @@ export class ClassesService {
         action: 'create',
         entityType: 'Class',
         entityId: classEntity.id,
+      },
+    });
+
+    return classEntity;
+  }
+
+  // TeachingSlot-driven flow: Sales creates a Class inside an existing TeachingSlot.
+  async createFromTeachingSlot(dto: { teachingSlotId: string; name?: string }, createdBy: string) {
+    const slot = await this.prisma.teachingSlot.findFirst({
+      where: { id: dto.teachingSlotId, deletedAt: null },
+      include: {
+        courseLevel: { include: { course: true } },
+        room: true,
+        instructor: true,
+      },
+    });
+    if (!slot) throw new NotFoundException('Teaching slot not found');
+    if (slot.status === TeachingSlotStatus.occupied) throw new BadRequestException('Teaching slot is occupied');
+    if (slot.status === TeachingSlotStatus.inactive) throw new BadRequestException('Teaching slot is inactive');
+
+    // Only one filling/draft group per slot at a time
+    if (slot.currentClassId) {
+      const current = await this.prisma.class.findFirst({ where: { id: slot.currentClassId, deletedAt: null } });
+      if (current && current.lifecycleStatus !== ClassLifecycleStatus.completed) {
+        throw new BadRequestException('Teaching slot already has an active group');
+      }
+    }
+
+    const name = String(dto.name || '').trim() || `${slot.courseLevel.course.name} (Slot)`;
+
+    const classEntity = await this.prisma.class.create({
+      data: {
+        name,
+        location: slot.room.location,
+        locationName: slot.room.name,
+        roomId: slot.roomId,
+        teachingSlotId: slot.id,
+        lifecycleStatus: ClassLifecycleStatus.filling,
+        profitabilityStatus: ProfitabilityStatus.red,
+        marginThresholdPct: slot.minMarginPct,
+        capacity: slot.maxCapacity,
+        minCapacity: slot.minCapacity,
+        maxCapacity: slot.maxCapacity,
+        code: undefined,
+        courseLevelId: slot.courseLevelId,
+        levelNumber: slot.courseLevel.sortOrder,
+        plannedSessions: slot.plannedSessions,
+        price: slot.pricePerStudent,
+        instructorId: slot.instructorId,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        startDate: slot.effectiveFrom || new Date(),
+        endDate: slot.effectiveTo,
+      } as any,
+      include: {
+        courseLevel: { include: { course: true } },
+        instructor: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        room: true,
+        students: { where: { deletedAt: null } },
+      },
+    });
+
+    // Reserve slot
+    await this.prisma.teachingSlot.update({
+      where: { id: slot.id },
+      data: { status: TeachingSlotStatus.reserved, currentClassId: classEntity.id },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: createdBy,
+        action: 'create',
+        entityType: 'Class',
+        entityId: classEntity.id,
+        changes: JSON.stringify({ createFromTeachingSlot: true, teachingSlotId: slot.id }),
       },
     });
 
@@ -237,6 +314,46 @@ export class ClassesService {
       (data as any).levelNumber = levelNumber;
     }
 
+    const existing = await this.prisma.class.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        teachingSlotId: true,
+        lifecycleStatus: true,
+      },
+    });
+    if (!existing) throw new NotFoundException('Class not found');
+
+    // Slot-driven: instructor/room/time edits must go through TeachingSlot, not Class.
+    if (existing.teachingSlotId) {
+      const forbidden: string[] = [];
+      const dAny: any = data as any;
+      if (dAny.instructorId !== undefined) forbidden.push('instructorId');
+      if (dAny.roomId !== undefined) forbidden.push('roomId');
+      if (dAny.dayOfWeek !== undefined) forbidden.push('dayOfWeek');
+      if (dAny.startTime !== undefined) forbidden.push('startTime');
+      if (dAny.endTime !== undefined) forbidden.push('endTime');
+      if (dAny.location !== undefined) forbidden.push('location');
+      if (dAny.locationName !== undefined) forbidden.push('locationName');
+      if (dAny.startDate !== undefined || dAny.endDate !== undefined) forbidden.push('dateWindow');
+      if (forbidden.length) {
+        throw new BadRequestException(`This group is slot-driven. Edit TeachingSlot instead (${forbidden.join(', ')})`);
+      }
+
+      // Once confirmed/active/completed, further edits should be restricted to safe fields only.
+      if (
+        existing.lifecycleStatus === ClassLifecycleStatus.confirmed ||
+        existing.lifecycleStatus === ClassLifecycleStatus.active ||
+        existing.lifecycleStatus === ClassLifecycleStatus.completed
+      ) {
+        // Allow only description/customData in legacy; keep strict for now.
+      }
+    }
+
+    // Prevent setting `instructorId: undefined` when slot-driven
+    const nextInstructorId =
+      existing.teachingSlotId ? undefined : (data.instructorId?.trim() ? data.instructorId.trim() : undefined);
+
     const classEntity = await this.prisma.class.update({
       where: { id },
       data: {
@@ -251,7 +368,7 @@ export class ClassesService {
             ? { minCapacity: Number(data.minCapacity) }
             : {}),
         ...(courseLevelIdToSet ? { courseLevelId: courseLevelIdToSet } : {}),
-        instructorId: data.instructorId?.trim() ? data.instructorId.trim() : undefined,
+        ...(existing.teachingSlotId ? {} : { instructorId: nextInstructorId }),
         startDate,
         endDate,
       },
@@ -278,6 +395,8 @@ export class ClassesService {
 
     // Recalculate metrics
     await this.recalculateMetrics(id);
+    // Recalculate profitability (live guardrail)
+    await this.recalculateProfitability(id);
 
     // Log audit
     await this.prisma.auditLog.create({
@@ -291,6 +410,118 @@ export class ClassesService {
     });
 
     return classEntity;
+  }
+
+  async recalculateProfitability(classId: string) {
+    const classEntity = await this.prisma.class.findFirst({
+      where: { id: classId, deletedAt: null },
+      include: {
+        teachingSlot: true,
+        instructor: { include: { costModels: true, availability: true, user: { select: { status: true } } } },
+        enrollments: { where: { status: 'active' } },
+      },
+    });
+    if (!classEntity) return;
+
+    const studentCount = classEntity.enrollments.length;
+    const price = Number(classEntity.price ?? classEntity.teachingSlot?.pricePerStudent ?? 0);
+    const revenue = Math.max(0, price * studentCount);
+
+    const plannedSessions = Number(classEntity.plannedSessions ?? classEntity.teachingSlot?.plannedSessions ?? 0);
+    const sessionDurationMins = Number(classEntity.teachingSlot?.sessionDurationMins ?? 60);
+    const totalMinutes = Math.max(0, plannedSessions * sessionDurationMins);
+
+    // Cost estimate (simple, deterministic): use the currently effective cost model if present; fallback to legacy.
+    const models = (classEntity.instructor?.costModels || []).filter((m: any) => !m.deletedAt);
+    const pickModelAt = (d: Date) => {
+      const t = d.getTime();
+      const candidates = models.filter((m: any) => {
+        const start = m.effectiveFrom ? new Date(m.effectiveFrom).getTime() : -Infinity;
+        const end = m.effectiveTo ? new Date(m.effectiveTo).getTime() : Infinity;
+        return t >= start && t <= end;
+      });
+      candidates.sort((a: any, b: any) => new Date(b.effectiveFrom || 0).getTime() - new Date(a.effectiveFrom || 0).getTime());
+      return candidates[0] || null;
+    };
+    const refDate = classEntity.startDate || new Date();
+    const model = pickModelAt(refDate);
+    const type = String(model?.type || classEntity.instructor?.costType || 'hourly').toLowerCase();
+    const amount = Number(model?.amount ?? classEntity.instructor?.costAmount ?? 0);
+    let cost = 0;
+    if (Number.isFinite(amount) && amount > 0) {
+      if (type === 'per_session' || type === 'per-session') cost = amount * plannedSessions;
+      else if (type === 'hourly') cost = amount * (totalMinutes / 60);
+      else if (type === 'monthly') cost = amount; // conservative: full monthly cost
+      else cost = amount * (totalMinutes / 60);
+    }
+
+    const margin = revenue - cost;
+    const threshold = Number(classEntity.marginThresholdPct ?? classEntity.teachingSlot?.minMarginPct ?? 0);
+    const marginPct = revenue > 0 ? margin / revenue : -1;
+    const minCap = Number(classEntity.minCapacity ?? classEntity.teachingSlot?.minCapacity ?? 0);
+
+    let profitabilityStatus: ProfitabilityStatus = ProfitabilityStatus.red;
+    if (studentCount < minCap || margin < 0) profitabilityStatus = ProfitabilityStatus.red;
+    else if (marginPct < threshold) profitabilityStatus = ProfitabilityStatus.yellow;
+    else profitabilityStatus = ProfitabilityStatus.green;
+
+    await this.prisma.class.update({
+      where: { id: classId },
+      data: {
+        expectedRevenue: revenue,
+        expectedCost: cost,
+        expectedMargin: margin,
+        profitabilityStatus,
+        marginThresholdPct: threshold,
+      },
+    });
+  }
+
+  async confirmClass(classId: string, reason: string, confirmedBy: string) {
+    if (!String(reason || '').trim()) throw new BadRequestException('Reason is required');
+    const classEntity = await this.prisma.class.findFirst({
+      where: { id: classId, deletedAt: null },
+      include: { teachingSlot: true, enrollments: { where: { status: 'active' } } },
+    });
+    if (!classEntity) throw new NotFoundException('Class not found');
+    if (!classEntity.teachingSlotId) throw new BadRequestException('Cannot confirm a group without a TeachingSlot');
+    if (classEntity.lifecycleStatus !== ClassLifecycleStatus.filling) throw new BadRequestException('Only filling groups can be confirmed');
+
+    await this.recalculateProfitability(classId);
+    const refreshed = await this.prisma.class.findFirst({ where: { id: classId } });
+    const minCap = Number(refreshed?.minCapacity ?? classEntity.teachingSlot?.minCapacity ?? 0);
+    const studentCount = classEntity.enrollments.length;
+
+    if (studentCount < minCap) throw new BadRequestException('Minimum capacity not met');
+    if (refreshed?.profitabilityStatus !== ProfitabilityStatus.green) throw new BadRequestException('Group is not profitable');
+
+    // Occupy slot and lock class
+    await this.prisma.$transaction(async (tx) => {
+      await tx.class.update({
+        where: { id: classId },
+        data: {
+          lifecycleStatus: ClassLifecycleStatus.confirmed,
+          confirmedAt: new Date(),
+          confirmedById: confirmedBy,
+          confirmReason: reason,
+        },
+      });
+      await tx.teachingSlot.update({
+        where: { id: classEntity.teachingSlotId! },
+        data: { status: TeachingSlotStatus.occupied, currentClassId: classId },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: confirmedBy,
+          action: 'update',
+          entityType: 'Class',
+          entityId: classId,
+          changes: JSON.stringify({ confirm: true, reason }),
+        },
+      });
+    });
+
+    return this.findOne(classId);
   }
 
   async remove(id: string, deletedBy: string) {

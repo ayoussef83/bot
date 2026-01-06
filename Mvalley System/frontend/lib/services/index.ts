@@ -3,6 +3,7 @@ export * from './classes.service';
 export * from './courses.service';
 export * from './groups.service';
 export * from './allocation.service';
+export * from './teaching-slots.service';
 export * from './sales.service';
 export * from './instructors.service';
 export * from './marketing.service';

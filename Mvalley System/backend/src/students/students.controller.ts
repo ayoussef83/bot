@@ -107,13 +107,13 @@ export class StudentsController {
   }
 
   @Patch('enrollments/:enrollmentId')
-  @Roles(UserRole.super_admin, UserRole.operations, UserRole.instructor)
+  @Roles(UserRole.super_admin, UserRole.operations, UserRole.sales, UserRole.management)
   updateEnrollment(
     @Param('enrollmentId') enrollmentId: string,
     @Body() body: UpdateEnrollmentDto,
     @CurrentUser() user: any,
   ) {
-    return this.studentsService.updateEnrollment(enrollmentId, body, user.id);
+    return this.studentsService.updateEnrollment(enrollmentId, body, user.id, user.role);
   }
 
   @Delete('enrollments/:enrollmentId')

@@ -36,7 +36,10 @@ export const classesService = {
   getAll: () => api.get<Class[]>('/classes'),
   getById: (id: string) => api.get<Class>(`/classes/${id}`),
   create: (data: Partial<Class>) => api.post<Class>('/classes', data),
+  createFromTeachingSlot: (data: { teachingSlotId: string; name?: string }) =>
+    api.post<Class>('/classes/from-teaching-slot', data),
   update: (id: string, data: Partial<Class>) => api.patch<Class>(`/classes/${id}`, data),
+  confirm: (id: string, reason: string) => api.post<Class>(`/classes/${id}/confirm`, { reason }),
   delete: (id: string) => api.delete(`/classes/${id}`),
 };
 

@@ -53,6 +53,8 @@ model User {
   createdGroups     Group[]   @relation("GroupCreatedBy")
   allocationRunsCreated AllocationRun[] @relation("AllocationRunCreatedBy")
   candidateGroupsLocked CandidateGroup[] @relation("CandidateGroupLockedBy")
+  teachingSlotsCreated TeachingSlot[] @relation("TeachingSlotCreatedBy")
+  classesConfirmed     Class[] @relation("ClassConfirmedBy")
 
   // Audit
   createdAt DateTime  @default(now())
@@ -186,6 +188,8 @@ model Student {
 
   // Custom attributes (admin-defined)
   customData Json?
+  // Availability input for allocation (Sales filling validation)
+  availability Json?
 
   // Parent info
   parentId String?
@@ -262,6 +266,27 @@ enum CandidateGroupStatus {
   rejected    // ops rejected
 }
 
+enum TeachingSlotStatus {
+  open
+  reserved
+  occupied
+  inactive
+}
+
+enum ClassLifecycleStatus {
+  draft
+  filling
+  confirmed
+  active
+  completed
+}
+
+enum ProfitabilityStatus {
+  red
+  yellow
+  green
+}
+
 model Course {
   id       String @id @default(uuid())
   name     String @unique
@@ -292,6 +317,7 @@ model CourseLevel {
   groups       Group[]
   demands      CourseDemand[]
   candidateGroups CandidateGroup[]
+  teachingSlots TeachingSlot[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -536,6 +562,7 @@ model Room {
   availabilities RoomAvailability[]
   classes        Class[]
   candidateGroups CandidateGroup[]
+  teachingSlots  TeachingSlot[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -569,6 +596,58 @@ model RoomAvailability {
   @@map("room_availabilities")
 }
 
+model TeachingSlot {
+  id           String @id @default(uuid())
+  status       TeachingSlotStatus @default(open)
+
+  courseLevelId String
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
+
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  roomId String
+  room   Room  @relation(fields: [roomId], references: [id])
+
+  // Time (weekly recurring)
+  dayOfWeek Int
+  startTime String
+  endTime   String
+
+  // Date window for planning
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  // Rules / economics for groups created inside this slot
+  minCapacity Int
+  maxCapacity Int
+  plannedSessions Int
+  sessionDurationMins Int
+  pricePerStudent Float
+  minMarginPct Float @default(0) // 0.2 = 20%
+  currency String @default("EGP")
+
+  // A slot can have multiple groups over time, but only one "current" in reserved/occupied
+  currentClassId String?
+  currentClass   Class? @relation("TeachingSlotCurrentClass", fields: [currentClassId], references: [id])
+  classes        Class[]
+
+  createdById String?
+  createdBy   User? @relation("TeachingSlotCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([courseLevelId])
+  @@index([instructorId])
+  @@index([roomId])
+  @@index([dayOfWeek])
+  @@index([deletedAt])
+  @@map("teaching_slots")
+}
+
 model Class {
   id           String      @id @default(uuid())
   name         String
@@ -577,6 +656,18 @@ model Class {
   locationName String?
   roomId       String?
   room         Room? @relation(fields: [roomId], references: [id])
+  teachingSlotId String?
+  teachingSlot   TeachingSlot? @relation(fields: [teachingSlotId], references: [id])
+  lifecycleStatus ClassLifecycleStatus @default(active)
+  profitabilityStatus ProfitabilityStatus @default(red)
+  expectedRevenue Float? @default(0)
+  expectedCost    Float? @default(0)
+  expectedMargin  Float? @default(0)
+  marginThresholdPct Float? @default(0)
+  confirmedAt DateTime?
+  confirmedById String?
+  confirmedBy   User? @relation("ClassConfirmedBy", fields: [confirmedById], references: [id])
+  confirmReason String?
   capacity     Int
   minCapacity  Int?
   maxCapacity  Int?
@@ -611,6 +702,7 @@ model Class {
   enrollments StudentEnrollment[]
   defaultForGroups Group[] @relation("GroupDefaultClass")
   confirmedCandidateGroups CandidateGroup[] @relation("CandidateGroupConfirmedClass")
+  slotCurrentFor TeachingSlot[] @relation("TeachingSlotCurrentClass")
 
   // Auto-calculated (cached)
   avgStudentsPerSession Float?  @default(0)
@@ -626,6 +718,8 @@ model Class {
   @@index([location])
   @@index([code])
   @@index([roomId])
+  @@index([teachingSlotId])
+  @@index([lifecycleStatus])
   @@map("classes")
 }
 
@@ -720,6 +814,7 @@ model Instructor {
   feedbackSummaries InstructorFeedbackSummary[]
   documents InstructorDocument[]
   candidateGroups CandidateGroup[]
+  teachingSlots  TeachingSlot[]
 
   // Audit
   createdAt DateTime  @default(now())

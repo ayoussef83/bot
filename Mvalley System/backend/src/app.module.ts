@@ -22,6 +22,7 @@ import { GroupsModule } from './groups/groups.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { AllocationModule } from './allocation/allocation.module';
 import { RoomsModule } from './rooms/rooms.module';
+import { TeachingSlotsModule } from './teaching-slots/teaching-slots.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { RoomsModule } from './rooms/rooms.module';
     PayrollModule,
     AllocationModule,
     RoomsModule,
+    TeachingSlotsModule,
   ],
   controllers: [HealthController],
 })
