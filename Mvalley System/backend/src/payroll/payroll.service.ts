@@ -67,6 +67,23 @@ export class PayrollService {
         orderBy: { scheduledDate: 'asc' },
       });
 
+      // If there are no completed sessions in the period, don't create empty payrolls (unless a monthly model applies).
+      const monthlyModel = await this.prisma.instructorCostModel.findFirst({
+        where: {
+          instructorId: instructor.id,
+          deletedAt: null,
+          type: InstructorCostModelType.monthly,
+          effectiveFrom: { lte: end },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: start } }],
+        },
+        orderBy: { effectiveFrom: 'desc' },
+      });
+
+      if (sessions.length === 0 && !monthlyModel) {
+        results.push({ instructorId: instructor.id, payrollId: null, status: 'no_sessions' });
+        continue;
+      }
+
       // Validation: no payroll generation without attendance
       const missingAttendance = sessions.filter((s) => (s as any)._count?.attendances === 0);
       if (missingAttendance.length > 0) {
@@ -110,18 +127,6 @@ export class PayrollService {
           calculatedAt: new Date(),
         });
       }
-
-      // If monthly model exists in period, use it as total; else use per-session/hourly sum.
-      const monthlyModel = await this.prisma.instructorCostModel.findFirst({
-        where: {
-          instructorId: instructor.id,
-          deletedAt: null,
-          type: InstructorCostModelType.monthly,
-          effectiveFrom: { lte: end },
-          OR: [{ effectiveTo: null }, { effectiveTo: { gte: start } }],
-        },
-        orderBy: { effectiveFrom: 'desc' },
-      });
 
       const totalAmount = monthlyModel ? monthlyModel.amount : totalFromSessions;
       const currency = monthlyModel?.currency || (instructorSessionRows[0]?.currency ?? 'EGP');

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { instructorsService, Instructor, InstructorDocument } from '@/lib/services';
+import api from '@/lib/api';
 import StandardDetailView, { Tab, ActionButton, Breadcrumb } from '@/components/StandardDetailView';
 import StatusBadge from '@/components/settings/StatusBadge';
 import { Column } from '@/components/DataTable';
@@ -84,7 +85,14 @@ export default function InstructorDetailPage() {
 
   // Inline edit (avoid old list modal)
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ costType: 'hourly', costAmount: '' });
+  const [editForm, setEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    status: 'active',
+    costType: 'hourly',
+    costAmount: '',
+  });
 
   // Availability fast editor
   const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, Partial<AvailabilityRow>>>({});
@@ -209,8 +217,10 @@ export default function InstructorDetailPage() {
         total = amount;
         break;
       } else {
-        const hours = Math.max(0, (new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 3600000);
-        total += hours * amount;
+        const durationMs = new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
+        const hours = durationMs / 3600000;
+        if (!Number.isFinite(hours)) continue;
+        total += Math.max(0, hours) * amount;
       }
     }
 
@@ -268,6 +278,17 @@ export default function InstructorDetailPage() {
     } catch (e: any) {
       setTabError(e?.response?.data?.message || 'Failed to load availability');
     }
+  };
+
+  const time12h = (hhmm: string) => {
+    const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm || ''));
+    if (!m) return hhmm || '';
+    let h = Number(m[1]);
+    const min = m[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${h}:${min} ${ampm}`;
   };
 
   const refreshCostModels = async () => {
@@ -343,6 +364,10 @@ export default function InstructorDetailPage() {
             label: 'Edit',
             onClick: () => {
               setEditForm({
+                firstName: String((instructor as any).user?.firstName || ''),
+                lastName: String((instructor as any).user?.lastName || ''),
+                email: String((instructor as any).user?.email || ''),
+                status: String((instructor as any).user?.status || 'active'),
                 costType: (instructor as any).costType || 'hourly',
                 costAmount: String((instructor as any).costAmount ?? ''),
               });
@@ -632,6 +657,9 @@ export default function InstructorDetailPage() {
                             className="w-full rounded-md border border-gray-400 px-2 py-1 text-sm"
                           />
                         </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Display: {time12h(String(newSlot.startTime || '09:00'))} – {time12h(String(newSlot.endTime || '17:00'))}
+                        </div>
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-xs text-gray-600">Location</label>
@@ -654,19 +682,34 @@ export default function InstructorDetailPage() {
                             if (!id) return;
                             try {
                               setTabError('');
-                              // checked = draft.isActive true
-                              const selected = Object.entries(availabilityDrafts)
-                                .filter(([_, v]) => (v as any).isActive === true)
-                                .map(([k]) => k);
-                              const targets = selected.length > 0 ? selected : availability.filter((a) => a.isActive).map((a) => a.id);
+                              // Apply to days that are currently active (including unsaved draft toggles).
+                              const activeDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                                .map((_, dow) => {
+                                  const row = availability.find((a) => Number(a.dayOfWeek) === dow) || null;
+                                  const draft = row ? (availabilityDrafts[row.id] || {}) : {};
+                                  const isActive = row ? Boolean((draft as any).isActive ?? row.isActive) : false;
+                                  return { dow, row, isActive };
+                                })
+                                .filter((x) => x.isActive);
+
                               await Promise.all(
-                                targets.map((availId) =>
-                                  instructorsService.updateAvailability(availId, {
-                                    startTime: newSlot.startTime || '09:00',
-                                    endTime: newSlot.endTime || '17:00',
-                                    location: (newSlot.location as any) || null,
-                                  }),
-                                ),
+                                activeDays.map(async ({ dow, row }) => {
+                                  if (!row) {
+                                    await instructorsService.addAvailability(String(id), {
+                                      dayOfWeek: dow,
+                                      startTime: String(newSlot.startTime || '09:00'),
+                                      endTime: String(newSlot.endTime || '17:00'),
+                                      location: (newSlot.location as any) || undefined,
+                                      isActive: true,
+                                    });
+                                  } else {
+                                    await instructorsService.updateAvailability(row.id, {
+                                      startTime: String(newSlot.startTime || '09:00'),
+                                      endTime: String(newSlot.endTime || '17:00'),
+                                      location: (newSlot.location as any) || null,
+                                    });
+                                  }
+                                }),
                               );
                               setAvailabilityDrafts({});
                               await refreshAvailability();
@@ -712,17 +755,40 @@ export default function InstructorDetailPage() {
                                 <input
                                   type="checkbox"
                                   checked={isActive}
-                                  onChange={(e) => {
-                                    if (!row) return;
+                                  onChange={async (e) => {
+                                    if (!canOps) return;
+                                    if (!row) {
+                                      // Create the slot on first click so checkbox is immediately usable.
+                                      if (!id) return;
+                                      if (!e.target.checked) return;
+                                      try {
+                                        setTabError('');
+                                        await instructorsService.addAvailability(String(id), {
+                                          dayOfWeek,
+                                          startTime: String(newSlot.startTime || '09:00'),
+                                          endTime: String(newSlot.endTime || '17:00'),
+                                          location: (newSlot.location as any) || undefined,
+                                          isActive: true,
+                                        });
+                                        await refreshAvailability();
+                                      } catch (err: any) {
+                                        setTabError(err?.response?.data?.message || 'Failed to add day slot');
+                                      }
+                                      return;
+                                    }
                                     setAvailabilityDrafts((s) => ({ ...s, [row.id]: { ...(s[row.id] || {}), isActive: e.target.checked } }));
                                   }}
-                                  disabled={!row || !canOps}
                                 />
                                 {dayLabel}
                               </label>
                               {isWeekend && (
                                 <span className="text-xs px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-700">
                                   Weekend
+                                </span>
+                              )}
+                              {(startTime || endTime) && (
+                                <span className="text-xs text-gray-500">
+                                  {time12h(startTime)} – {time12h(endTime)}
                                 </span>
                               )}
                             </div>
@@ -940,7 +1006,11 @@ export default function InstructorDetailPage() {
                           if (!id) return;
                           try {
                             setTabError('');
-                            await instructorsService.generatePayroll({ year: payrollYear, month: payrollMonth, instructorId: String(id) });
+                            const res = await instructorsService.generatePayroll({ year: payrollYear, month: payrollMonth, instructorId: String(id) });
+                            const status = res.data?.results?.[0]?.status;
+                            if (status === 'no_sessions') {
+                              setTabError('No completed sessions in this month (or sessions missing attendance). Payroll was not generated.');
+                            }
                             await fetchPayroll(String(id));
                           } catch (e: any) {
                             setTabError(e?.response?.data?.message || 'Failed to generate payroll');
@@ -1185,10 +1255,77 @@ export default function InstructorDetailPage() {
       label: 'Performance',
       icon: <FiUsers className="w-4 h-4" />,
       content: show(['management', 'super_admin']) ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <pre className="text-xs bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
-{JSON.stringify((instructor as any).feedbackSummaries || [], null, 2)}
-          </pre>
+        <div className="space-y-4">
+          {(() => {
+            const summaries = ((instructor as any).feedbackSummaries || []) as any[];
+            const totalFeedback = summaries.reduce((s, x) => s + Number(x.totalFeedback || 0), 0);
+            const weightedRating =
+              totalFeedback > 0
+                ? summaries.reduce((s, x) => s + Number(x.avgRating || 0) * Number(x.totalFeedback || 0), 0) / totalFeedback
+                : null;
+
+            const now = new Date();
+            const startCur = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const endPrev = startCur;
+
+            const prevStudents = new Set<string>();
+            const curStudents = new Set<string>();
+            for (const s of sessions || []) {
+              const sd = new Date(s.scheduledDate);
+              const atts = ((s as any).attendances || []) as any[];
+              for (const a of atts) {
+                const sid = String(a.studentId || a.student?.id || '');
+                if (!sid) continue;
+                if (sd >= startPrev && sd < endPrev) prevStudents.add(sid);
+                if (sd >= startCur) curStudents.add(sid);
+              }
+            }
+            let retained = 0;
+            Array.from(prevStudents).forEach((sid) => {
+              if (curStudents.has(sid)) retained++;
+            });
+            const retentionPct = prevStudents.size > 0 ? (retained / prevStudents.size) * 100 : null;
+
+            const last90 = new Date(now.getTime() - 90 * 24 * 3600 * 1000);
+            const recent = (sessions || []).filter((s) => new Date(s.scheduledDate) >= last90);
+            const completed = recent.filter((s) => s.status === 'completed').length;
+            const cancelled = recent.filter((s) => s.status === 'cancelled').length;
+            const reliabilityPct = completed + cancelled > 0 ? (completed / (completed + cancelled)) * 100 : null;
+
+            const latestSummary = summaries[0] || null;
+
+            return (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="text-xs text-gray-500">Avg Rating</div>
+                    <div className="text-2xl font-semibold text-gray-900">{weightedRating != null ? weightedRating.toFixed(2) : '—'}</div>
+                    <div className="text-xs text-gray-500 mt-1">{totalFeedback > 0 ? `${totalFeedback} feedback` : 'No feedback yet'}</div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="text-xs text-gray-500">Attendance reliability (last 90d)</div>
+                    <div className="text-2xl font-semibold text-gray-900">{reliabilityPct != null ? `${reliabilityPct.toFixed(0)}%` : '—'}</div>
+                    <div className="text-xs text-gray-500 mt-1">{completed} completed / {cancelled} cancelled</div>
+                  </div>
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="text-xs text-gray-500">Student retention (prev → current month)</div>
+                    <div className="text-2xl font-semibold text-gray-900">{retentionPct != null ? `${retentionPct.toFixed(0)}%` : '—'}</div>
+                    <div className="text-xs text-gray-500 mt-1">{retained} returning / {prevStudents.size} last month</div>
+                  </div>
+                </div>
+
+                {show(['hr', 'super_admin']) && (
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-1">Internal notes (HR)</div>
+                    <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {latestSummary?.notes || '—'}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       ) : (
         <div className="text-sm text-gray-500">Not available for your role.</div>
@@ -1470,6 +1607,43 @@ export default function InstructorDetailPage() {
                 <h2 className="text-xl font-semibold">Edit Instructor</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <label className="block text-sm font-medium text-gray-700">First Name</label>
+                    <input
+                      value={editForm.firstName}
+                      onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                    <input
+                      value={editForm.lastName}
+                      onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                      inputMode="email"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">Fees Type</label>
                     <select
                       value={editForm.costType}
@@ -1506,6 +1680,17 @@ export default function InstructorDetailPage() {
                     onClick={async () => {
                       try {
                         setError('');
+                        // Update user profile fields (super_admin-only endpoint on backend)
+                        if ((instructor as any)?.user?.id) {
+                          await api.patch(`/users/${(instructor as any).user.id}`, {
+                            firstName: editForm.firstName,
+                            lastName: editForm.lastName,
+                            email: editForm.email,
+                            status: editForm.status,
+                          });
+                        }
+
+                        // Update instructor fees (legacy)
                         await instructorsService.update(String(id), {
                           costType: editForm.costType,
                           costAmount: parseFloat(editForm.costAmount || '0'),
