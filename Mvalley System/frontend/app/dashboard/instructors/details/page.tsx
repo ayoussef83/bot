@@ -1101,7 +1101,13 @@ export default function InstructorDetailPage() {
             content: (
               <div className="space-y-6">
                 {!!tabErrors.payroll && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                  <div
+                    className={`px-4 py-3 rounded text-sm border ${
+                      String(tabErrors.payroll).toLowerCase().includes('no sessions')
+                        ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                        : 'bg-red-50 border-red-200 text-red-700'
+                    }`}
+                  >
                     {tabErrors.payroll}
                   </div>
                 )}
@@ -1116,7 +1122,10 @@ export default function InstructorDetailPage() {
                           min="2000"
                           max="2100"
                           value={payrollYear}
-                          onChange={(e) => setPayrollYear(parseInt(e.target.value))}
+                          onChange={(e) => {
+                            clearTabError('payroll');
+                            setPayrollYear(parseInt(e.target.value));
+                          }}
                           className="mt-1 block w-28 rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
                         />
                       </div>
@@ -1127,7 +1136,10 @@ export default function InstructorDetailPage() {
                           min="1"
                           max="12"
                           value={payrollMonth}
-                          onChange={(e) => setPayrollMonth(parseInt(e.target.value))}
+                          onChange={(e) => {
+                            clearTabError('payroll');
+                            setPayrollMonth(parseInt(e.target.value));
+                          }}
                           className="mt-1 block w-24 rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
                         />
                       </div>
@@ -1140,7 +1152,16 @@ export default function InstructorDetailPage() {
                             const res = await instructorsService.generatePayroll({ year: payrollYear, month: payrollMonth, instructorId: String(id) });
                             const status = res.data?.results?.[0]?.status;
                             if (status === 'no_sessions') {
-                              setTabError('payroll', 'No sessions found in this month to calculate payroll.');
+                              const firstModel = ((costModels as any[]) || []).slice().sort((a: any, b: any) =>
+                                new Date(a.effectiveFrom).getTime() - new Date(b.effectiveFrom).getTime(),
+                              )[0];
+                              const hint = firstModel?.effectiveFrom
+                                ? ` Your first cost model starts ${new Date(firstModel.effectiveFrom).toLocaleDateString()}.`
+                                : '';
+                              setTabError(
+                                'payroll',
+                                `No sessions found in this month, and no cost model is active for this period.${hint}`,
+                              );
                             }
                             await fetchPayroll(String(id));
                           } catch (e: any) {
