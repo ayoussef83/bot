@@ -153,12 +153,20 @@ export default function AllocationEnginePage() {
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm font-medium text-gray-800">Teaching Slots</div>
-          <button
-            className="inline-flex items-center gap-2 px-3 py-2 border border-gray-400 rounded-md text-sm hover:bg-gray-50"
-            onClick={fetchSlots}
-          >
-            <FiRefreshCw className="w-4 h-4" /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href="/dashboard/ops/teaching-slots"
+              className="inline-flex items-center gap-2 px-3 py-2 border border-gray-400 rounded-md text-sm hover:bg-gray-50"
+            >
+              <FiPlus className="w-4 h-4" /> Create Teaching Slot
+            </a>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-2 border border-gray-400 rounded-md text-sm hover:bg-gray-50"
+              onClick={fetchSlots}
+            >
+              <FiRefreshCw className="w-4 h-4" /> Refresh
+            </button>
+          </div>
         </div>
         <p className="mt-2 text-xs text-gray-500">
           Ops defines capacity (Instructor + Room + Day + Time). Sales creates a group from a slot and fills it with students. The system blocks confirmation unless capacity and profitability rules are met.

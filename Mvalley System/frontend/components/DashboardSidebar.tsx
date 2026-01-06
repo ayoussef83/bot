@@ -126,6 +126,36 @@ const navigationSections: NavigationSection[] = [
     ],
   },
   {
+    id: 'operations',
+    label: 'Operations',
+    icon: <FiBriefcase className="w-4 h-4" />,
+    group: 'Main',
+    roles: ['super_admin', 'operations', 'management'],
+    children: [
+      {
+        id: 'ops-dashboard',
+        label: 'Dashboard',
+        icon: <FiBarChart2 className="w-4 h-4" />,
+        path: '/dashboard/ops',
+        roles: ['super_admin', 'operations', 'management'],
+      },
+      {
+        id: 'teaching-slots',
+        label: 'Teaching Slots',
+        icon: <FiClock className="w-4 h-4" />,
+        path: '/dashboard/ops/teaching-slots',
+        roles: ['super_admin', 'operations', 'management'],
+      },
+      {
+        id: 'rooms',
+        label: 'Rooms',
+        icon: <FiHome className="w-4 h-4" />,
+        path: '/dashboard/ops/rooms',
+        roles: ['super_admin', 'operations', 'management'],
+      },
+    ],
+  },
+  {
     id: 'crm',
     label: 'CRM',
     icon: <MdContactPhone className="w-4 h-4" />,
