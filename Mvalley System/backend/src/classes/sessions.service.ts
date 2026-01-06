@@ -41,6 +41,16 @@ export class SessionsService {
     const cls = await this.prisma.class.findFirst({ where: { id: classId, deletedAt: null }, select: { location: true } });
     if (!cls) throw new BadRequestException('Invalid class');
 
+    // Instructor must be active to be scheduled/allocated
+    const instructor = await this.prisma.instructor.findFirst({
+      where: { id: instructorId, deletedAt: null },
+      include: { user: { select: { status: true } } },
+    });
+    if (!instructor) throw new BadRequestException('Invalid instructor');
+    if (instructor.user?.status !== 'active') {
+      throw new BadRequestException('Instructor is not active');
+    }
+
     // Blackout check
     const blackout = await this.prisma.instructorBlackoutDate.findFirst({
       where: {

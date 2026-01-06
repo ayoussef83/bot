@@ -463,6 +463,11 @@ model Instructor {
   costType   InstructorCostType
   costAmount Float // hourly rate or monthly salary
 
+  // Profile (optional)
+  age           Int?
+  educationLevel String? // "undergraduate" | "graduate" | "other"
+  livingArea    String?
+
   // Relations
   classes  Class[]
   sessions Session[]

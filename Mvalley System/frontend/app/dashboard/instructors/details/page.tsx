@@ -81,7 +81,12 @@ export default function InstructorDetailPage() {
   const [docPreviewContentType, setDocPreviewContentType] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tabError, setTabError] = useState<string>('');
+  const [tabErrors, setTabErrors] = useState<Record<string, string>>({});
+
+  const setTabError = (tabId: string, message: string) =>
+    setTabErrors((s) => ({ ...s, [tabId]: message }));
+  const clearTabError = (tabId: string) =>
+    setTabErrors((s) => ({ ...s, [tabId]: '' }));
 
   // Inline edit (avoid old list modal)
   const [showEditModal, setShowEditModal] = useState(false);
@@ -92,7 +97,15 @@ export default function InstructorDetailPage() {
     status: 'active',
     costType: 'hourly',
     costAmount: '',
+    age: '',
+    educationLevel: 'undergraduate',
+    livingArea: '',
   });
+
+  // Sidebar summary range
+  const [summaryPreset, setSummaryPreset] = useState<'7d' | 'month' | 'year' | 'all' | 'custom'>('month');
+  const [summaryFrom, setSummaryFrom] = useState<string>('');
+  const [summaryTo, setSummaryTo] = useState<string>('');
 
   // Availability fast editor
   const [availabilityDrafts, setAvailabilityDrafts] = useState<Record<string, Partial<AvailabilityRow>>>({});
@@ -230,6 +243,94 @@ export default function InstructorDetailPage() {
     return Math.round(total * 100) / 100;
   }, [sessions, costModels, monthRange, instructor]);
 
+  const summaryRange = useMemo(() => {
+    const now = new Date();
+    if (summaryPreset === 'all') return { from: null as Date | null, to: null as Date | null };
+    if (summaryPreset === '7d') return { from: new Date(now.getTime() - 7 * 24 * 3600 * 1000), to: now };
+    if (summaryPreset === 'month') return { from: monthRange.start, to: monthRange.end };
+    if (summaryPreset === 'year') return { from: new Date(now.getFullYear(), 0, 1), to: now };
+    if (summaryPreset === 'custom') {
+      const f = summaryFrom ? new Date(summaryFrom) : null;
+      const t = summaryTo ? new Date(summaryTo) : null;
+      return { from: f, to: t };
+    }
+    return { from: monthRange.start, to: monthRange.end };
+  }, [summaryPreset, summaryFrom, summaryTo, monthRange]);
+
+  const sessionsInSummaryRange = useMemo(() => {
+    const { from, to } = summaryRange;
+    return (sessions || []).filter((s) => {
+      const d = new Date(s.scheduledDate);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }, [sessions, summaryRange]);
+
+  const feesInSummaryRange = useMemo(() => {
+    const { from, to } = summaryRange;
+    const rangeSessions = (sessions || []).filter((s) => {
+      if (s.status !== 'completed') return false;
+      const d = new Date(s.scheduledDate);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+
+    const cm = (costModels || []) as any[];
+    const pickModelAt = (at: Date) => {
+      const ms = at.getTime();
+      const matches = cm.filter((m) => {
+        const from = new Date(m.effectiveFrom).getTime();
+        const to = m.effectiveTo ? new Date(m.effectiveTo).getTime() : Infinity;
+        return from <= ms && ms <= to;
+      });
+      matches.sort((a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime());
+      return matches[0] || null;
+    };
+
+    const legacyType = (instructor as any)?.costType || 'hourly';
+    const legacyAmount = Number((instructor as any)?.costAmount ?? 0);
+
+    let total = 0;
+    for (const s of rangeSessions) {
+      const at = new Date(s.startTime || s.scheduledDate);
+      const model = pickModelAt(at);
+      const type = model?.type || legacyType;
+      const amount = Number(model?.amount ?? legacyAmount ?? 0);
+      if (!Number.isFinite(amount)) continue;
+      if (type === 'per_session') {
+        total += amount;
+      } else if (type === 'monthly') {
+        // For a custom range, monthly salary isn't well-defined. We show it only for Month/Year presets.
+        if (summaryPreset === 'month' || summaryPreset === 'year') {
+          total = amount;
+          break;
+        }
+      } else {
+        const durationMs = new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
+        const hours = durationMs / 3600000;
+        if (!Number.isFinite(hours)) continue;
+        total += Math.max(0, hours) * amount;
+      }
+    }
+
+    return Math.round(total * 100) / 100;
+  }, [sessions, costModels, instructor, summaryRange, summaryPreset]);
+
+  const currentEffectiveCostModel = useMemo(() => {
+    const now = new Date();
+    const cms = (costModels || []) as any[];
+    const matches = cms.filter((m) => {
+      const from = new Date(m.effectiveFrom).getTime();
+      const to = m.effectiveTo ? new Date(m.effectiveTo).getTime() : Infinity;
+      const t = now.getTime();
+      return from <= t && t <= to;
+    });
+    matches.sort((a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime());
+    return matches[0] || null;
+  }, [costModels]);
+
   const user = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const str = localStorage.getItem('user');
@@ -279,7 +380,7 @@ export default function InstructorDetailPage() {
       const res = await instructorsService.listAvailability(String(id));
       setAvailability(res.data || []);
     } catch (e: any) {
-      setTabError(e?.response?.data?.message || 'Failed to load availability');
+      setTabError('availability', e?.response?.data?.message || 'Failed to load availability');
     }
   };
 
@@ -300,7 +401,7 @@ export default function InstructorDetailPage() {
       const res = await instructorsService.listCostModels(String(id));
       setCostModels(res.data || []);
     } catch (e: any) {
-      setTabError(e?.response?.data?.message || 'Failed to load cost models');
+      setTabError('payroll', e?.response?.data?.message || 'Failed to load cost models');
     }
   };
 
@@ -310,7 +411,7 @@ export default function InstructorDetailPage() {
       const res = await instructorsService.listDocuments(String(id));
       setDocuments(res.data || []);
     } catch (e: any) {
-      setTabError(e?.response?.data?.message || 'Failed to load documents');
+      setTabError('documents', e?.response?.data?.message || 'Failed to load documents');
     }
   };
 
@@ -373,6 +474,9 @@ export default function InstructorDetailPage() {
                 status: String((instructor as any).user?.status || 'active'),
                 costType: (instructor as any).costType || 'hourly',
                 costAmount: String((instructor as any).costAmount ?? ''),
+                age: String((instructor as any).age ?? ''),
+                educationLevel: String((instructor as any).educationLevel || 'undergraduate'),
+                livingArea: String((instructor as any).livingArea || ''),
               });
               setShowEditModal(true);
             },
@@ -559,19 +663,26 @@ export default function InstructorDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Fees Type (legacy)
+                Fees Type
               </h3>
-              <p className="text-lg text-gray-900 capitalize">{instructor.costType}</p>
-              <p className="text-xs text-gray-400 mt-1">Accounting cost models are the source of truth.</p>
+              <p className="text-lg text-gray-900 capitalize">
+                {(currentEffectiveCostModel?.type || instructor.costType) || '—'}
+              </p>
+              {currentEffectiveCostModel?.effectiveFrom && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Effective from {new Date(currentEffectiveCostModel.effectiveFrom).toLocaleDateString()}
+                </p>
+              )}
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                 <FiDollarSign className="w-4 h-4" />
-                Fees (legacy)
+                Fees
               </h3>
               <p className="text-lg text-gray-900">
-                EGP {instructor.costAmount.toLocaleString()}
-                {instructor.costType === 'hourly' && ' / hour'}
+                {(currentEffectiveCostModel?.currency || 'EGP').toUpperCase()}{' '}
+                {Number(currentEffectiveCostModel?.amount ?? instructor.costAmount).toLocaleString()}
+                {(currentEffectiveCostModel?.type || instructor.costType) === 'hourly' && ' / hour'}
               </p>
             </div>
           </div>
@@ -611,6 +722,23 @@ export default function InstructorDetailPage() {
               )}
             </div>
           </div>
+
+          <div className="grid grid-cols-3 gap-6">
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Age</h3>
+              <div className="text-sm text-gray-700">{(instructor as any).age ?? '—'}</div>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Education Level</h3>
+              <div className="text-sm text-gray-700 capitalize">
+                {String((instructor as any).educationLevel || '').replace('_', ' ') || '—'}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Living Area</h3>
+              <div className="text-sm text-gray-700">{(instructor as any).livingArea || '—'}</div>
+            </div>
+          </div>
         </div>
       ),
     },
@@ -622,9 +750,9 @@ export default function InstructorDetailPage() {
             icon: <FiClock className="w-4 h-4" />,
             content: (
               <div className="space-y-4">
-                {tabError && (
+                {!!tabErrors.availability && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
-                    {tabError}
+                    {tabErrors.availability}
                   </div>
                 )}
 
@@ -684,7 +812,7 @@ export default function InstructorDetailPage() {
                           onClick={async () => {
                             if (!id) return;
                             try {
-                              setTabError('');
+                              clearTabError('availability');
                               // Apply to days that are currently active (including unsaved draft toggles).
                               const activeDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
                                 .map((_, dow) => {
@@ -717,7 +845,7 @@ export default function InstructorDetailPage() {
                               setAvailabilityDrafts({});
                               await refreshAvailability();
                             } catch (e: any) {
-                              setTabError(e?.response?.data?.message || 'Failed to apply times');
+                              setTabError('availability', e?.response?.data?.message || 'Failed to apply times');
                             }
                           }}
                         >
@@ -765,7 +893,7 @@ export default function InstructorDetailPage() {
                                       if (!id) return;
                                       if (!e.target.checked) return;
                                       try {
-                                        setTabError('');
+                                        clearTabError('availability');
                                         await instructorsService.addAvailability(String(id), {
                                           dayOfWeek,
                                           startTime: String(newSlot.startTime || '09:00'),
@@ -775,7 +903,7 @@ export default function InstructorDetailPage() {
                                         });
                                         await refreshAvailability();
                                       } catch (err: any) {
-                                        setTabError(err?.response?.data?.message || 'Failed to add day slot');
+                                        setTabError('availability', err?.response?.data?.message || 'Failed to add day slot');
                                       }
                                       return;
                                     }
@@ -846,7 +974,7 @@ export default function InstructorDetailPage() {
                                         className="flex-1 px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
                                         onClick={async () => {
                                           try {
-                                            setTabError('');
+                                            clearTabError('availability');
                                             await instructorsService.updateAvailability(row.id, {
                                               isActive,
                                               startTime,
@@ -860,7 +988,7 @@ export default function InstructorDetailPage() {
                                             });
                                             await refreshAvailability();
                                           } catch (e: any) {
-                                            setTabError(e?.response?.data?.message || 'Failed to save');
+                                            setTabError('availability', e?.response?.data?.message || 'Failed to save');
                                           }
                                         }}
                                       >
@@ -875,7 +1003,7 @@ export default function InstructorDetailPage() {
                                             await instructorsService.deleteAvailability(row.id);
                                             await refreshAvailability();
                                           } catch (e: any) {
-                                            setTabError(e?.response?.data?.message || 'Failed to delete');
+                                            setTabError('availability', e?.response?.data?.message || 'Failed to delete');
                                           }
                                         }}
                                       >
@@ -895,7 +1023,7 @@ export default function InstructorDetailPage() {
                                     onClick={async () => {
                                       if (!id) return;
                                       try {
-                                        setTabError('');
+                                        clearTabError('availability');
                                         await instructorsService.addAvailability(String(id), {
                                           dayOfWeek,
                                           startTime: '09:00',
@@ -904,7 +1032,7 @@ export default function InstructorDetailPage() {
                                         });
                                         await refreshAvailability();
                                       } catch (e: any) {
-                                        setTabError(e?.response?.data?.message || 'Failed to add day slot');
+                                        setTabError('availability', e?.response?.data?.message || 'Failed to add day slot');
                                       }
                                     }}
                                   >
@@ -972,9 +1100,9 @@ export default function InstructorDetailPage() {
             icon: <FiDollarSign className="w-4 h-4" />,
             content: (
               <div className="space-y-6">
-                {tabError && (
+                {!!tabErrors.payroll && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
-                    {tabError}
+                    {tabErrors.payroll}
                   </div>
                 )}
 
@@ -1008,15 +1136,15 @@ export default function InstructorDetailPage() {
                         onClick={async () => {
                           if (!id) return;
                           try {
-                            setTabError('');
+                            clearTabError('payroll');
                             const res = await instructorsService.generatePayroll({ year: payrollYear, month: payrollMonth, instructorId: String(id) });
                             const status = res.data?.results?.[0]?.status;
                             if (status === 'no_sessions') {
-                              setTabError('No sessions found in this month to calculate payroll.');
+                              setTabError('payroll', 'No sessions found in this month to calculate payroll.');
                             }
                             await fetchPayroll(String(id));
                           } catch (e: any) {
-                            setTabError(e?.response?.data?.message || 'Failed to generate payroll');
+                            setTabError('payroll', e?.response?.data?.message || 'Failed to generate payroll');
                           }
                         }}
                       >
@@ -1123,7 +1251,7 @@ export default function InstructorDetailPage() {
                                   await instructorsService.deleteCostModel(row.id);
                                   await refreshCostModels();
                                 } catch (e: any) {
-                                  setTabError(e?.response?.data?.message || 'Failed to delete cost model');
+                                  setTabError('payroll', e?.response?.data?.message || 'Failed to delete cost model');
                                 }
                               },
                               icon: <FiTrash2 className="w-4 h-4" />,
@@ -1217,7 +1345,7 @@ export default function InstructorDetailPage() {
                                 onClick={async () => {
                                   if (!id) return;
                                   try {
-                                    setTabError('');
+                                    clearTabError('payroll');
                                     const payload: any = {
                                       type: costModelForm.type,
                                       amount: parseFloat(String(costModelForm.amount || 0)),
@@ -1234,7 +1362,7 @@ export default function InstructorDetailPage() {
                                     setShowCostModelModal(false);
                                     await refreshCostModels();
                                   } catch (e: any) {
-                                    setTabError(e?.response?.data?.message || 'Failed to save cost model');
+                                    setTabError('payroll', e?.response?.data?.message || 'Failed to save cost model');
                                   }
                                 }}
                                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
@@ -1340,9 +1468,9 @@ export default function InstructorDetailPage() {
       icon: <FiFileText className="w-4 h-4" />,
       content: show(['hr', 'management', 'super_admin']) ? (
         <div className="space-y-4">
-          {tabError && (
+          {!!tabErrors.documents && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
-              {tabError}
+              {tabErrors.documents}
             </div>
           )}
 
@@ -1356,7 +1484,7 @@ export default function InstructorDetailPage() {
                     if (!id || !docFile) return;
                     try {
                       setUploadingDoc(true);
-                      setTabError('');
+                      clearTabError('documents');
                       const presign = await instructorsService.presignDocumentUpload(String(id), {
                         type: docType,
                         name: docFile.name,
@@ -1373,7 +1501,7 @@ export default function InstructorDetailPage() {
                       setDocFile(null);
                       await refreshDocuments();
                     } catch (e: any) {
-                      setTabError(e?.response?.data?.message || e?.message || 'Failed to upload document');
+                      setTabError('documents', e?.response?.data?.message || e?.message || 'Failed to upload document');
                     } finally {
                       setUploadingDoc(false);
                     }
@@ -1460,7 +1588,7 @@ export default function InstructorDetailPage() {
                           type="button"
                           onClick={async () => {
                             try {
-                              setTabError('');
+                              clearTabError('documents');
                               const res = await instructorsService.presignDocumentDownload(d.id);
                               const url = res.data?.url;
                               if (!url) throw new Error('Download URL missing');
@@ -1468,7 +1596,7 @@ export default function InstructorDetailPage() {
                               setDocPreviewUrl(url);
                               setDocPreviewContentType(String((d.metadata as any)?.contentType || ''));
                             } catch (e: any) {
-                              setTabError(e?.response?.data?.message || e?.message || 'Failed to load document');
+                              setTabError('documents', e?.response?.data?.message || e?.message || 'Failed to load document');
                             }
                           }}
                           className="px-3 py-2 text-sm font-medium rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -1491,11 +1619,11 @@ export default function InstructorDetailPage() {
                             onClick={async () => {
                               if (!confirm('Delete this document?')) return;
                               try {
-                                setTabError('');
+                                clearTabError('documents');
                                 await instructorsService.deleteDocument(d.id);
                                 await refreshDocuments();
                               } catch (e: any) {
-                                setTabError(e?.response?.data?.message || 'Failed to delete document');
+                                setTabError('documents', e?.response?.data?.message || 'Failed to delete document');
                               }
                             }}
                             className="px-3 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700"
@@ -1563,14 +1691,51 @@ export default function InstructorDetailPage() {
       </div>
       <div className="pt-4 border-t border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Summary</h3>
+        <div className="mb-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <select
+              value={summaryPreset}
+              onChange={(e) => setSummaryPreset(e.target.value as any)}
+              className="w-full rounded-md border border-gray-300 text-sm"
+            >
+              <option value="7d">Last 7 days</option>
+              <option value="month">This month</option>
+              <option value="year">This year</option>
+              <option value="all">All</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          {summaryPreset === 'custom' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-500">From</label>
+                <input
+                  type="date"
+                  value={summaryFrom}
+                  onChange={(e) => setSummaryFrom(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500">To</label>
+                <input
+                  type="date"
+                  value={summaryTo}
+                  onChange={(e) => setSummaryTo(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 text-sm"
+                />
+              </div>
+            </div>
+          )}
+        </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">Assigned Classes:</span>
             <span className="font-medium text-gray-900">{classes.length}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Total Sessions:</span>
-            <span className="font-medium text-gray-900">{sessions.length}</span>
+            <span className="text-gray-500">Sessions (range):</span>
+            <span className="font-medium text-gray-900">{sessionsInSummaryRange.length}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Total Students:</span>
@@ -1579,12 +1744,14 @@ export default function InstructorDetailPage() {
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Fees (this month):</span>
-            <span className="font-medium text-gray-900">EGP {Number(currentMonthFees || 0).toLocaleString()}</span>
+            <span className="text-gray-500">Fees (range):</span>
+            <span className="font-medium text-gray-900">
+              {(currentEffectiveCostModel?.currency || 'EGP').toUpperCase()} {Number(feesInSummaryRange || 0).toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between pt-2 border-t border-gray-200">
             <span className="text-gray-500">Fees Type:</span>
-            <span className="font-medium text-gray-900 capitalize">{instructor.costType}</span>
+            <span className="font-medium text-gray-900 capitalize">{(currentEffectiveCostModel?.type || instructor.costType) as any}</span>
           </div>
         </div>
       </div>
@@ -1600,6 +1767,10 @@ export default function InstructorDetailPage() {
         tabs={tabs}
         breadcrumbs={breadcrumbs}
         sidebar={sidebar}
+        onTabChange={() => {
+          // Clear alerts when switching tabs so messages don't appear in other tabs
+          setTabErrors({});
+        }}
       />
       {showEditModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -1667,6 +1838,37 @@ export default function InstructorDetailPage() {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Age</label>
+                    <input
+                      value={editForm.age}
+                      onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Education Level</label>
+                    <select
+                      value={editForm.educationLevel}
+                      onChange={(e) => setEditForm({ ...editForm, educationLevel: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                    >
+                      <option value="undergraduate">Undergraduate</option>
+                      <option value="graduate">Graduate</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Living Area</label>
+                    <input
+                      value={editForm.livingArea}
+                      onChange={(e) => setEditForm({ ...editForm, livingArea: e.target.value })}
+                      className="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-600 focus:ring-indigo-600"
+                    />
+                  </div>
+                </div>
                 <div className="text-xs text-gray-500">
                   Skills, contracts, availability, cost models, payroll, and documents are edited inside their tabs.
                 </div>
@@ -1693,10 +1895,13 @@ export default function InstructorDetailPage() {
                           });
                         }
 
-                        // Update instructor fees (legacy)
+                        // Update instructor profile + fees
                         await instructorsService.update(String(id), {
                           costType: editForm.costType,
                           costAmount: parseFloat(editForm.costAmount || '0'),
+                          age: editForm.age ? parseInt(editForm.age) : null,
+                          educationLevel: editForm.educationLevel || null,
+                          livingArea: editForm.livingArea || null,
                         });
                         setShowEditModal(false);
                         await fetchInstructor(String(id));

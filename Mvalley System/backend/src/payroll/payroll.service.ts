@@ -33,12 +33,22 @@ export class PayrollService {
     const { start, end } = this.monthRangeUtc(dto.year, dto.month);
 
     const instructors = dto.instructorId
-      ? await this.prisma.instructor.findMany({ where: { id: dto.instructorId, deletedAt: null } })
-      : await this.prisma.instructor.findMany({ where: { deletedAt: null } });
+      ? await this.prisma.instructor.findMany({
+          where: { id: dto.instructorId, deletedAt: null },
+          include: { user: { select: { status: true } } },
+        })
+      : await this.prisma.instructor.findMany({
+          where: { deletedAt: null },
+          include: { user: { select: { status: true } } },
+        });
     if (dto.instructorId && instructors.length === 0) throw new NotFoundException('Instructor not found');
 
     const results: any[] = [];
     for (const instructor of instructors) {
+      if ((instructor as any).user?.status && (instructor as any).user.status !== 'active') {
+        results.push({ instructorId: instructor.id, payrollId: null, status: 'inactive' });
+        continue;
+      }
       const existing = await this.prisma.instructorPayroll.findFirst({
         where: {
           instructorId: instructor.id,

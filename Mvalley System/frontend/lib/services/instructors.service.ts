@@ -5,6 +5,9 @@ export interface Instructor {
   userId: string;
   costType: string;
   costAmount: number;
+  age?: number | null;
+  educationLevel?: string | null;
+  livingArea?: string | null;
   user?: any;
   classes?: any[];
   sessions?: any[];
