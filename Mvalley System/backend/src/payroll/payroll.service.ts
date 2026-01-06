@@ -48,7 +48,8 @@ export class PayrollService {
           status: { not: InstructorPayrollStatus.void },
         },
       });
-      if (existing) {
+      // If a payroll exists and it's not draft, we don't modify it.
+      if (existing && existing.status !== InstructorPayrollStatus.draft) {
         results.push({ instructorId: instructor.id, payrollId: existing.id, status: 'exists' });
         continue;
       }
@@ -114,6 +115,19 @@ export class PayrollService {
           } else if (model.type === InstructorCostModelType.monthly) {
             costAmount = 0; // handled at payroll level
           }
+        } else {
+          // Fallback to legacy instructor fees if no model matches the session date
+          const legacyType = (instructor as any).costType;
+          const legacyAmount = Number((instructor as any).costAmount ?? 0);
+          if (Number.isFinite(legacyAmount) && legacyAmount > 0) {
+            if (legacyType === InstructorCostModelType.hourly) {
+              costAmount = (durationMinutes / 60) * legacyAmount;
+            } else if (legacyType === InstructorCostModelType.per_session) {
+              costAmount = legacyAmount;
+            } else if (legacyType === InstructorCostModelType.monthly) {
+              costAmount = 0;
+            }
+          }
         }
 
         totalFromSessions += costAmount;
@@ -152,20 +166,31 @@ export class PayrollService {
           : null,
       };
 
-      // Write payroll + instructorSessions atomically
+      // Write payroll + instructorSessions atomically (create or recalc draft)
       const payroll = await this.prisma.$transaction(async (tx) => {
-        const payrollRow = await tx.instructorPayroll.create({
-          data: {
-            instructorId: instructor.id,
-            periodYear: dto.year,
-            periodMonth: dto.month,
-            status: InstructorPayrollStatus.draft,
-            currency,
-            totalAmount,
-            snapshot,
-            generatedBy,
-          },
-        });
+        const payrollRow = existing
+          ? await tx.instructorPayroll.update({
+              where: { id: existing.id },
+              data: {
+                currency,
+                totalAmount,
+                snapshot,
+                generatedBy,
+                generatedAt: new Date(),
+              },
+            })
+          : await tx.instructorPayroll.create({
+              data: {
+                instructorId: instructor.id,
+                periodYear: dto.year,
+                periodMonth: dto.month,
+                status: InstructorPayrollStatus.draft,
+                currency,
+                totalAmount,
+                snapshot,
+                generatedBy,
+              },
+            });
 
         for (const row of instructorSessionRows) {
           await tx.instructorSession.upsert({
@@ -198,7 +223,7 @@ export class PayrollService {
         await tx.auditLog.create({
           data: {
             userId: generatedBy,
-            action: 'create',
+            action: existing ? 'update' : 'create',
             entityType: 'InstructorPayroll',
             entityId: payrollRow.id,
             changes: JSON.stringify({ instructorId: instructor.id, year: dto.year, month: dto.month }),
@@ -208,7 +233,11 @@ export class PayrollService {
         return payrollRow;
       });
 
-      results.push({ instructorId: instructor.id, payrollId: payroll.id, status: 'created' });
+      results.push({
+        instructorId: instructor.id,
+        payrollId: payroll.id,
+        status: existing ? 'recalculated' : 'created',
+      });
     }
 
     return { year: dto.year, month: dto.month, results };

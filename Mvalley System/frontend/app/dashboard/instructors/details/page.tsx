@@ -189,7 +189,7 @@ export default function InstructorDetailPage() {
     const { start, end } = monthRange;
     const monthSessions = (sessions || []).filter((s) => {
       const d = new Date(s.scheduledDate);
-      return d >= start && d < end;
+      return d >= start && d < end && s.status === 'completed';
     });
 
     const cm = (costModels || []) as any[];
@@ -206,9 +206,12 @@ export default function InstructorDetailPage() {
 
     let total = 0;
     for (const s of monthSessions) {
-      const model = pickCostModel(new Date(s.scheduledDate));
-      const type = model?.type || (instructor as any)?.costType || 'hourly';
-      const amount = Number(model?.amount ?? (instructor as any)?.costAmount ?? 0);
+      const at = new Date(s.startTime || s.scheduledDate);
+      const model = pickCostModel(at);
+      const legacyType = (instructor as any)?.costType || 'hourly';
+      const legacyAmount = Number((instructor as any)?.costAmount ?? 0);
+      const type = model?.type || legacyType;
+      const amount = Number(model?.amount ?? legacyAmount ?? 0);
       if (!Number.isFinite(amount)) continue;
       if (type === 'per_session') {
         total += amount;
