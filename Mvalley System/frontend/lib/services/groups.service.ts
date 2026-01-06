@@ -7,13 +7,14 @@ export interface Group {
   courseLevel?: any;
   defaultClassId?: string | null;
   defaultClass?: any;
+  createdBy?: { id: string; firstName?: string; lastName?: string; email?: string } | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export const groupsService = {
   getAll: () => api.get<Group[]>('/groups'),
-  create: (data: { name: string; courseLevelId: string; defaultClassId?: string | null }) => api.post<Group>('/groups', data),
+  create: (data: { name?: string; courseLevelId: string; defaultClassId?: string | null }) => api.post<Group>('/groups', data),
   update: (id: string, data: Partial<{ name: string; courseLevelId: string; defaultClassId?: string | null }>) => api.patch<Group>(`/groups/${id}`, data),
   delete: (id: string) => api.delete(`/groups/${id}`),
 };

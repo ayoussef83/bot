@@ -18,7 +18,7 @@ export default function GroupsPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Group | null>(null);
-  const [form, setForm] = useState({ name: '', courseLevelId: '', defaultClassId: '' });
+  const [form, setForm] = useState({ courseLevelId: '', defaultClassId: '' });
 
   const fetchAll = async () => {
     setLoading(true);
@@ -42,26 +42,67 @@ export default function GroupsPage() {
   const columns: Column<Group>[] = [
     {
       key: 'name',
-      label: 'Group',
+      label: 'Name',
       render: (value) => <span className="text-sm font-medium text-gray-900">{String(value || '-')}</span>,
     },
     {
+      key: 'courseName',
+      label: 'Course Name',
+      render: (_, row: any) => <span className="text-sm text-gray-700">{row?.courseLevel?.course?.name || '-'}</span>,
+    },
+    {
       key: 'courseLevel',
-      label: 'Course / Level',
+      label: 'Course Level',
       render: (_, row: any) => (
         <span className="text-sm text-gray-700">
-          {(row?.courseLevel?.course?.name || 'Course') + ' — ' + (row?.courseLevel?.name || 'Level')}
+          {row?.courseLevel?.sortOrder ?? '-'} {row?.courseLevel?.name ? `(${row.courseLevel.name})` : ''}
         </span>
       ),
     },
     {
-      key: 'defaultClass',
-      label: 'Default Course Group',
-      render: (_, row: any) => (
-        <span className="text-sm text-gray-700">
-          {row?.defaultClass?.name ? `${row.defaultClass.name} (${row.defaultClass.locationName || row.defaultClass.location})` : '-'}
-        </span>
-      ),
+      key: 'capacity',
+      label: 'Capacity',
+      render: (_, row: any) => {
+        const c = row?.defaultClass;
+        const min = c?.minCapacity;
+        const max = c?.maxCapacity ?? c?.capacity;
+        if (min && max) return <span className="text-sm text-gray-700">{min}–{max}</span>;
+        if (max) return <span className="text-sm text-gray-700">{max}</span>;
+        return <span className="text-sm text-gray-500">—</span>;
+      },
+    },
+    {
+      key: 'ageGroup',
+      label: 'Age Group',
+      render: (_, row: any) => {
+        const c = row?.defaultClass;
+        if (c?.ageMin != null && c?.ageMax != null) return <span className="text-sm text-gray-700">{c.ageMin}–{c.ageMax}</span>;
+        if (c?.ageMin != null) return <span className="text-sm text-gray-700">{c.ageMin}+</span>;
+        return <span className="text-sm text-gray-500">—</span>;
+      },
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      render: (_, row: any) => {
+        const c = row?.defaultClass;
+        const loc = c?.locationName || c?.location;
+        return <span className="text-sm text-gray-700">{loc || '—'}</span>;
+      },
+    },
+    {
+      key: 'createdAt',
+      label: 'Creation date',
+      render: (v: any) => <span className="text-sm text-gray-700">{v ? new Date(v).toLocaleDateString('en-GB') : '—'}</span>,
+    },
+    {
+      key: 'createdBy',
+      label: 'Created By',
+      render: (_: any, row: any) => {
+        const u = row?.createdBy;
+        const name = [u?.firstName, u?.lastName].filter(Boolean).join(' ').trim();
+        return <span className="text-sm text-gray-700">{name || u?.email || '—'}</span>;
+      },
     },
   ];
 
@@ -80,14 +121,13 @@ export default function GroupsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', courseLevelId: '', defaultClassId: '' });
+    setForm({ courseLevelId: '', defaultClassId: '' });
     setShowModal(true);
   };
 
   const openEdit = (row: any) => {
     setEditing(row);
     setForm({
-      name: row?.name || '',
       courseLevelId: row?.courseLevelId || row?.courseLevel?.id || '',
       defaultClassId: row?.defaultClassId || '',
     });
@@ -99,17 +139,15 @@ export default function GroupsPage() {
     setError('');
     try {
       const payload = {
-        name: form.name.trim(),
         courseLevelId: form.courseLevelId,
         defaultClassId: form.defaultClassId || null,
       };
-      if (!payload.name) throw new Error('Group name is required');
       if (!payload.courseLevelId) throw new Error('Course level is required');
 
       if (editing?.id) {
-        await groupsService.update(editing.id, payload);
+        await groupsService.update(editing.id, payload as any);
       } else {
-        await groupsService.create(payload);
+        await groupsService.create(payload as any);
       }
       setShowModal(false);
       await fetchAll();
@@ -137,10 +175,12 @@ export default function GroupsPage() {
 
   const levelOptions = levels.map((l: any) => ({
     id: l.id,
-    label: `${l?.course?.name || 'Course'} — ${l?.name || 'Level'}`,
+    label: `${l?.course?.name || 'Course'} — ${l?.sortOrder ?? ''} ${l?.name ? `(${l.name})` : ''}`.trim(),
   }));
 
-  const classOptions = classes.map((c: any) => ({
+  const classOptions = classes
+    .filter((c: any) => !form.courseLevelId || String(c.courseLevelId || '') === String(form.courseLevelId))
+    .map((c: any) => ({
     id: c.id,
     label: `${c.name} (${c.locationName || c.location})`,
   }));
@@ -191,14 +231,14 @@ export default function GroupsPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Group Name</label>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                      placeholder="e.g. Group A"
-                    />
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+                    <div className="text-xs text-gray-500">Name (auto-generated)</div>
+                    <div className="text-sm font-medium text-gray-900 mt-0.5">
+                      {editing?.name ? editing.name : 'Will be generated after selecting Course Level'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Format: 2 letters (course name) - 2 digit number - 1 digit level. مثال: LW-01-1
+                    </div>
                   </div>
 
                   <div>
@@ -218,7 +258,7 @@ export default function GroupsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Default Course Group (optional)</label>
+                    <label className="block text-sm font-medium text-gray-700">Location / Capacity / Age Group (via Default Course Group)</label>
                     <select
                       value={form.defaultClassId}
                       onChange={(e) => setForm((f) => ({ ...f, defaultClassId: e.target.value }))}
@@ -232,7 +272,7 @@ export default function GroupsPage() {
                       ))}
                     </select>
                     <p className="mt-1 text-xs text-gray-500">
-                      If set, selecting this Group in Allocations will auto-pick the Course Group.
+                      If set, Capacity / Age Group / Location are taken from that Course Group, and Allocations can auto-pick it.
                     </p>
                   </div>
 

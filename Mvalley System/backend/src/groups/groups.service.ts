@@ -5,6 +5,44 @@ import { PrismaService } from '../prisma/prisma.service';
 export class GroupsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private toGroupPrefix(courseName: string) {
+    const words = String(courseName || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    const w = words[0] || 'G';
+    return w.slice(0, 2).toUpperCase();
+  }
+
+  private async generateGroupCode(courseLevelId: string) {
+    const level = await this.prisma.courseLevel.findFirst({
+      where: { id: courseLevelId, deletedAt: null },
+      include: { course: true },
+    });
+    if (!level) throw new BadRequestException('Invalid course level');
+
+    const prefix = this.toGroupPrefix(level.course?.name || '');
+    const levelDigit = Number(level.sortOrder || 1);
+
+    const existing = await this.prisma.group.findMany({
+      where: { courseLevelId, deletedAt: null },
+      select: { name: true },
+    });
+
+    const re = new RegExp(`^${prefix}-(\\d{2})-${levelDigit}$`);
+    let max = 0;
+    for (const g of existing) {
+      const m = re.exec(String(g.name || '').trim());
+      if (!m) continue;
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n)) max = Math.max(max, n);
+    }
+
+    const next = String(max + 1).padStart(2, '0');
+    return `${prefix}-${next}-${levelDigit}`;
+  }
+
   async findAll() {
     return this.prisma.group.findMany({
       where: { deletedAt: null },
@@ -16,22 +54,21 @@ export class GroupsService {
             instructor: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
           },
         },
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
   }
 
-  async create(data: { name: string; courseLevelId: string; defaultClassId?: string | null }) {
-    const name = String(data.name || '').trim();
-    if (!name) throw new BadRequestException('Group name is required');
-
-    const level = await this.prisma.courseLevel.findFirst({ where: { id: data.courseLevelId, deletedAt: null } });
-    if (!level) throw new BadRequestException('Invalid course level');
+  async create(data: { name?: string; courseLevelId: string; defaultClassId?: string | null; createdById?: string }) {
+    if (!data.courseLevelId) throw new BadRequestException('Course level is required');
+    const name = String(data.name || '').trim() || (await this.generateGroupCode(data.courseLevelId));
 
     return this.prisma.group.create({
       data: {
         name,
         courseLevelId: data.courseLevelId,
         defaultClassId: data.defaultClassId || undefined,
+        createdById: data.createdById || undefined,
       },
       include: {
         courseLevel: { include: { course: true } },
@@ -40,6 +77,7 @@ export class GroupsService {
             instructor: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
           },
         },
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
   }
@@ -54,7 +92,11 @@ export class GroupsService {
       if (!name) throw new BadRequestException('Group name is required');
       next.name = name;
     }
-    if (data.courseLevelId !== undefined) next.courseLevelId = data.courseLevelId;
+    if (data.courseLevelId !== undefined) {
+      next.courseLevelId = data.courseLevelId;
+      // If caller didn't explicitly set name, regenerate code for the new level
+      if (data.name === undefined) next.name = await this.generateGroupCode(data.courseLevelId);
+    }
     if (data.defaultClassId !== undefined) next.defaultClassId = data.defaultClassId || null;
 
     return this.prisma.group.update({
@@ -67,6 +109,7 @@ export class GroupsService {
             instructor: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
           },
         },
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
   }

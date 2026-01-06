@@ -50,6 +50,7 @@ model User {
   studentProfile    Student?
   parentProfile     Parent?
   recordedPayments  Payment[]  @relation("PaymentRecordedBy")
+  createdGroups     Group[]   @relation("GroupCreatedBy")
 
   // Audit
   createdAt DateTime  @default(now())
@@ -325,12 +326,16 @@ model Group {
   // Relations
   enrollments StudentEnrollment[]
 
+  createdById String?
+  createdBy   User? @relation("GroupCreatedBy", fields: [createdById], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
   @@index([courseLevelId])
   @@index([defaultClassId])
+  @@index([createdById])
   @@index([deletedAt])
   @@map("groups")
 }
