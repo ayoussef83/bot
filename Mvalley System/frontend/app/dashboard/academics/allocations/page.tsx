@@ -72,6 +72,32 @@ const availabilityOverlapsWeek = (av: any, weekStartKey: string, weekEndKey: str
   return s <= weekEndKey && e >= weekStartKey;
 };
 
+const normalizeAvailabilityBlocksForWeek = (room: any, weekStartKey: string, weekEndKey: string) => {
+  const avs = Array.isArray(room?.availabilities) ? room.availabilities : [];
+  const blocks: { dayOfWeek: number; startTime: string; endTime: string }[] = [];
+  for (const a of avs) {
+    if (!availabilityOverlapsWeek(a, weekStartKey, weekEndKey)) continue;
+    const day = Number(a?.dayOfWeek);
+    if (!Number.isFinite(day) || day < 0 || day > 6) continue;
+    const startTime = String(a?.startTime || '').trim();
+    const endTime = String(a?.endTime || '').trim();
+    if (!startTime || !endTime) continue;
+    blocks.push({ dayOfWeek: day, startTime, endTime });
+  }
+  // Sort + merge overlaps per day
+  blocks.sort((x, y) => x.dayOfWeek - y.dayOfWeek || timeToMinutes(x.startTime) - timeToMinutes(y.startTime));
+  const merged: typeof blocks = [];
+  for (const b of blocks) {
+    const last = merged[merged.length - 1];
+    if (last && last.dayOfWeek === b.dayOfWeek && timeToMinutes(b.startTime) <= timeToMinutes(last.endTime)) {
+      if (timeToMinutes(b.endTime) > timeToMinutes(last.endTime)) last.endTime = b.endTime;
+    } else {
+      merged.push({ ...b });
+    }
+  }
+  return merged;
+};
+
 const isTeachingSlotWithinRoomAvailabilityForWeek = (slot: any, room: any, weekStartKey: string, weekEndKey: string) => {
   const avs = Array.isArray(room?.availabilities) ? room.availabilities : [];
   if (!avs.length) return false;
@@ -93,6 +119,7 @@ type Draft = {
   branch: string;
   roomId: string;
   teachingSlotId: string;
+  availabilityKey?: string; // `${dayOfWeek}|${startTime}|${endTime}`
 };
 
 type GroupRow = {
@@ -111,7 +138,7 @@ export default function AllocationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>({ branch: '', roomId: '', teachingSlotId: '' });
+  const [draft, setDraft] = useState<Draft>({ branch: '', roomId: '', teachingSlotId: '', availabilityKey: '' });
   const [saving, setSaving] = useState(false);
   const [weekDate, setWeekDate] = useState<string>(() => toYmd(new Date()));
 
@@ -219,7 +246,7 @@ export default function AllocationsPage() {
         return (
           <select
             value={draft.branch || currentBranch || ''}
-            onChange={(e) => setDraft({ branch: e.target.value, roomId: '', teachingSlotId: '' })}
+            onChange={(e) => setDraft({ branch: e.target.value, roomId: '', teachingSlotId: '', availabilityKey: '' })}
             className="w-full rounded-md border-gray-300 text-sm"
           >
             <option value="">Select…</option>
@@ -250,7 +277,7 @@ export default function AllocationsPage() {
           <select
             value={draft.roomId || currentRoomId || ''}
             disabled={!draft.branch}
-            onChange={(e) => setDraft((d) => ({ ...d, roomId: e.target.value, teachingSlotId: '' }))}
+            onChange={(e) => setDraft((d) => ({ ...d, roomId: e.target.value, teachingSlotId: '', availabilityKey: '' }))}
             className="w-full rounded-md border-gray-300 text-sm disabled:opacity-60"
           >
             <option value="">Select…</option>
@@ -281,40 +308,25 @@ export default function AllocationsPage() {
         const selectedRoom = rooms.find((r: any) => String(r.id) === String(selectedRoomId));
         const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
         const ws = startOfWeekSunday(base);
-        const weExclusive = addDays(ws, 7);
         const wsKey = toYmd(ws);
         const weKey = toYmd(addDays(ws, 6)); // inclusive end
 
-        const options = teachingSlots
-          .filter((ts: any) => String(ts.roomId) === String(selectedRoomId))
-          .filter((ts: any) => overlapsWeek(ts, ws, weExclusive))
-          .filter((ts: any) => (selectedRoom ? isTeachingSlotWithinRoomAvailabilityForWeek(ts, selectedRoom, wsKey, weKey) : true));
-
-        // Lock reserved/occupied slots unless it's already this group's slot
-        const isLockedByOther = (ts: any) => {
-          const status = String(ts.status || '').toLowerCase();
-          if (status !== 'reserved' && status !== 'occupied') return false;
-          const currentClassId = String(ts.currentClassId || '');
-          const groupClassId = String(row?.group?.defaultClassId || '');
-          return Boolean(currentClassId) && Boolean(groupClassId) && currentClassId !== groupClassId;
-        };
+        const options = selectedRoom ? normalizeAvailabilityBlocksForWeek(selectedRoom, wsKey, weKey) : [];
 
         return (
           <select
-            value={draft.teachingSlotId || currentSlotId || ''}
+            value={draft.availabilityKey || ''}
             disabled={!draft.roomId || !selectedRoom?.availabilities?.length}
-            onChange={(e) => setDraft((d) => ({ ...d, teachingSlotId: e.target.value }))}
+            onChange={(e) => setDraft((d) => ({ ...d, availabilityKey: e.target.value }))}
             className="w-full rounded-md border-gray-300 text-sm disabled:opacity-60"
           >
             <option value="">{!selectedRoom?.availabilities?.length ? 'Set room availability first…' : 'Select…'}</option>
-            {options.map((ts: any) => {
-              const label = `${DOW[ts.dayOfWeek]} ${ts.startTime}–${ts.endTime}`;
-              const locked = isLockedByOther(ts);
-              const by = ts?.currentClass?.name ? ` • reserved by ${ts.currentClass.name}` : '';
+            {options.map((b: any) => {
+              const key = `${b.dayOfWeek}|${b.startTime}|${b.endTime}`;
+              const label = `${DOW[b.dayOfWeek]} ${b.startTime}–${b.endTime}`;
               return (
-                <option key={ts.id} value={ts.id} disabled={locked}>
-                  {label} • {ts.status}
-                  {by}
+                <option key={key} value={key}>
+                  {label}
                 </option>
               );
             })}
@@ -392,26 +404,76 @@ export default function AllocationsPage() {
           try {
             if (!draft.branch) throw new Error('Branch is required');
             if (!draft.roomId) throw new Error('Room is required');
-            if (!draft.teachingSlotId) throw new Error('Room available slot is required');
+            if (!draft.availabilityKey) throw new Error('Room availability slot is required');
 
-            const slot = teachingSlots.find((ts: any) => String(ts.id) === String(draft.teachingSlotId));
-            if (!slot) throw new Error('Invalid slot');
+            const [dayStr, startTime, endTime] = String(draft.availabilityKey).split('|');
+            const dayOfWeek = Number(dayStr);
+            if (!Number.isFinite(dayOfWeek)) throw new Error('Invalid availability slot');
 
-            // If slot is reserved by another group, block
-            const lockedStatus = String(slot.status || '').toLowerCase();
-            if ((lockedStatus === 'reserved' || lockedStatus === 'occupied') && slot.currentClassId && slot.currentClassId !== (row.group as any).defaultClassId) {
-              throw new Error(`Slot is ${slot.status}. Release it first to reassign.`);
+            // Behind the scenes: pick an existing matching teaching slot, or create one if needed.
+            const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+            const ws = startOfWeekSunday(base);
+            const weExclusive = addDays(ws, 7);
+            const wsKey = toYmd(ws);
+            const weKey = toYmd(addDays(ws, 6));
+
+            const courseLevelId = String((row.group as any)?.courseLevelId || '');
+            if (!courseLevelId) throw new Error('Group course level is missing');
+
+            const matching = teachingSlots
+              .filter((ts: any) => String(ts.roomId) === String(draft.roomId))
+              .filter((ts: any) => overlapsWeek(ts, ws, weExclusive))
+              .filter((ts: any) => String(ts.courseLevelId || '') === courseLevelId)
+              .filter((ts: any) => Number(ts.dayOfWeek) === dayOfWeek)
+              .filter((ts: any) => String(ts.startTime) === String(startTime) && String(ts.endTime) === String(endTime))
+              .find((ts: any) => {
+                const status = String(ts.status || '').toLowerCase();
+                if (status !== 'reserved' && status !== 'occupied') return true;
+                const currentClassId = String(ts.currentClassId || '');
+                const groupClassId = String((row.group as any).defaultClassId || '');
+                return Boolean(currentClassId) && Boolean(groupClassId) && currentClassId === groupClassId;
+              });
+
+            let slotId = String(matching?.id || '');
+            if (!slotId) {
+              // Try to reuse instructor from the currently assigned slot/class (if any)
+              const currentAssignedSlotId = String((row?.defaultClass as any)?.teachingSlotId || '');
+              const currentAssignedSlot = teachingSlots.find((ts: any) => String(ts.id) === currentAssignedSlotId);
+              const instructorId = String(currentAssignedSlot?.instructorId || '');
+              if (!instructorId) {
+                throw new Error('No instructor found for this group. Please allocate a slot that already has an instructor.');
+              }
+              const payload: any = {
+                courseLevelId,
+                instructorId,
+                roomId: String(draft.roomId),
+                dayOfWeek,
+                startTime,
+                endTime,
+                effectiveFrom: wsKey,
+                effectiveTo: weKey,
+                minCapacity: Number((row.group as any).minCapacity || 1),
+                maxCapacity: Number((row.group as any).maxCapacity || 10),
+                plannedSessions: 8,
+                sessionDurationMins: 120,
+                pricePerStudent: 0,
+                minMarginPct: 0,
+                currency: 'EGP',
+              };
+              const created = await teachingSlotsService.create(payload);
+              slotId = String((created as any)?.data?.id || '');
             }
+            if (!slotId) throw new Error('Failed to create/choose a slot');
 
-            // Ensure a class exists for this slot
-            let classId = String(slot.currentClassId || (row.group as any).defaultClassId || '');
+            // Ensure a class exists for this slot then link group -> class
+            const slotObj = teachingSlots.find((ts: any) => String(ts.id) === String(slotId));
+            let classId = String(slotObj?.currentClassId || (row.group as any).defaultClassId || '');
             if (!classId) {
-              const created = await classesService.createFromTeachingSlot({ teachingSlotId: slot.id });
+              const created = await classesService.createFromTeachingSlot({ teachingSlotId: slotId });
               classId = String((created as any)?.data?.id || '');
             }
             if (!classId) throw new Error('Failed to create group for this slot');
 
-            // Link group -> class
             await groupsService.update(row.group.id, { defaultClassId: classId });
 
             setEditingId(null);

@@ -95,10 +95,14 @@ export default function RoomsPage() {
     setError('');
     try {
       const [r, ts] = await Promise.all([roomsService.getAll(), teachingSlotsService.getAll()]);
-      setRooms(Array.isArray(r.data) ? r.data : []);
-      setTeachingSlots(Array.isArray(ts.data) ? ts.data : []);
+      const roomsList = Array.isArray(r.data) ? r.data : [];
+      const slotsList = Array.isArray(ts.data) ? ts.data : [];
+      setRooms(roomsList);
+      setTeachingSlots(slotsList);
+      return { roomsList, slotsList };
     } catch (e: any) {
       setError(toErrorString(e));
+      return null;
     } finally {
       setLoading(false);
     }
@@ -526,8 +530,12 @@ export default function RoomsPage() {
                     await roomsService.addAvailability(room.id, payload);
                   }
 
-                  await fetchAll();
-                  setShowAvailability(false);
+                  const res = await fetchAll();
+                  // Keep the availability view open and keep the selected week.
+                  // Refresh the selected room object so the grid stays in sync with saved data.
+                  const id = String(room.id);
+                  const updated = res?.roomsList?.find((rr: any) => String(rr.id) === id);
+                  if (updated) setAvailabilityRoom(updated);
                 } catch (e: any) {
                   setError(toErrorString(e));
                 } finally {
