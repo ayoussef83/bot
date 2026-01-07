@@ -122,14 +122,19 @@ export default function RoomsPage() {
 
     const next = Array.from({ length: 7 }, () => Array.from({ length: 48 }, () => false));
     const avs = Array.isArray((availabilityRoom as any).availabilities) ? (availabilityRoom as any).availabilities : [];
-    for (const a of avs) {
-      if (!availabilityOverlapsWeek(a, wsKey, weKey)) continue;
-      const day = Number(a?.dayOfWeek);
-      if (!Number.isFinite(day) || day < 0 || day > 6) continue;
-      const startIdx = timeToSlotIndex(String(a?.startTime || '00:00'));
-      const endIdx = timeToSlotIndex(String(a?.endTime || '00:00'));
-      const endExclusive = Math.max(startIdx + 1, endIdx);
-      for (let i = startIdx; i < endExclusive; i++) next[day][i] = true;
+    const weekAvs = avs.filter((a: any) => availabilityOverlapsWeek(a, wsKey, weKey));
+    // NEW LOGIC: if no availability records exist for this week, room is available by default (all green).
+    if (!weekAvs.length) {
+      for (let day = 0; day < 7; day++) for (let i = 0; i < 48; i++) next[day][i] = true;
+    } else {
+      for (const a of weekAvs) {
+        const day = Number(a?.dayOfWeek);
+        if (!Number.isFinite(day) || day < 0 || day > 6) continue;
+        const startIdx = timeToSlotIndex(String(a?.startTime || '00:00'));
+        const endIdx = timeToSlotIndex(String(a?.endTime || '00:00'));
+        const endExclusive = Math.max(startIdx + 1, endIdx);
+        for (let i = startIdx; i < endExclusive; i++) next[day][i] = true;
+      }
     }
     setGrid(next);
   }, [weekDate, showAvailability, availabilityRoom]);
@@ -512,10 +517,12 @@ export default function RoomsPage() {
                   await Promise.all(toDelete.map((a: any) => roomsService.deleteAvailability(a.id)));
 
                   const create: any[] = [];
+                  let isAllGreen = true;
                   for (let day = 0; day < 7; day++) {
                     let runStart: number | null = null;
                     for (let i = 0; i <= 48; i++) {
                       const on = i < 48 ? !!grid[day][i] : false;
+                      if (i < 48 && !on) isAllGreen = false;
                       if (on && runStart === null) runStart = i;
                       if ((!on || i === 48) && runStart !== null) {
                         const startTime = slotIndexToTime(runStart);
@@ -526,8 +533,11 @@ export default function RoomsPage() {
                     }
                   }
 
-                  for (const payload of create) {
-                    await roomsService.addAvailability(room.id, payload);
+                  // If the user kept everything green, we store NOTHING for that week (default availability).
+                  if (!isAllGreen) {
+                    for (const payload of create) {
+                      await roomsService.addAvailability(room.id, payload);
+                    }
                   }
 
                   const res = await fetchAll();
