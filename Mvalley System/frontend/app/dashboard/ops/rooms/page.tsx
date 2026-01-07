@@ -35,6 +35,13 @@ const toYmd = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const toDateKey = (v: any) => {
+  if (!v) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return toYmd(d);
+};
+
 const startOfWeekSunday = (d: Date) => {
   const date = new Date(d);
   const day = date.getDay(); // 0=Sun
@@ -56,6 +63,12 @@ const overlapsWeek = (ts: any, weekStart: Date, weekEndExclusive: Date) => {
   const end = et ? et : new Date('2999-12-31T00:00:00Z');
   // overlap if start < weekEnd && end >= weekStart (treat end inclusive)
   return start < weekEndExclusive && end >= weekStart;
+};
+
+const availabilityOverlapsWeek = (av: any, weekStartKey: string, weekEndKey: string) => {
+  const s = toDateKey(av?.effectiveFrom) || '0000-01-01';
+  const e = toDateKey(av?.effectiveTo) || '9999-12-31';
+  return s <= weekEndKey && e >= weekStartKey;
 };
 
 export default function RoomsPage() {
@@ -94,6 +107,28 @@ export default function RoomsPage() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  // When week changes in availability view, rebuild the grid from availabilities for that specific week
+  useEffect(() => {
+    if (!showAvailability || !availabilityRoom) return;
+    const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+    const ws = startOfWeekSunday(base);
+    const weKey = toYmd(addDays(ws, 6));
+    const wsKey = toYmd(ws);
+
+    const next = Array.from({ length: 7 }, () => Array.from({ length: 48 }, () => false));
+    const avs = Array.isArray((availabilityRoom as any).availabilities) ? (availabilityRoom as any).availabilities : [];
+    for (const a of avs) {
+      if (!availabilityOverlapsWeek(a, wsKey, weKey)) continue;
+      const day = Number(a?.dayOfWeek);
+      if (!Number.isFinite(day) || day < 0 || day > 6) continue;
+      const startIdx = timeToSlotIndex(String(a?.startTime || '00:00'));
+      const endIdx = timeToSlotIndex(String(a?.endTime || '00:00'));
+      const endExclusive = Math.max(startIdx + 1, endIdx);
+      for (let i = startIdx; i < endExclusive; i++) next[day][i] = true;
+    }
+    setGrid(next);
+  }, [weekDate, showAvailability, availabilityRoom]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -329,6 +364,8 @@ export default function RoomsPage() {
               const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
               const ws = startOfWeekSunday(base);
               const we = addDays(ws, 7);
+              const weKey = toYmd(addDays(ws, 6));
+              const wsKey = toYmd(ws);
               return (
                 <>
                   <div className="text-sm text-gray-700 font-medium">Week:</div>
@@ -354,6 +391,9 @@ export default function RoomsPage() {
                   </button>
                   <div className="text-xs text-gray-500">
                     Showing reserved/occupied slots effective during {ws.toLocaleDateString('en-GB')} – {addDays(we, -1).toLocaleDateString('en-GB')}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Editing room availability for this week only ({wsKey} → {weKey}).
                   </div>
                 </>
               );
@@ -458,7 +498,14 @@ export default function RoomsPage() {
                 try {
                   const room = availabilityRoom as any;
                   const existing = Array.isArray(room.availabilities) ? room.availabilities : [];
-                  await Promise.all(existing.map((a: any) => roomsService.deleteAvailability(a.id)));
+                  const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+                  const ws = startOfWeekSunday(base);
+                  const wsKey = toYmd(ws);
+                  const weKey = toYmd(addDays(ws, 6)); // inclusive end (Sat)
+
+                  // Only replace availabilities for the selected week; keep other weeks untouched
+                  const toDelete = existing.filter((a: any) => availabilityOverlapsWeek(a, wsKey, weKey));
+                  await Promise.all(toDelete.map((a: any) => roomsService.deleteAvailability(a.id)));
 
                   const create: any[] = [];
                   for (let day = 0; day < 7; day++) {
@@ -469,7 +516,7 @@ export default function RoomsPage() {
                       if ((!on || i === 48) && runStart !== null) {
                         const startTime = slotIndexToTime(runStart);
                         const endTime = slotIndexToTime(i);
-                        create.push({ dayOfWeek: day, startTime, endTime });
+                        create.push({ dayOfWeek: day, startTime, endTime, effectiveFrom: wsKey, effectiveTo: weKey });
                         runStart = null;
                       }
                     }

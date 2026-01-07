@@ -24,19 +24,62 @@ function toErrorString(err: any) {
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const BRANCHES = ['MOA', 'Espace', 'SODIC', 'PalmHills'];
 
+const toYmd = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const toDateKey = (v: any) => {
+  if (!v) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return toYmd(d);
+};
+
+const startOfWeekSunday = (d: Date) => {
+  const date = new Date(d);
+  const day = date.getDay();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - day);
+  return date;
+};
+
+const addDays = (d: Date, days: number) => {
+  const x = new Date(d);
+  x.setDate(x.getDate() + days);
+  return x;
+};
+
+const overlapsWeek = (ts: any, weekStart: Date, weekEndExclusive: Date) => {
+  const ef = ts?.effectiveFrom ? new Date(ts.effectiveFrom) : null;
+  const et = ts?.effectiveTo ? new Date(ts.effectiveTo) : null;
+  const start = ef ? ef : new Date('1970-01-01T00:00:00Z');
+  const end = et ? et : new Date('2999-12-31T00:00:00Z');
+  return start < weekEndExclusive && end >= weekStart;
+};
+
 const timeToMinutes = (hhmm: string) => {
   const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm || '').trim());
   if (!m) return 0;
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 };
 
-const isTeachingSlotWithinRoomAvailability = (slot: any, room: any) => {
+const availabilityOverlapsWeek = (av: any, weekStartKey: string, weekEndKey: string) => {
+  const s = toDateKey(av?.effectiveFrom) || '0000-01-01';
+  const e = toDateKey(av?.effectiveTo) || '9999-12-31';
+  return s <= weekEndKey && e >= weekStartKey;
+};
+
+const isTeachingSlotWithinRoomAvailabilityForWeek = (slot: any, room: any, weekStartKey: string, weekEndKey: string) => {
   const avs = Array.isArray(room?.availabilities) ? room.availabilities : [];
   if (!avs.length) return false;
   const day = Number(slot?.dayOfWeek);
   const sStart = timeToMinutes(String(slot?.startTime || '00:00'));
   const sEnd = timeToMinutes(String(slot?.endTime || '00:00'));
   for (const a of avs) {
+    if (!availabilityOverlapsWeek(a, weekStartKey, weekEndKey)) continue;
     const aDay = Number(a?.dayOfWeek);
     if (aDay !== day) continue;
     const aStart = timeToMinutes(String(a?.startTime || '00:00'));
@@ -70,6 +113,7 @@ export default function AllocationsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({ branch: '', roomId: '', teachingSlotId: '' });
   const [saving, setSaving] = useState(false);
+  const [weekDate, setWeekDate] = useState<string>(() => toYmd(new Date()));
 
   const fetchAll = async () => {
     setLoading(true);
@@ -235,9 +279,16 @@ export default function AllocationsPage() {
 
         const selectedRoomId = draft.roomId || String(row?.defaultClass?.roomId || '');
         const selectedRoom = rooms.find((r: any) => String(r.id) === String(selectedRoomId));
+        const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+        const ws = startOfWeekSunday(base);
+        const weExclusive = addDays(ws, 7);
+        const wsKey = toYmd(ws);
+        const weKey = toYmd(addDays(ws, 6)); // inclusive end
+
         const options = teachingSlots
           .filter((ts: any) => String(ts.roomId) === String(selectedRoomId))
-          .filter((ts: any) => (selectedRoom ? isTeachingSlotWithinRoomAvailability(ts, selectedRoom) : true));
+          .filter((ts: any) => overlapsWeek(ts, ws, weExclusive))
+          .filter((ts: any) => (selectedRoom ? isTeachingSlotWithinRoomAvailabilityForWeek(ts, selectedRoom, wsKey, weKey) : true));
 
         // Lock reserved/occupied slots unless it's already this group's slot
         const isLockedByOther = (ts: any) => {
@@ -386,6 +437,42 @@ export default function AllocationsPage() {
   return (
     <>
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">{error}</div>}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        {(() => {
+          const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+          const ws = startOfWeekSunday(base);
+          const we = addDays(ws, 7);
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-sm text-gray-700 font-medium">Week:</div>
+              <button
+                type="button"
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                onClick={() => setWeekDate(toYmd(addDays(ws, -7)))}
+              >
+                Prev
+              </button>
+              <input
+                type="date"
+                value={weekDate}
+                onChange={(e) => setWeekDate(e.target.value)}
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+              />
+              <button
+                type="button"
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                onClick={() => setWeekDate(toYmd(addDays(ws, 7)))}
+              >
+                Next
+              </button>
+              <div className="text-xs text-gray-500">
+                Allocating for {ws.toLocaleDateString('en-GB')} – {addDays(we, -1).toLocaleDateString('en-GB')}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
 
       <StandardListView
         title="Allocations"
