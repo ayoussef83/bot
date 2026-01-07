@@ -26,7 +26,10 @@ export const studentsService = {
   listEnrollments: (studentId: string) => api.get<StudentEnrollment[]>(`/students/${studentId}/enrollments`),
   addEnrollment: (studentId: string, data: { courseLevelId: string; classId?: string }) =>
     api.post<StudentEnrollment>(`/students/${studentId}/enrollments`, data),
-  updateEnrollment: (enrollmentId: string, data: { classId?: string | null; groupId?: string | null; status?: string }) =>
+  updateEnrollment: (
+    enrollmentId: string,
+    data: { classId?: string | null; groupId?: string | null; status?: string; reason?: string },
+  ) =>
     api.patch<StudentEnrollment>(`/students/enrollments/${enrollmentId}`, data),
   removeEnrollment: (enrollmentId: string) => api.delete(`/students/enrollments/${enrollmentId}`),
 };

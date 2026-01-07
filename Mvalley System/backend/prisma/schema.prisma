@@ -368,6 +368,13 @@ model Group {
   defaultClassId String?
   defaultClass   Class? @relation("GroupDefaultClass", fields: [defaultClassId], references: [id])
 
+  // Group planning fields (optional overrides; if unset, UI can derive from defaultClass/slot)
+  location   Location?
+  minCapacity Int?
+  maxCapacity Int?
+  ageMin     Int?
+  ageMax     Int?
+
   // Relations
   enrollments StudentEnrollment[]
   confirmedCandidateGroups CandidateGroup[] @relation("CandidateGroupConfirmedGroup")
@@ -382,6 +389,7 @@ model Group {
   @@index([courseLevelId])
   @@index([defaultClassId])
   @@index([createdById])
+  @@index([location])
   @@index([deletedAt])
   @@map("groups")
 }

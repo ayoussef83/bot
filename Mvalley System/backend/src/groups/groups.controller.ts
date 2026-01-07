@@ -20,7 +20,17 @@ export class GroupsController {
   @Post()
   @Roles(UserRole.super_admin, UserRole.management, UserRole.operations)
   create(
-    @Body() body: { name?: string; courseLevelId: string; defaultClassId?: string | null },
+    @Body()
+    body: {
+      name?: string;
+      courseLevelId: string;
+      defaultClassId?: string | null;
+      location?: any;
+      minCapacity?: number | null;
+      maxCapacity?: number | null;
+      ageMin?: number | null;
+      ageMax?: number | null;
+    },
     @CurrentUser() user: any,
   ) {
     return this.groupsService.create({ ...body, createdById: user?.id });
@@ -28,7 +38,20 @@ export class GroupsController {
 
   @Patch(':id')
   @Roles(UserRole.super_admin, UserRole.management, UserRole.operations)
-  update(@Param('id') id: string, @Body() body: Partial<{ name: string; courseLevelId: string; defaultClassId?: string | null }>) {
+  update(
+    @Param('id') id: string,
+    @Body()
+    body: Partial<{
+      name: string;
+      courseLevelId: string;
+      defaultClassId?: string | null;
+      location?: any;
+      minCapacity?: number | null;
+      maxCapacity?: number | null;
+      ageMin?: number | null;
+      ageMax?: number | null;
+    }>,
+  ) {
     return this.groupsService.update(id, body);
   }
 

@@ -5,12 +5,13 @@ import StandardListView, { FilterConfig } from '@/components/StandardListView';
 import EmptyState from '@/components/EmptyState';
 import { ActionButton, Column } from '@/components/DataTable';
 import { FiEdit, FiPlus, FiSave, FiTrash2, FiX } from 'react-icons/fi';
-import { coursesService, classesService, groupsService, type Group, type Class } from '@/lib/services';
+import { coursesService, classesService, groupsService, studentsService, type Group, type Class, type Student } from '@/lib/services';
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [levels, setLevels] = useState<any[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,16 +19,33 @@ export default function GroupsPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Group | null>(null);
-  const [form, setForm] = useState({ courseLevelId: '', defaultClassId: '' });
+  const [form, setForm] = useState({
+    courseLevelId: '',
+    defaultClassId: '',
+    location: '',
+    minCapacity: '',
+    maxCapacity: '',
+    ageMin: '',
+    ageMax: '',
+  });
+  const [membersSearch, setMembersSearch] = useState('');
+  const [pendingMemberEnrollmentIds, setPendingMemberEnrollmentIds] = useState<Set<string>>(new Set());
+  const [savingMembers, setSavingMembers] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
     setError('');
     try {
-      const [g, l, c] = await Promise.all([groupsService.getAll(), coursesService.listLevels(), classesService.getAll()]);
+      const [g, l, c, s] = await Promise.all([
+        groupsService.getAll(),
+        coursesService.listLevels(),
+        classesService.getAll(),
+        studentsService.getAll(),
+      ]);
       setGroups(Array.isArray(g.data) ? g.data : []);
       setLevels(Array.isArray(l.data) ? l.data : []);
       setClasses(Array.isArray(c.data) ? c.data : []);
+      setStudents(Array.isArray(s.data) ? s.data : []);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load groups');
     } finally {
@@ -63,9 +81,8 @@ export default function GroupsPage() {
       key: 'capacity',
       label: 'Capacity',
       render: (_, row: any) => {
-        const c = row?.defaultClass;
-        const min = c?.minCapacity;
-        const max = c?.maxCapacity ?? c?.capacity;
+        const min = row?.minCapacity ?? row?.defaultClass?.minCapacity;
+        const max = row?.maxCapacity ?? (row?.defaultClass?.maxCapacity ?? row?.defaultClass?.capacity);
         if (min && max) return <span className="text-sm text-gray-700">{min}–{max}</span>;
         if (max) return <span className="text-sm text-gray-700">{max}</span>;
         return <span className="text-sm text-gray-500">—</span>;
@@ -75,9 +92,10 @@ export default function GroupsPage() {
       key: 'ageGroup',
       label: 'Age Group',
       render: (_, row: any) => {
-        const c = row?.defaultClass;
-        if (c?.ageMin != null && c?.ageMax != null) return <span className="text-sm text-gray-700">{c.ageMin}–{c.ageMax}</span>;
-        if (c?.ageMin != null) return <span className="text-sm text-gray-700">{c.ageMin}+</span>;
+        const ageMin = row?.ageMin ?? row?.defaultClass?.ageMin;
+        const ageMax = row?.ageMax ?? row?.defaultClass?.ageMax;
+        if (ageMin != null && ageMax != null) return <span className="text-sm text-gray-700">{ageMin}–{ageMax}</span>;
+        if (ageMin != null) return <span className="text-sm text-gray-700">{ageMin}+</span>;
         return <span className="text-sm text-gray-500">—</span>;
       },
     },
@@ -85,8 +103,7 @@ export default function GroupsPage() {
       key: 'location',
       label: 'Location',
       render: (_, row: any) => {
-        const c = row?.defaultClass;
-        const loc = c?.locationName || c?.location;
+        const loc = row?.location || row?.defaultClass?.locationName || row?.defaultClass?.location;
         return <span className="text-sm text-gray-700">{loc || '—'}</span>;
       },
     },
@@ -121,7 +138,9 @@ export default function GroupsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ courseLevelId: '', defaultClassId: '' });
+    setForm({ courseLevelId: '', defaultClassId: '', location: '', minCapacity: '', maxCapacity: '', ageMin: '', ageMax: '' });
+    setPendingMemberEnrollmentIds(new Set());
+    setMembersSearch('');
     setShowModal(true);
   };
 
@@ -130,7 +149,14 @@ export default function GroupsPage() {
     setForm({
       courseLevelId: row?.courseLevelId || row?.courseLevel?.id || '',
       defaultClassId: row?.defaultClassId || '',
+      location: row?.location || '',
+      minCapacity: row?.minCapacity != null ? String(row.minCapacity) : '',
+      maxCapacity: row?.maxCapacity != null ? String(row.maxCapacity) : '',
+      ageMin: row?.ageMin != null ? String(row.ageMin) : '',
+      ageMax: row?.ageMax != null ? String(row.ageMax) : '',
     });
+    setPendingMemberEnrollmentIds(new Set());
+    setMembersSearch('');
     setShowModal(true);
   };
 
@@ -141,6 +167,11 @@ export default function GroupsPage() {
       const payload = {
         courseLevelId: form.courseLevelId,
         defaultClassId: form.defaultClassId || null,
+        location: form.location || null,
+        minCapacity: form.minCapacity ? Number(form.minCapacity) : null,
+        maxCapacity: form.maxCapacity ? Number(form.maxCapacity) : null,
+        ageMin: form.ageMin ? Number(form.ageMin) : null,
+        ageMax: form.ageMax ? Number(form.ageMax) : null,
       };
       if (!payload.courseLevelId) throw new Error('Course level is required');
 
@@ -184,6 +215,24 @@ export default function GroupsPage() {
     id: c.id,
     label: `${c.name} (${c.locationName || c.location})`,
   }));
+
+  const memberCandidates = useMemo(() => {
+    if (!form.courseLevelId) return [];
+    const q = membersSearch.trim().toLowerCase();
+    const out: { student: any; enrollment: any; isMember: boolean }[] = [];
+    for (const s of students as any[]) {
+      const ens = Array.isArray(s.enrollments) ? s.enrollments : [];
+      for (const e of ens) {
+        if (String(e.courseLevelId) !== String(form.courseLevelId)) continue;
+        const isMember = Boolean(editing?.id && String(e.groupId || '') === String(editing.id));
+        const fullName = `${s.firstName || ''} ${s.lastName || ''}`.trim().toLowerCase();
+        const phone = String(s.phone || '').toLowerCase();
+        if (q && !fullName.includes(q) && !phone.includes(q)) continue;
+        out.push({ student: s, enrollment: e, isMember });
+      }
+    }
+    return out;
+  }, [students, form.courseLevelId, membersSearch, editing?.id]);
 
   return (
     <>
@@ -237,7 +286,7 @@ export default function GroupsPage() {
                       {editing?.name ? editing.name : 'Will be generated after selecting Course Level'}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      Format: 2 letters (course name) - 2 digit number - 1 digit level. مثال: LW-01-1
+                      Format: 2 letters (course name) - 3 digit number - 1 digit level. مثال: LW-001-1
                     </div>
                   </div>
 
@@ -258,7 +307,7 @@ export default function GroupsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Location / Capacity / Age Group (via Default Course Group)</label>
+                    <label className="block text-sm font-medium text-gray-700">Default Course Group (optional)</label>
                     <select
                       value={form.defaultClassId}
                       onChange={(e) => setForm((f) => ({ ...f, defaultClassId: e.target.value }))}
@@ -272,8 +321,148 @@ export default function GroupsPage() {
                       ))}
                     </select>
                     <p className="mt-1 text-xs text-gray-500">
-                      If set, Capacity / Age Group / Location are taken from that Course Group, and Allocations can auto-pick it.
+                      If set, Allocations can auto-pick a class, but you can also set Location/Capacity/Age below.
                     </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Location (Branch)</label>
+                      <select
+                        value={form.location}
+                        onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                        className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                        <option value="">—</option>
+                        <option value="MOA">MOA</option>
+                        <option value="Espace">Espace</option>
+                        <option value="SODIC">SODIC</option>
+                        <option value="PalmHills">PalmHills</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Capacity (min / max)</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={form.minCapacity}
+                          onChange={(e) => setForm((f) => ({ ...f, minCapacity: e.target.value }))}
+                          className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          inputMode="numeric"
+                          placeholder="Min"
+                        />
+                        <input
+                          value={form.maxCapacity}
+                          onChange={(e) => setForm((f) => ({ ...f, maxCapacity: e.target.value }))}
+                          className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          inputMode="numeric"
+                          placeholder="Max"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Age Group (from / to)</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          value={form.ageMin}
+                          onChange={(e) => setForm((f) => ({ ...f, ageMin: e.target.value }))}
+                          className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          inputMode="numeric"
+                          placeholder="From"
+                        />
+                        <input
+                          value={form.ageMax}
+                          onChange={(e) => setForm((f) => ({ ...f, ageMax: e.target.value }))}
+                          className="mt-1 block w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          inputMode="numeric"
+                          placeholder="To"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Group Members</div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        value={membersSearch}
+                        onChange={(e) => setMembersSearch(e.target.value)}
+                        className="w-full rounded-md border border-gray-400 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-2 py-1"
+                        placeholder="Search student by name or phone…"
+                      />
+                    </div>
+                    <div className="max-h-56 overflow-auto border border-gray-200 rounded-md">
+                      {!form.courseLevelId ? (
+                        <div className="p-3 text-sm text-gray-500">Select Course/Level to manage members.</div>
+                      ) : memberCandidates.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500">No students found for this course level.</div>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {memberCandidates.map(({ student, enrollment, isMember }) => {
+                            const enrolled = pendingMemberEnrollmentIds.has(enrollment.id) ? !isMember : isMember;
+                            return (
+                              <label key={enrollment.id} className="flex items-center justify-between p-2 text-sm">
+                                <div>
+                                  <div className="font-medium text-gray-900">
+                                    {student.firstName} {student.lastName}
+                                  </div>
+                                  <div className="text-xs text-gray-500">{student.phone || '—'}</div>
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  checked={enrolled}
+                                  disabled={!editing?.id}
+                                  onChange={() => {
+                                    setPendingMemberEnrollmentIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(enrollment.id)) next.delete(enrollment.id);
+                                      else next.add(enrollment.id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex justify-end mt-2">
+                      <button
+                        type="button"
+                        disabled={!editing?.id || pendingMemberEnrollmentIds.size === 0 || savingMembers}
+                        onClick={async () => {
+                          if (!editing?.id) return;
+                          setSavingMembers(true);
+                          setError('');
+                          try {
+                            for (const enrollmentId of Array.from(pendingMemberEnrollmentIds)) {
+                              const match = memberCandidates.find((m) => m.enrollment.id === enrollmentId);
+                              if (!match) continue;
+                              const shouldBeMember = !match.isMember;
+                              await studentsService.updateEnrollment(enrollmentId, {
+                                groupId: shouldBeMember ? editing.id : null,
+                                reason: 'Group members update (Groups tab)',
+                              } as any);
+                            }
+                            setPendingMemberEnrollmentIds(new Set());
+                            await fetchAll();
+                          } catch (e: any) {
+                            setError(e?.response?.data?.message || 'Failed to update members');
+                          } finally {
+                            setSavingMembers(false);
+                          }
+                        }}
+                        className="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm disabled:opacity-60"
+                      >
+                        {savingMembers ? 'Updating…' : 'Apply member changes'}
+                      </button>
+                    </div>
+                    {!editing?.id ? (
+                      <div className="text-xs text-gray-500 mt-2">Save the group first, then assign members.</div>
+                    ) : null}
                   </div>
 
                   <div className="flex gap-3 pt-2">

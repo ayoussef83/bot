@@ -24,6 +24,28 @@ function toErrorString(err: any) {
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const BRANCHES = ['MOA', 'Espace', 'SODIC', 'PalmHills'];
 
+const timeToMinutes = (hhmm: string) => {
+  const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m) return 0;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+};
+
+const isTeachingSlotWithinRoomAvailability = (slot: any, room: any) => {
+  const avs = Array.isArray(room?.availabilities) ? room.availabilities : [];
+  if (!avs.length) return false;
+  const day = Number(slot?.dayOfWeek);
+  const sStart = timeToMinutes(String(slot?.startTime || '00:00'));
+  const sEnd = timeToMinutes(String(slot?.endTime || '00:00'));
+  for (const a of avs) {
+    const aDay = Number(a?.dayOfWeek);
+    if (aDay !== day) continue;
+    const aStart = timeToMinutes(String(a?.startTime || '00:00'));
+    const aEnd = timeToMinutes(String(a?.endTime || '00:00'));
+    if (sStart >= aStart && sEnd <= aEnd) return true;
+  }
+  return false;
+};
+
 type Draft = {
   branch: string;
   roomId: string;
@@ -212,7 +234,10 @@ export default function AllocationsPage() {
         }
 
         const selectedRoomId = draft.roomId || String(row?.defaultClass?.roomId || '');
-        const options = teachingSlots.filter((ts: any) => String(ts.roomId) === String(selectedRoomId));
+        const selectedRoom = rooms.find((r: any) => String(r.id) === String(selectedRoomId));
+        const options = teachingSlots
+          .filter((ts: any) => String(ts.roomId) === String(selectedRoomId))
+          .filter((ts: any) => (selectedRoom ? isTeachingSlotWithinRoomAvailability(ts, selectedRoom) : true));
 
         // Lock reserved/occupied slots unless it's already this group's slot
         const isLockedByOther = (ts: any) => {
@@ -226,11 +251,11 @@ export default function AllocationsPage() {
         return (
           <select
             value={draft.teachingSlotId || currentSlotId || ''}
-            disabled={!draft.roomId}
+            disabled={!draft.roomId || !selectedRoom?.availabilities?.length}
             onChange={(e) => setDraft((d) => ({ ...d, teachingSlotId: e.target.value }))}
             className="w-full rounded-md border-gray-300 text-sm disabled:opacity-60"
           >
-            <option value="">Select…</option>
+            <option value="">{!selectedRoom?.availabilities?.length ? 'Set room availability first…' : 'Select…'}</option>
             {options.map((ts: any) => {
               const label = `${DOW[ts.dayOfWeek]} ${ts.startTime}–${ts.endTime}`;
               const locked = isLockedByOther(ts);

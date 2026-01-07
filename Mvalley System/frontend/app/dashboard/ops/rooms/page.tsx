@@ -28,6 +28,36 @@ const timeToSlotIndex = (hhmm: string) => {
   return Math.max(0, Math.min(47, Math.floor((h * 60 + mm) / 30)));
 };
 
+const toYmd = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const startOfWeekSunday = (d: Date) => {
+  const date = new Date(d);
+  const day = date.getDay(); // 0=Sun
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - day);
+  return date;
+};
+
+const addDays = (d: Date, days: number) => {
+  const x = new Date(d);
+  x.setDate(x.getDate() + days);
+  return x;
+};
+
+const overlapsWeek = (ts: any, weekStart: Date, weekEndExclusive: Date) => {
+  const ef = ts?.effectiveFrom ? new Date(ts.effectiveFrom) : null;
+  const et = ts?.effectiveTo ? new Date(ts.effectiveTo) : null;
+  const start = ef ? ef : new Date('1970-01-01T00:00:00Z');
+  const end = et ? et : new Date('2999-12-31T00:00:00Z');
+  // overlap if start < weekEnd && end >= weekStart (treat end inclusive)
+  return start < weekEndExclusive && end >= weekStart;
+};
+
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [teachingSlots, setTeachingSlots] = useState<TeachingSlot[]>([]);
@@ -45,6 +75,7 @@ export default function RoomsPage() {
   const [availabilityRoom, setAvailabilityRoom] = useState<Room | null>(null);
   const [grid, setGrid] = useState<boolean[][]>(() => Array.from({ length: 7 }, () => Array.from({ length: 48 }, () => false)));
   const [savingGrid, setSavingGrid] = useState(false);
+  const [weekDate, setWeekDate] = useState<string>(() => toYmd(new Date()));
 
   const fetchAll = async () => {
     setLoading(true);
@@ -153,6 +184,7 @@ export default function RoomsPage() {
         }
         setAvailabilityRoom(row);
         setGrid(next);
+        setWeekDate(toYmd(new Date()));
         setShowAvailability(true);
       },
     },
@@ -292,10 +324,50 @@ export default function RoomsPage() {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {(() => {
+              const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+              const ws = startOfWeekSunday(base);
+              const we = addDays(ws, 7);
+              return (
+                <>
+                  <div className="text-sm text-gray-700 font-medium">Week:</div>
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                    onClick={() => setWeekDate(toYmd(addDays(ws, -7)))}
+                  >
+                    Prev
+                  </button>
+                  <input
+                    type="date"
+                    value={weekDate}
+                    onChange={(e) => setWeekDate(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                    onClick={() => setWeekDate(toYmd(addDays(ws, 7)))}
+                  >
+                    Next
+                  </button>
+                  <div className="text-xs text-gray-500">
+                    Showing reserved/occupied slots effective during {ws.toLocaleDateString('en-GB')} – {addDays(we, -1).toLocaleDateString('en-GB')}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
           {(() => {
+            const base = weekDate ? new Date(`${weekDate}T00:00:00`) : new Date();
+            const weekStart = startOfWeekSunday(base);
+            const weekEndExclusive = addDays(weekStart, 7);
             const slotBlocks = teachingSlots
               .filter((ts: any) => String(ts.roomId) === String((availabilityRoom as any).id))
-              .filter((ts: any) => ['reserved', 'occupied'].includes(String(ts.status || '').toLowerCase()));
+              .filter((ts: any) => ['reserved', 'occupied'].includes(String(ts.status || '').toLowerCase()))
+              .filter((ts: any) => overlapsWeek(ts, weekStart, weekEndExclusive));
             const locked = new Map<string, { label: string; isStart: boolean }>();
             for (const s of slotBlocks as any[]) {
               const day = Number(s.dayOfWeek);
