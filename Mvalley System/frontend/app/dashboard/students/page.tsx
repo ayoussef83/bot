@@ -117,6 +117,7 @@ export default function StudentsPage() {
           ...formData,
           learningTrack: 'general',
           age: parseInt(formData.age),
+          email: formData.email.trim() || undefined,
         });
       } else {
         if (!formData.phone.trim()) {
@@ -148,6 +149,7 @@ export default function StudentsPage() {
           ...formData,
           learningTrack: 'general',
           age: parseInt(formData.age),
+          email: formData.email.trim() || undefined,
           parentId,
         });
 
@@ -198,6 +200,8 @@ export default function StudentsPage() {
       setParentForm({ firstName: '', lastName: '', email: '' });
       setSelectedCourseGroupIds([]);
       setPhoneGate('empty');
+      // Clear editId from URL so the deep-link effect doesn't re-open the form
+      router.replace('/dashboard/students');
       fetchStudents();
     } catch (err: any) {
       setError(toErrorString(err, 'Failed to save student'));
