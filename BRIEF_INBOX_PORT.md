@@ -19,6 +19,10 @@
 6. Frontend: port inbox pages; replace `authFetch` import with MV-OS auth lib equivalent (check `frontend/src/lib/`); keep Arabic labels.
 7. Env: document every var needed in `ENV_NEEDED_INBOX.md` (Meta app creds, WhatsApp Cloud token for 01060014563, `SOCIAL_CRYPTO_KEY`, Twilio if kept).
 
+## WhatsApp transport (updated 2026-07-03)
+
+Primary WhatsApp transport for MV is **360dialog**, not Baileys/Meta-Cloud-direct. Read `360DIALOG_INTEGRATION_GUIDE.md` — especially the two gotchas: inbound media host swap (`lookaside.fbsbx.com` → `waba-v2.360dialog.io` + `D360-API-KEY`) and normalizing phones to intl `20…` before building `<phoneNumberId>:<waId>` thread keys. Adapt the ported `whatsapp-cloud.service.ts` accordingly (URL + header swap only; payloads/webhooks identical). Keep Baileys as optional secondary lines. One-way notification templates already ride 360dialog via the notifications module — do not duplicate.
+
 ## Acceptance
 
 - Backend compiles; module loads without DI errors (list registrations for integrator)
