@@ -29,8 +29,8 @@ FROM public.ecr.aws/docker/library/node:18-bullseye-slim
 
 WORKDIR /app
 
-# Ensure OpenSSL is present for Prisma query engine
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+# Ensure OpenSSL is present for Prisma query engine; git needed for baileys' git deps
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl git \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
