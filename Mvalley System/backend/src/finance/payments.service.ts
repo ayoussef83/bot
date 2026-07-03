@@ -156,6 +156,15 @@ export class PaymentsService {
       },
     });
 
+    // Onboarding hook (Workflow B): first payment moves the student's active
+    // enrollments from pending_payment -> paid_unverified for ops verification.
+    if (allocation.invoice?.studentId) {
+      await this.prisma.studentEnrollment.updateMany({
+        where: { studentId: allocation.invoice.studentId, onboardingStatus: 'pending_payment' },
+        data: { onboardingStatus: 'paid_unverified' },
+      });
+    }
+
     // Update invoice status
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: createAllocationDto.invoiceId },

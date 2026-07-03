@@ -18,6 +18,7 @@ import { MarketingModule } from './marketing/marketing.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ParentsModule } from './parents/parents.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { OpsModelModule } from './ops-model/ops-model.module';
 import { CoursesModule } from './courses/courses.module';
 import { GroupsModule } from './groups/groups.module';
 import { PayrollModule } from './payroll/payroll.module';
@@ -48,6 +49,7 @@ import { TeachingSlotsModule } from './teaching-slots/teaching-slots.module';
     WebhooksModule,
     ParentsModule,
     WhatsappModule,
+    OpsModelModule,
     GroupsModule,
     PayrollModule,
     AllocationModule,

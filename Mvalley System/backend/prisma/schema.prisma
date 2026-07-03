@@ -369,6 +369,18 @@ model StudentEnrollment {
 
   status EnrollmentStatus @default(active)
 
+  // Operating model: 12-session rounds + renewal tracking (GAP B1)
+  sessionsPlanned  Int              @default(12)
+  roundNo          Int              @default(1)
+  renewalDate      DateTime?
+  // Onboarding pipeline (GAP B3)
+  onboardingStatus OnboardingStatus @default(pending_payment)
+  onboardedAt      DateTime?
+  onboardedById    String?
+
+  renewalCases    RenewalCase[]
+  progressReports ProgressReport[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -842,6 +854,8 @@ model SessionReport {
   activitiesRating    ReportRating
   difficultyRating    ReportRating
   materialSuitability Int // 1-5 (age-group fit)
+  topicCovered        String? // 2-line session log (operating model Workflow C)
+  homework            String?
   issues              String?
   followUps           String? // shown to instructor at next session start
   submittedAt         DateTime     @default(now())
@@ -1853,6 +1867,168 @@ model LeadFollowUp {
 
   @@index([leadId])
   @@map("lead_follow_ups")
+}
+
+// ============================================
+// OPERATING MODEL (GAP_ANALYSIS_OPERATING_MODEL.md)
+// ============================================
+
+enum OnboardingStatus {
+  pending_payment
+  paid_unverified
+  onboarded
+}
+
+enum RenewalStage {
+  due
+  reminder_sent
+  negotiating
+  renewed
+  lost
+}
+
+enum ChurnReason {
+  price
+  schedule
+  exams
+  moved
+  dissatisfied
+  other
+}
+
+// Workflow E — renewal pipeline, owned by Operations
+model RenewalCase {
+  id                       String            @id @default(uuid())
+  enrollmentId             String
+  enrollment               StudentEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  roundNo                  Int
+  dueDate                  DateTime
+  stage                    RenewalStage      @default(due)
+  attempts                 Int               @default(0)
+  lastContactAt            DateTime?
+  instructorRecommendation String?
+  churnReason              ChurnReason?
+  churnNotes               String?
+  ownerId                  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([enrollmentId, roundNo])
+  @@index([stage])
+  @@index([dueDate])
+  @@map("renewal_cases")
+}
+
+enum ProgressReportStatus {
+  draft
+  approved
+  published
+}
+
+// Workflow D — milestone reports at sessions 4/8/12
+model ProgressReport {
+  id           String               @id @default(uuid())
+  enrollmentId String
+  enrollment   StudentEnrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  milestone    Int // 4 | 8 | 12
+  content      String
+  strengths    String?
+  nextFocus    String?
+  status       ProgressReportStatus @default(draft)
+  authorId     String // instructor userId
+  approvedById String?
+  approvedAt   DateTime?
+  publishedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([enrollmentId, milestone])
+  @@index([status])
+  @@map("progress_reports")
+}
+
+enum PortfolioItemType {
+  certificate
+  project_photo
+  note
+}
+
+model PortfolioItem {
+  id          String            @id @default(uuid())
+  studentId   String
+  type        PortfolioItemType
+  url         String?
+  caption     String?
+  createdById String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([studentId])
+  @@map("portfolio_items")
+}
+
+enum SlotRequestStatus {
+  open
+  matched
+  closed
+}
+
+// Sales -> Ops official demand channel (Workflow A trigger)
+model SlotRequest {
+  id             String            @id @default(uuid())
+  parentId       String?
+  studentId      String?
+  courseId       String
+  courseLevelId  String?
+  preferredDay   Int? // 0=Sun..6=Sat
+  timeWindow     String? // e.g. "16:00-19:00"
+  location       Location?
+  notes          String?
+  status         SlotRequestStatus @default(open)
+  matchedClassId String?
+  createdById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([courseId, courseLevelId])
+  @@map("slot_requests")
+}
+
+enum AuditFlagType {
+  unpaid_booking
+  incomplete_profile
+  missing_attendance
+}
+
+enum AuditFlagStatus {
+  open
+  resolved
+}
+
+// Daily audits (Operations Department doc §2)
+model AuditFlag {
+  id             String          @id @default(uuid())
+  type           AuditFlagType
+  entityType     String // enrollment | parent | session
+  entityId       String
+  message        String
+  status         AuditFlagStatus @default(open)
+  resolvedById   String?
+  resolvedAt     DateTime?
+  resolutionNote String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([type, entityType, entityId, status])
+  @@index([status])
+  @@index([type])
+  @@map("audit_flags")
 }
 
 // ============================================
