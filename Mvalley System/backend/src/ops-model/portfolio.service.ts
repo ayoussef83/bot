@@ -54,7 +54,7 @@ export class PortfolioService {
     if (parent?.phone) {
       await this.prisma.notification.create({
         data: {
-          channel: 'sms',
+          channel: 'whatsapp',
           recipient: parent.phone,
           template: 'progress_report_published',
           message: `تقرير جديد عن تقدم ${r.enrollment.student.firstName} متاح الآن في ملفه — اسألونا عنه!`,

@@ -10,6 +10,11 @@ import { MockEmailProvider } from './providers/mock-email.provider';
 import { MockSmsProvider } from './providers/mock-sms.provider';
 import { MockWhatsAppProvider } from './providers/mock-whatsapp.provider';
 import { MockMetaMessengerProvider } from './providers/mock-meta-messenger.provider';
+import { Dialog360WhatsAppProvider } from './providers/dialog360-whatsapp.provider';
+
+// Mock only when explicitly requested — NODE_ENV=local on the datacenter stack
+// was silently mocking all channels (see COORDINATOR.md notifications note).
+const useMocks = process.env.MOCK_PROVIDERS === '1';
 
 @Module({
   imports: [PrismaModule],
@@ -22,20 +27,19 @@ import { MockMetaMessengerProvider } from './providers/mock-meta-messenger.provi
     MockSmsProvider,
     MockWhatsAppProvider,
     MockMetaMessengerProvider,
+    Dialog360WhatsAppProvider,
     {
       provide: EMAIL_PROVIDER,
-      useExisting:
-        process.env.NODE_ENV === 'local' ? MockEmailProvider : EmailService,
+      useExisting: useMocks ? MockEmailProvider : EmailService,
     },
     {
       provide: SMS_PROVIDER,
-      useExisting:
-        process.env.NODE_ENV === 'local' ? MockSmsProvider : SmsService,
+      useExisting: useMocks ? MockSmsProvider : SmsService,
     },
     {
+      // WhatsApp via 360dialog (Meta BSP). Falls back to SMS in NotificationsService.
       provide: WHATSAPP_PROVIDER,
-      useExisting:
-        process.env.NODE_ENV === 'local' ? MockWhatsAppProvider : WhatsAppService,
+      useExisting: useMocks ? MockWhatsAppProvider : Dialog360WhatsAppProvider,
     },
     {
       provide: META_MESSENGER_PROVIDER,

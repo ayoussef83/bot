@@ -70,7 +70,7 @@ export class RenewalsService {
     if (e.student.parent?.phone) {
       await this.prisma.notification.create({
         data: {
-          channel: 'sms',
+          channel: 'whatsapp',
           recipient: e.student.parent.phone,
           template: 'renewal_session8',
           message: `تجديد ${e.courseLevel.course.name} - ${e.student.firstName}: باقي 4 حصص على نهاية المستوى. تواصلوا معنا للتجديد.`,

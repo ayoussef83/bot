@@ -78,7 +78,7 @@ export class OpsWorkflowsService {
     if (e.student.parent?.phone) {
       await this.prisma.notification.create({
         data: {
-          channel: 'sms',
+          channel: 'whatsapp',
           recipient: e.student.parent.phone,
           template: 'welcome_onboarding',
           message: `أهلاً بيكم في Mindvalley! تم تسجيل ${e.student.firstName} في ${e.courseLevel.course.name}. Welcome aboard!`,

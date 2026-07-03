@@ -53,12 +53,24 @@ export class NotificationsService {
           );
           break;
         case 'whatsapp':
-          result = await this.whatsappProvider.send(
-            dto.recipient,
-            dto.message,
-            dto.template,
-            dto.payload,
-          );
+          // Primary: WhatsApp via 360dialog. Fallback: SMS (operating model —
+          // every parent touchpoint must arrive even if WA fails/unconfigured).
+          try {
+            result = await this.whatsappProvider.send(
+              dto.recipient,
+              dto.message,
+              dto.template,
+              dto.payload,
+            );
+          } catch (waError) {
+            result = await this.smsProvider.send(
+              dto.recipient,
+              dto.message,
+              dto.template,
+              dto.payload,
+            );
+            result = { ...result, provider: `${result.provider ?? 'sms'} (wa-fallback: ${waError.message})` };
+          }
           break;
         default:
           throw new Error(`Unsupported channel: ${dto.channel}`);

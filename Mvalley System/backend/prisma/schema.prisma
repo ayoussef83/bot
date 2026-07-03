@@ -111,6 +111,7 @@ enum IntegrationProvider {
   zoho_email
   smsmisr
   whatsapp_baileys
+  whatsapp_360dialog
 }
 
 enum MessageChannel {
