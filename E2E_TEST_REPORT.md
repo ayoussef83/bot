@@ -28,5 +28,16 @@ Ran as super_admin against the live stack (backend `stable-20260703-parents-fix`
 - No notification fired on payment (receipt automation not built yet — known blueprint gap).
 - Test data left in DB, prefixed `E2E` (student bd70ac26…, course "E2E Course 1783079129", junk course "E2E-GRP-1783079193" from bug #1) — say the word and I'll clean it.
 
-## Suggested fix batch
-Bugs 1–3 + 5–7 are one small backend PR (DTO fields, includes, validation). Bug 4 needs a payroll-flow decision. I can implement the batch and deploy via `./deploy.sh backend`.
+## Fix status (2026-07-03, deployed + re-verified on mv-app)
+
+All 7 bugs closed (commits `0a22f9f`, `5e11ae5`, `6294317`):
+- ✅ 1. `courseLevelId`/`roomId` accepted on class create/update; explicit link skips auto-course. Verified: no junk course created, both FKs set.
+- ✅ 2. Class detail includes enrollment roster (verified `enrollments:1`).
+- ✅ 3. Student profile includes invoices (verified `invoices:1`).
+- ✅ 4. **Not a bug — by design + matches policy:** part-time (hourly cost model) accrues per delivered hour at payroll run; full-time (monthly model) gets salary total. Verified: `POST /payroll/generate {year,month}` → hourly instructor draft payroll 225 EGP = 1.5h × 150 with session snapshot.
+- ✅ 5. Session dates normalized; bad date → 400.
+- ✅ 6. Empty-string FK → 400 (UUID validation).
+- ✅ 7. Invoice `classId:""` → 400.
+- Bonus: Dockerfile builder+production stages now install git (baileys libsignal git dep) — the VM's uncommitted Dockerfile fix is now in the repo.
+
+Stable tag: `stable-20260703-e2e-fixes`.
