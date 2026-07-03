@@ -54,6 +54,15 @@ Sessions add NEW files freely inside their module directories. Any edit to a sha
 - **Only the integrator deploys.** Sessions never run deploy.sh.
 - Tag a `stable-YYYYMMDD-<name>` baseline after every verified deploy.
 
+## Messaging channels (2026-07-03)
+
+- **Parent touchpoints = WhatsApp via 360dialog (Meta BSP) primary, SMS (SMSMisr) fallback** — automatic in `NotificationsService` for channel `whatsapp`.
+- Configure in Settings → Integrations (`IntegrationConfig`):
+  - `whatsapp_360dialog`: secrets `{apiKey}`, config `{defaultLanguage:'ar', templateMap:{renewal_session8:'<approved-template>', welcome_onboarding:'...', progress_report_published:'...'}}`. Templates must be approved in the 360dialog hub first.
+  - `smsmisr`: existing provider config.
+- **Providers are REAL by default now** — set `MOCK_PROVIDERS=1` env to mock (previously `NODE_ENV=local` silently mocked all channels on the datacenter stack).
+- S1 (inbox port) handles two-way conversations; these one-way notification templates ride 360dialog independently.
+
 ## Integrator loop
 
 Every merge window: `git fetch --all` → review each feature branch diff → merge to `main` in dependency order → run migrations on staging → deploy → smoke test → update Status below. Use the session-coordinator skill ("check sessions") to generate branch status reports.
