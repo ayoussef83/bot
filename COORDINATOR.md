@@ -17,7 +17,10 @@
 | S4 | RBAC + mobile API | `feature/mobile-api` | Role/Permission tables, permission matrix seed (OPERATING_MODEL §3), `mobile/` API namespace, FCM push | — |
 | S5 | Instructor app | `feature/app-instructor` | Expo app: schedule, attendance, session report, availability, allocation accept/decline | S4 |
 | S6 | Sheet import + Locations | `feature/sheet-import` | Location model (MOA/ESPACES/DOKKI/Maadi/Online), idempotent importer for the Schedule System sheet, invalid-groups fix queue | — |
-| S7 | Parent app | `feature/app-parent` | Expo parent mode: schedule, attendance, payments, chat | S4, S5 shipped |
+| S7 | Parent app | `feature/app-parent` | Expo parent mode: schedule, attendance, payments, chat, portfolio | S4, S5 shipped |
+| S8 | Ops workflows | `feature/ops-workflows` | Slot requests, onboarding pipeline, daily audits (`BRIEF_OPS_WORKFLOWS.md`) | S4 RBAC |
+| S9 | Renewal + portfolio | `feature/renewal-portfolio` | Renewal engine, progress reports, portfolio (`BRIEF_RENEWAL_PORTFOLIO.md`) | S4; S10 prices later |
+| S10 | Pricing + commissions | `feature/pricing-commissions` | PriceList, discount governance, sales commissions (GAP B6) | S2 CRM |
 
 Recommended wave 1: **S1 + S4 + S6** (no interdependencies). Wave 2: S2 + S5. Wave 3: S3 + S7.
 

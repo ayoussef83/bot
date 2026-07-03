@@ -6,9 +6,9 @@
 ## Part A — RBAC
 
 1. Copy Nour Auto RBAC models from `~/NourAutoERP/backend/prisma/schema.prisma`: `Role, Permission, RolePermission, UserRole` (+ `Branch, UserBranch` adapted to `Location, UserLocation`). Deliver as `prisma/PROPOSED_MODELS_RBAC.md` for integrator merge.
-2. `Location` model: id, name, type (`own_branch | partner_venue | online`). Seed: MOA, ESPACES, DOKKI, Maadi, Online, Sheikh Zayed, Tagamo3.
+2. `Location` model: id, name, type (`own_branch | partner_venue | online`). Seed: MOA, ESPACES, DOKKI, Maadi, **Nasr City**, Online, Sheikh Zayed, Tagamo3 (Nasr City confirmed in customer data — see GAP_ANALYSIS_OPERATING_MODEL.md B9).
 3. Port/adapt guards from Nour Auto `backend/src/auth/`: `RolesGuard`, `@Permissions('resource.action')` decorator.
-4. Seed script `prisma/seed-rbac.ts`: the full permission matrix from OPERATING_MODEL §3 (7 roles). Idempotent.
+4. Seed script `prisma/seed-rbac.ts`: the full permission matrix from OPERATING_MODEL §3, EXTENDED per GAP_ANALYSIS B5 with manager tiers: `sales_manager`, `instructors_manager`, `ops_leader` (in addition to agent-level roles). Manager-only permissions: `groups.approve` + price-list edit (ops_leader), `reports.approve` (instructors_manager), `discounts.approve` (sales_manager). Idempotent.
 5. Scope filters: helper `applyScope(query, user, {location?, ownership?})` used by services; document usage in `RBAC_USAGE.md`.
 6. Wire existing endpoints minimally: add `@Permissions()` to students, groups, finance controllers as reference implementations (3 controllers is enough — the rest follow in their own sessions).
 

@@ -28,6 +28,17 @@ Sheet ID: `1VnkvVoLUhZNjN1N_p5XTjxKA_YPi6mD46xA3EBK3Zf4` (public htmlview). CSV 
 4. If new models needed (Location, legacy tables, fix queue) → deliver `prisma/PROPOSED_MODELS_IMPORT.md` ([SHARED] schema — integrator merges). Coordinate with S4 which also creates `Location`: **S4 owns the Location model; you consume it** — if S4's isn't merged yet, define it identically in your proposal and note the overlap.
 5. Summary output: counts per entity, violations, unknown names — printed and written to `IMPORT_REPORT.md`.
 
+## Extension (added 2026-07-03, from GAP_ANALYSIS B10)
+
+Also import the **2025 Customer Data** Google Sheet (Drive file `1NAu4S8_WJyvIrbq8RtgqgFEn12cGZFNQUAAMdEq9qB0`, folder `109zBwhDXM6snfXRON0kegzOdQsZUH5Rq`):
+- Columns: Group Name, Course, Level, Location, Day, Time, Kid's Name, Phone, Email, Session No., last/next payment, notes
+- Parents: dedupe by normalized phone (E.164); kids sharing a phone share a parent
+- Students + enrollments into matching groups (codes like "PB G36" ≈ PB036 — build alias map)
+- Session No. ("session 8 Lv 1") → enrollment session counter seed (feeds renewal engine S9)
+- "next payment" dates → `renewalDate` seed; "STOPPED"/"FINISHED" → enrollment status
+- Notes column → ContactNote/Student note (rich at-risk + sentiment info — do not lose)
+- Locations include Nasr City, Zayed, Tagamo3, Dokki — map to Location records
+
 ## Acceptance
 
 - Running twice produces zero duplicates
