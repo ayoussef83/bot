@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsDateString,
   IsNumber,
+  IsUUID,
   Min,
   Max,
 } from 'class-validator';
@@ -15,6 +16,15 @@ export class UpdateClassDto {
   @IsInt()
   @Min(1)
   levelNumber?: number;
+
+  // Explicit re-link to an existing course level (overrides name/levelNumber remap)
+  @IsOptional()
+  @IsUUID()
+  courseLevelId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  roomId?: string;
 
   @IsOptional()
   @IsString()

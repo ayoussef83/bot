@@ -92,17 +92,35 @@ export class SessionsService {
   }
 
   async create(data: CreateSessionDto, createdBy: string) {
+    // Normalize date inputs (accepts date-only strings) before they reach Prisma.
+    const toDate = (v: unknown, field: string): Date => {
+      const d = new Date(String(v));
+      if (!v || Number.isNaN(d.getTime())) {
+        throw new BadRequestException(`Invalid ${field}: expected an ISO date`);
+      }
+      return d;
+    };
+    const scheduledDate = toDate(data.scheduledDate, 'scheduledDate');
+    const startTime = toDate(data.startTime, 'startTime');
+    const endTime = toDate(data.endTime, 'endTime');
+    if (endTime <= startTime) {
+      throw new BadRequestException('endTime must be after startTime');
+    }
+
     if ((data as any).instructorId) {
       await this.assertInstructorAvailable(
         (data as any).instructorId,
         (data as any).classId,
-        new Date((data as any).startTime),
-        new Date((data as any).endTime),
+        startTime,
+        endTime,
       );
     }
     const session = await this.prisma.session.create({
       data: {
         ...data,
+        scheduledDate,
+        startTime,
+        endTime,
       },
       include: {
         class: {

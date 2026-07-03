@@ -1,12 +1,12 @@
-import { IsString, IsOptional, IsNumber, IsDateString, IsEnum, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, IsEnum, IsUUID, Min } from 'class-validator';
 import { InvoiceStatus } from '@prisma/client';
 
 export class CreateInvoiceDto {
-  @IsString()
+  @IsUUID()
   @IsOptional()
   studentId?: string;
 
-  @IsString()
+  @IsUUID()
   @IsOptional()
   classId?: string;
 

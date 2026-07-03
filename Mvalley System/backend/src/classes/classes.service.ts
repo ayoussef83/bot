@@ -43,18 +43,33 @@ export class ClassesService {
       throw new BadRequestException('Minimum capacity cannot be greater than maximum capacity');
     }
 
-    // Map (Course name + Level number) -> CourseLevel. Auto-create if missing.
-    const course = await this.prisma.course.upsert({
-      where: { name: courseName },
-      update: { deletedAt: null, isActive: true },
-      create: { name: courseName, isActive: true },
-    });
-    const levelName = `Level ${levelNumber}`;
-    const level = await this.prisma.courseLevel.upsert({
-      where: { courseId_name: { courseId: course.id, name: levelName } },
-      update: { deletedAt: null, isActive: true },
-      create: { courseId: course.id, name: levelName, sortOrder: levelNumber, isActive: true },
-    });
+    // If an explicit courseLevelId is provided, link to it directly (no auto-created Course).
+    // Otherwise: map (Course name + Level number) -> CourseLevel, auto-creating if missing.
+    let level: { id: string };
+    if (data.courseLevelId) {
+      const existingLevel = await this.prisma.courseLevel.findFirst({
+        where: { id: data.courseLevelId, deletedAt: null },
+      });
+      if (!existingLevel) throw new BadRequestException('Course level not found');
+      level = existingLevel;
+    } else {
+      const course = await this.prisma.course.upsert({
+        where: { name: courseName },
+        update: { deletedAt: null, isActive: true },
+        create: { name: courseName, isActive: true },
+      });
+      const levelName = `Level ${levelNumber}`;
+      level = await this.prisma.courseLevel.upsert({
+        where: { courseId_name: { courseId: course.id, name: levelName } },
+        update: { deletedAt: null, isActive: true },
+        create: { courseId: course.id, name: levelName, sortOrder: levelNumber, isActive: true },
+      });
+    }
+
+    if (data.roomId) {
+      const room = await this.prisma.room.findFirst({ where: { id: data.roomId, deletedAt: null } });
+      if (!room) throw new BadRequestException('Room not found');
+    }
 
     const classEntity = await this.prisma.class.create({
       data: {
@@ -246,6 +261,14 @@ export class ClassesService {
             parent: true,
           },
         },
+        // Roster truth: enrollments assigned to this class (Student.classId is legacy)
+        enrollments: {
+          include: {
+            student: {
+              include: { parent: true },
+            },
+          },
+        },
         sessions: {
           orderBy: { scheduledDate: 'desc' },
           include: {
@@ -312,6 +335,20 @@ export class ClassesService {
       });
       courseLevelIdToSet = level.id;
       (data as any).levelNumber = levelNumber;
+    }
+
+    // Explicit courseLevelId wins over the name/levelNumber remap (no auto-created Course).
+    if (data.courseLevelId) {
+      const lvl = await this.prisma.courseLevel.findFirst({
+        where: { id: data.courseLevelId, deletedAt: null },
+      });
+      if (!lvl) throw new BadRequestException('Course level not found');
+      courseLevelIdToSet = lvl.id;
+    }
+
+    if (data.roomId) {
+      const room = await this.prisma.room.findFirst({ where: { id: data.roomId, deletedAt: null } });
+      if (!room) throw new BadRequestException('Room not found');
     }
 
     const existing = await this.prisma.class.findFirst({

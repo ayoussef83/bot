@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsDateString,
   IsNumber,
+  IsUUID,
   Min,
   Max,
 } from 'class-validator';
@@ -13,6 +14,15 @@ import { Location } from '@prisma/client';
 export class CreateClassDto {
   @IsString()
   name: string;
+
+  // Link to an EXISTING course level (skips auto-creating a Course from `name`)
+  @IsOptional()
+  @IsUUID()
+  courseLevelId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  roomId?: string;
 
   @IsInt()
   @Min(1)

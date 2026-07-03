@@ -1,10 +1,10 @@
-import { IsString, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsBoolean, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateAttendanceDto {
-  @IsString()
+  @IsUUID()
   sessionId: string;
 
-  @IsString()
+  @IsUUID()
   studentId: string;
 
   @IsBoolean()

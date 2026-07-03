@@ -6,9 +6,10 @@ import {
   IsEnum,
 } from 'class-validator';
 import { SessionStatus } from '@prisma/client';
+import { IsUUID } from 'class-validator';
 
 export class CreateSessionDto {
-  @IsString()
+  @IsUUID()
   classId: string;
 
   @IsDateString()
@@ -21,7 +22,7 @@ export class CreateSessionDto {
   endTime: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   instructorId?: string;
 
   @IsOptional()

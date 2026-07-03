@@ -1,13 +1,15 @@
-import { IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsUUID, ValidateIf } from 'class-validator';
 import { EnrollmentStatus } from '@prisma/client';
 
 export class UpdateEnrollmentDto {
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.classId !== null)
+  @IsUUID()
   classId?: string | null;
 
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.groupId !== null)
+  @IsUUID()
   groupId?: string | null;
 
   @IsOptional()

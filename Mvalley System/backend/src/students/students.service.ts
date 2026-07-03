@@ -205,6 +205,7 @@ export class StudentsService {
           },
         },
         payments: userRole !== 'instructor', // Hide payments from instructors
+        invoices: userRole !== 'instructor', // Unpaid balance visibility on profile
         attendances: {
           include: {
             session: {
