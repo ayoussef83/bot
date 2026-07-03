@@ -3,8 +3,9 @@ FROM public.ecr.aws/docker/library/node:18-bullseye-slim AS builder
 
 WORKDIR /app
 
-# Prisma native engines need OpenSSL at runtime; ensure it's present in builder too
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl \
+# Prisma native engines need OpenSSL at runtime; ensure it's present in builder too.
+# git is required: baileys resolves libsignal from GitHub (package-lock git deps).
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl git \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
@@ -50,9 +51,9 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 # Start application
 # - Normal: apply migrations then start
 # - One-time RESET (DESTRUCTIVE): set RESET_DB=1 to drop all data and rebuild schema from baseline migration
-CMD ["sh", "-c", "if [ \"${RESET_DB:-}\" = \"1\" ]; then echo \"⚠️ RESET_DB=1 -> prisma migrate reset (DESTRUCTIVE)\"; npx prisma migrate reset --force --skip-seed; fi; echo \"🔧 Attempting to resolve known failed migration (safe if already resolved)...\"; npx prisma migrate resolve --rolled-back 20260101210000_courses_levels_enrollments || true; npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "if [ \"${RESET_DB:-}\" = \"1\" ]; then echo \"⚠️ RESET_DB=1 -> prisma migrate reset (DESTRUCTIVE)\"; npx prisma migrate reset --force --skip-seed; fi; if [ \"${SKIP_MIGRATIONS:-}\" = \"1\" ]; then echo \"⏭️ SKIP_MIGRATIONS=1 -> starting without prisma migrate deploy\"; node dist/main.js; else echo \"🔧 Attempting to resolve known failed migration (safe if already resolved)...\"; npx prisma migrate resolve --rolled-back 20260101210000_courses_levels_enrollments || true; npx prisma migrate deploy && node dist/main.js; fi"]
