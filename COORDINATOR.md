@@ -49,7 +49,9 @@ Every merge window: `git fetch --all` → review each feature branch diff → me
 
 | Branch | State | Last update |
 |---|---|---|
-| — | Not started. Wave 1 briefs pending. | 2026-07-03 |
+| `feature/inbox-port` | Branch created, brief ready (`BRIEF_INBOX_PORT.md`), session not started | 2026-07-03 |
+| `feature/mobile-api` | Branch created, brief ready (`BRIEF_RBAC_MOBILE.md`), session not started | 2026-07-03 |
+| `feature/sheet-import` | Branch created, brief ready (`BRIEF_SHEET_IMPORT.md`), session not started | 2026-07-03 |
 
 ## Blockers
 
