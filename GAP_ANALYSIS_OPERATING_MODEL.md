@@ -81,3 +81,12 @@ Customer sheets reveal **Nasr City** branch + Zayed/Tagamo3 active. Location see
 | B1 renewal engine, B4 portfolio+reports | **NEW S9 brief** `feature/renewal-portfolio` | 2 |
 | B6 pricing+commissions | **NEW S10 brief** `feature/pricing-commissions` | 3 |
 | B7 KPIs, B8 no-delete | Integrator + dashboards after S8/S9 land | 3 |
+
+## Implementation status (2026-07-03, deployed `2ce7901`, tag `stable-20260703-gap-closure`)
+
+**Backend for B1–B4 is LIVE on mv-app** (`ops-model` module + migration `20260703200000_operating_model_gap`):
+- ✅ B1 Renewal engine: `RenewalCase` + round fields on enrollment; daily 06:00 Cairo scan creates cases at session 8 + parent notification + projected renewal dates (verified: 2026-09-19 for the E2E enrollment = correct 12-week math); stage machine with guards (lost requires churnReason + 3 attempts; renewed requires fully-paid new-round invoice and increments round); `GET /renewals/win-back`; KPIs endpoint
+- ✅ B2 Slot requests: CRUD + `GET /slot-requests/demand` (verified: 3 matching requests grouped, readyToOpen=true) + match-on-open endpoint
+- ✅ B3 Onboarding: pending_payment → paid_unverified (auto on payment allocation, hook in finance) → onboarded (+bilingual welcome notification); Daily audits 05:30 Cairo: unpaid bookings, incomplete paid profiles, missing attendance (verified: 1 flag) + resolve-with-note
+- ✅ B4 Portfolio: `ProgressReport` (4/8/12, draft→approved→published, author≠approver) + `PortfolioItem` + `GET /portfolio/student/:id` full pitch payload (verified) + publish notification; SessionReport gained topicCovered/homework
+- ⏳ Remaining: frontend pages (S8/S9 briefs — now UI-only), B5 manager roles (S4), B6 pricing/commissions (S10), B7 KPI widgets, customer-data import (S6)
