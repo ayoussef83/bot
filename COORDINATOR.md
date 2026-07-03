@@ -41,6 +41,15 @@ Sessions add NEW files freely inside their module directories. Any edit to a sha
 5. Blocked >30 min → write the blocker into this file under "Blockers" and move to next task.
 6. Read before coding: `MV-OS_OPERATING_MODEL.md` (data chains + RBAC), `PORT_PLAN_NOURAUTO.md`, `MV-OS_FULL_SYSTEM_BLUEPRINT.md`.
 
+## Deployment (mv-app, set up 2026-07-03)
+
+- Server: `ssh mv-app` → stack at `/opt/stacks/mvalley-system`, git checkout at `/opt/stacks/mvalley-repo` (clone of GitHub main)
+- Deploy: `cd /opt/stacks/mvalley-system && ./deploy.sh backend|frontend|all` (pulls main, syncs code preserving server `.env*`, builds, restarts, shows logs)
+- Rollback: `./deploy.sh rollback <tag>` — stable baseline tags like `stable-20260703-parents-fix`
+- Rules: never touch postgres/minio, never edit server `.env`, migrations auto-apply on backend start (`prisma migrate deploy` in entrypoint)
+- **Only the integrator deploys.** Sessions never run deploy.sh.
+- Tag a `stable-YYYYMMDD-<name>` baseline after every verified deploy.
+
 ## Integrator loop
 
 Every merge window: `git fetch --all` → review each feature branch diff → merge to `main` in dependency order → run migrations on staging → deploy → smoke test → update Status below. Use the session-coordinator skill ("check sessions") to generate branch status reports.
