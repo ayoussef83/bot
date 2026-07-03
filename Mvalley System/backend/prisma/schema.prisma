@@ -110,6 +110,7 @@ enum CustomFieldType {
 enum IntegrationProvider {
   zoho_email
   smsmisr
+  whatsapp_baileys
 }
 
 enum MessageChannel {

@@ -17,6 +17,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ParentsModule } from './parents/parents.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { CoursesModule } from './courses/courses.module';
 import { GroupsModule } from './groups/groups.module';
 import { PayrollModule } from './payroll/payroll.module';
@@ -46,6 +47,7 @@ import { TeachingSlotsModule } from './teaching-slots/teaching-slots.module';
     MarketingModule,
     WebhooksModule,
     ParentsModule,
+    WhatsappModule,
     GroupsModule,
     PayrollModule,
     AllocationModule,
