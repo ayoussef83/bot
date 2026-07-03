@@ -46,7 +46,8 @@ Sessions add NEW files freely inside their module directories. Any edit to a sha
 - Server: `ssh mv-app` → stack at `/opt/stacks/mvalley-system`, git checkout at `/opt/stacks/mvalley-repo` (clone of GitHub main)
 - Deploy: `cd /opt/stacks/mvalley-system && ./deploy.sh backend|frontend|all` (pulls main, syncs code preserving server `.env*`, builds, restarts, shows logs)
 - Rollback: `./deploy.sh rollback <tag>` — stable baseline tags like `stable-20260703-parents-fix`
-- Rules: never touch postgres/minio, never edit server `.env`, migrations auto-apply on backend start (`prisma migrate deploy` in entrypoint)
+- Rules: never touch postgres/minio, never edit server `.env` credentials, migrations auto-apply on backend start (`prisma migrate deploy` in entrypoint)
+- **CORS:** backend allows only origins in `FRONTEND_URL` (set via `MVOS_FRONTEND_URL` in `/opt/stacks/mvalley-system/.env`, currently `https://mv-os.mvalley-eg.com` + localhost/LAN variants). If the app moves to a new domain, add it there and `up -d backend` — otherwise every browser call fails with "Network Error" (preflight 404). Public URL: https://mv-os.mvalley-eg.com (Cloudflare tunnel → edge nginx :80 → frontend/backend).
 - **Only the integrator deploys.** Sessions never run deploy.sh.
 - Tag a `stable-YYYYMMDD-<name>` baseline after every verified deploy.
 
