@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsEnum } from 'class-validator';
+import { EnrollmentStatus } from '@prisma/client';
 
 export class UpdateEnrollmentDto {
   @IsOptional()
@@ -10,8 +11,8 @@ export class UpdateEnrollmentDto {
   groupId?: string | null;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(EnrollmentStatus)
+  status?: EnrollmentStatus;
 
   // Mandatory when requesting a manual override (e.g., moving a student into a locked group)
   @IsOptional()

@@ -46,15 +46,16 @@ model User {
   status    UserStatus @default(active)
 
   // Relations
-  instructorProfile Instructor?
-  studentProfile    Student?
-  parentProfile     Parent?
-  recordedPayments  Payment[]  @relation("PaymentRecordedBy")
-  createdGroups     Group[]   @relation("GroupCreatedBy")
-  allocationRunsCreated AllocationRun[] @relation("AllocationRunCreatedBy")
+  instructorProfile     Instructor?
+  studentProfile        Student?
+  parentProfile         Parent?
+  recordedPayments      Payment[]        @relation("PaymentRecordedBy")
+  createdGroups         Group[]          @relation("GroupCreatedBy")
+  allocationRunsCreated AllocationRun[]  @relation("AllocationRunCreatedBy")
   candidateGroupsLocked CandidateGroup[] @relation("CandidateGroupLockedBy")
-  teachingSlotsCreated TeachingSlot[] @relation("TeachingSlotCreatedBy")
-  classesConfirmed     Class[] @relation("ClassConfirmedBy")
+  teachingSlotsCreated  TeachingSlot[]   @relation("TeachingSlotCreatedBy")
+  classesConfirmed      Class[]          @relation("ClassConfirmedBy")
+  pushDevices           PushDevice[]
 
   // Audit
   createdAt DateTime  @default(now())
@@ -187,7 +188,7 @@ model Student {
   phone String?
 
   // Custom attributes (admin-defined)
-  customData Json?
+  customData   Json?
   // Availability input for allocation (Sales filling validation)
   availability Json?
 
@@ -196,6 +197,8 @@ model Student {
   parent   Parent? @relation(fields: [parentId], references: [id])
 
   // Class assignment
+  // DEPRECATED (DB_AUDIT B1): StudentEnrollment is the single source of truth for
+  // class placement. Do not add new reads/writes; backfill + drop planned post-Wave 1.
   classId String?
   class   Class?  @relation(fields: [classId], references: [id])
 
@@ -227,9 +230,9 @@ model Parent {
   address   String?
 
   // Relations
-  user     User?     @relation(fields: [userId], references: [id])
-  students Student[]
-  convertedLeads Lead[] @relation("LeadConvertedParent")
+  user           User?     @relation(fields: [userId], references: [id])
+  students       Student[]
+  convertedLeads Lead[]    @relation("LeadConvertedParent")
 
   // Audit
   createdAt DateTime  @default(now())
@@ -244,11 +247,17 @@ model Parent {
 // CLASSES & SESSIONS
 // ============================================
 
+// NOTE(DB_AUDIT A1): extended with real operating locations from the Schedule
+// System sheet. Full conversion to a Location *table* (own_branch/partner_venue/online)
+// is owned by S4 (feature/mobile-api) — this enum is transitional.
 enum Location {
   MOA
   Espace
   SODIC
   PalmHills
+  DOKKI
+  Maadi
+  Online
 }
 
 enum AllocationRunStatus {
@@ -259,11 +268,11 @@ enum AllocationRunStatus {
 }
 
 enum CandidateGroupStatus {
-  draft       // created and ready for ops review
-  blocked     // missing requirements / not profitable
-  held        // ops hold (needs changes)
-  confirmed   // became a real Group + Class (locked)
-  rejected    // ops rejected
+  draft // created and ready for ops review
+  blocked // missing requirements / not profitable
+  held // ops hold (needs changes)
+  confirmed // became a real Group + Class (locked)
+  rejected // ops rejected
 }
 
 enum TeachingSlotStatus {
@@ -281,6 +290,19 @@ enum ClassLifecycleStatus {
   completed
 }
 
+// DB_AUDIT B5: typed statuses (were bare strings)
+enum SessionStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+enum EnrollmentStatus {
+  active
+  paused
+  completed
+}
+
 enum ProfitabilityStatus {
   red
   yellow
@@ -288,14 +310,14 @@ enum ProfitabilityStatus {
 }
 
 model Course {
-  id       String @id @default(uuid())
-  name     String @unique
+  id       String  @id @default(uuid())
+  name     String  @unique
   isActive Boolean @default(true)
 
   levels CourseLevel[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([isActive])
@@ -305,22 +327,22 @@ model Course {
 model CourseLevel {
   id       String @id @default(uuid())
   courseId String
-  course   Course  @relation(fields: [courseId], references: [id])
+  course   Course @relation(fields: [courseId], references: [id])
 
   name      String // e.g. "Level 1", "Beginner"
-  sortOrder Int    @default(1)
+  sortOrder Int     @default(1)
   isActive  Boolean @default(true)
 
   // Relations
-  classes      Class[]
-  enrollments  StudentEnrollment[]
-  groups       Group[]
-  demands      CourseDemand[]
+  classes         Class[]
+  enrollments     StudentEnrollment[]
+  groups          Group[]
+  demands         CourseDemand[]
   candidateGroups CandidateGroup[]
-  teachingSlots TeachingSlot[]
+  teachingSlots   TeachingSlot[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@unique([courseId, name])
@@ -330,21 +352,21 @@ model CourseLevel {
 }
 
 model StudentEnrollment {
-  id           String @id @default(uuid())
-  studentId    String
-  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id            String      @id @default(uuid())
+  studentId     String
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   courseLevelId String
-  courseLevel  CourseLevel @relation(fields: [courseLevelId], references: [id])
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
 
   // Allocation to a specific scheduled group (Class)
   classId String?
-  class   Class? @relation(fields: [classId], references: [id])
+  class   Class?  @relation(fields: [classId], references: [id])
 
   // Optional grouping (used by operations for cohorting)
   groupId String?
-  group   Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  group   Group?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
-  status String @default("active") // active, paused, completed
+  status EnrollmentStatus @default(active)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -359,31 +381,31 @@ model StudentEnrollment {
 
 // Operational grouping of students within a course level (cohort/group name)
 model Group {
-  id           String @id @default(uuid())
-  name         String
+  id            String      @id @default(uuid())
+  name          String
   courseLevelId String
-  courseLevel  CourseLevel @relation(fields: [courseLevelId], references: [id])
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
 
   // Optional default class for this group (so allocations can auto-pick location/instructor)
   defaultClassId String?
-  defaultClass   Class? @relation("GroupDefaultClass", fields: [defaultClassId], references: [id])
+  defaultClass   Class?  @relation("GroupDefaultClass", fields: [defaultClassId], references: [id])
 
   // Group planning fields (optional overrides; if unset, UI can derive from defaultClass/slot)
-  location   Location?
+  location    Location?
   minCapacity Int?
   maxCapacity Int?
-  ageMin     Int?
-  ageMax     Int?
+  ageMin      Int?
+  ageMax      Int?
 
   // Relations
-  enrollments StudentEnrollment[]
-  confirmedCandidateGroups CandidateGroup[] @relation("CandidateGroupConfirmedGroup")
+  enrollments              StudentEnrollment[]
+  confirmedCandidateGroups CandidateGroup[]    @relation("CandidateGroupConfirmedGroup")
 
   createdById String?
-  createdBy   User? @relation("GroupCreatedBy", fields: [createdById], references: [id])
+  createdBy   User?   @relation("GroupCreatedBy", fields: [createdById], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([courseLevelId])
@@ -399,29 +421,29 @@ model Group {
 // ============================
 
 model AllocationRun {
-  id        String @id @default(uuid())
-  status    AllocationRunStatus @default(draft)
+  id     String              @id @default(uuid())
+  status AllocationRunStatus @default(draft)
 
   // Run parameters (for explainability & reproducibility)
-  fromDate  DateTime
-  toDate    DateTime
-  notes     String?
-  params    Json?
+  fromDate DateTime
+  toDate   DateTime
+  notes    String?
+  params   Json?
 
   // Audit
   createdById String?
-  createdBy   User? @relation("AllocationRunCreatedBy", fields: [createdById], references: [id])
-  startedAt DateTime?
-  finishedAt DateTime?
-  error     String?
+  createdBy   User?     @relation("AllocationRunCreatedBy", fields: [createdById], references: [id])
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  error       String?
 
   // Relations
   demands         CourseDemand[]
   timeClusters    TimeCluster[]
   candidateGroups CandidateGroup[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([status])
@@ -431,32 +453,32 @@ model AllocationRun {
 }
 
 model CourseDemand {
-  id        String @id @default(uuid())
-  runId     String
-  run       AllocationRun @relation(fields: [runId], references: [id])
+  id    String        @id @default(uuid())
+  runId String
+  run   AllocationRun @relation(fields: [runId], references: [id])
 
   courseLevelId String
   courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
 
   // Demand inputs
-  studentIds          Json    // string[]
-  studentAvailability Json?   // engine input: free-form but expected weekly slots
-  requiredSkills      Json?   // string[]
+  studentIds          Json // string[]
+  studentAvailability Json? // engine input: free-form but expected weekly slots
+  requiredSkills      Json? // string[]
 
   // Course rules / expected economics
-  minCapacity   Int
-  maxCapacity   Int
-  plannedSessions Int
+  minCapacity         Int
+  maxCapacity         Int
+  plannedSessions     Int
   sessionDurationMins Int
-  pricePerStudent Float
-  preferredLocation Location?
+  pricePerStudent     Float
+  preferredLocation   Location?
 
   // Relations
   timeClusters    TimeCluster[]
   candidateGroups CandidateGroup[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([runId])
@@ -467,7 +489,7 @@ model CourseDemand {
 
 // Computed availability cluster (persisted for explainability)
 model TimeCluster {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   runId    String
   run      AllocationRun @relation(fields: [runId], references: [id])
   demandId String?
@@ -480,11 +502,11 @@ model TimeCluster {
   studentCount Int
   studentIds   Json
 
-  score        Float @default(0)
-  explanation  Json?
+  score       Float @default(0)
+  explanation Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([runId])
@@ -494,15 +516,15 @@ model TimeCluster {
 }
 
 model CandidateGroup {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   runId    String
   run      AllocationRun @relation(fields: [runId], references: [id])
   demandId String
-  demand   CourseDemand @relation(fields: [demandId], references: [id])
+  demand   CourseDemand  @relation(fields: [demandId], references: [id])
 
-  name         String
-  status       CandidateGroupStatus @default(draft)
-  blockReason  String?
+  name        String
+  status      CandidateGroupStatus @default(draft)
+  blockReason String?
 
   courseLevelId String
   courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
@@ -519,15 +541,15 @@ model CandidateGroup {
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
 
   roomId String?
-  room   Room? @relation(fields: [roomId], references: [id])
+  room   Room?   @relation(fields: [roomId], references: [id])
 
   // Proposed students
   studentCount Int
   studentIds   Json
 
   // Rules & economics
-  minCapacity Int
-  maxCapacity Int
+  minCapacity     Int
+  maxCapacity     Int
   expectedRevenue Float
   expectedCost    Float
   expectedMargin  Float
@@ -537,17 +559,17 @@ model CandidateGroup {
   explanation Json?
 
   // Lifecycle / safety
-  lockedAt DateTime?
+  lockedAt   DateTime?
   lockedById String?
-  lockedBy   User? @relation("CandidateGroupLockedBy", fields: [lockedById], references: [id])
+  lockedBy   User?     @relation("CandidateGroupLockedBy", fields: [lockedById], references: [id])
 
   confirmedGroupId String?
-  confirmedGroup   Group? @relation("CandidateGroupConfirmedGroup", fields: [confirmedGroupId], references: [id])
+  confirmedGroup   Group?  @relation("CandidateGroupConfirmedGroup", fields: [confirmedGroupId], references: [id])
   confirmedClassId String?
-  confirmedClass   Class? @relation("CandidateGroupConfirmedClass", fields: [confirmedClassId], references: [id])
+  confirmedClass   Class?  @relation("CandidateGroupConfirmedClass", fields: [confirmedClassId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([runId])
@@ -561,41 +583,42 @@ model CandidateGroup {
 }
 
 model Room {
-  id       String @id @default(uuid())
+  id       String   @id @default(uuid())
   name     String
   location Location
   capacity Int
-  isActive Boolean @default(true)
+  isActive Boolean  @default(true)
 
-  availabilities RoomAvailability[]
-  classes        Class[]
-  candidateGroups CandidateGroup[]
-  teachingSlots  TeachingSlot[]
+  availabilities   RoomAvailability[]
+  classes          Class[]
+  candidateGroups  CandidateGroup[]
+  teachingSlots    TeachingSlot[]
+  sessionOverrides Session[]          @relation("SessionRoomOverride")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  @@unique([name, location])
   @@index([location])
   @@index([isActive])
   @@index([deletedAt])
-  @@unique([name, location])
   @@map("rooms")
 }
 
 model RoomAvailability {
-  id        String @id @default(uuid())
-  roomId    String
-  room      Room @relation(fields: [roomId], references: [id])
+  id     String @id @default(uuid())
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id])
 
-  dayOfWeek Int
-  startTime String
-  endTime   String
+  dayOfWeek     Int
+  startTime     String
+  endTime       String
   effectiveFrom DateTime?
   effectiveTo   DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([roomId])
@@ -605,8 +628,8 @@ model RoomAvailability {
 }
 
 model TeachingSlot {
-  id           String @id @default(uuid())
-  status       TeachingSlotStatus @default(open)
+  id     String             @id @default(uuid())
+  status TeachingSlotStatus @default(open)
 
   courseLevelId String
   courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id])
@@ -615,7 +638,7 @@ model TeachingSlot {
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
   roomId String
-  room   Room  @relation(fields: [roomId], references: [id])
+  room   Room   @relation(fields: [roomId], references: [id])
 
   // Time (weekly recurring)
   dayOfWeek Int
@@ -627,24 +650,24 @@ model TeachingSlot {
   effectiveTo   DateTime?
 
   // Rules / economics for groups created inside this slot
-  minCapacity Int
-  maxCapacity Int
-  plannedSessions Int
+  minCapacity         Int
+  maxCapacity         Int
+  plannedSessions     Int
   sessionDurationMins Int
-  pricePerStudent Float
-  minMarginPct Float @default(0) // 0.2 = 20%
-  currency String @default("EGP")
+  pricePerStudent     Float
+  minMarginPct        Float  @default(0) // 0.2 = 20%
+  currency            String @default("EGP")
 
   // A slot can have multiple groups over time, but only one "current" in reserved/occupied
   currentClassId String?
-  currentClass   Class? @relation("TeachingSlotCurrentClass", fields: [currentClassId], references: [id])
+  currentClass   Class?  @relation("TeachingSlotCurrentClass", fields: [currentClassId], references: [id])
   classes        Class[]
 
   createdById String?
-  createdBy   User? @relation("TeachingSlotCreatedBy", fields: [createdById], references: [id])
+  createdBy   User?   @relation("TeachingSlotCreatedBy", fields: [createdById], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([status])
@@ -657,44 +680,46 @@ model TeachingSlot {
 }
 
 model Class {
-  id           String      @id @default(uuid())
-  name         String
-  location     Location
+  id                  String               @id @default(uuid())
+  name                String
+  location            Location
   // Dynamic location (user-managed). Backfilled from enum `location`.
-  locationName String?
-  roomId       String?
-  room         Room? @relation(fields: [roomId], references: [id])
-  teachingSlotId String?
-  teachingSlot   TeachingSlot? @relation(fields: [teachingSlotId], references: [id])
-  lifecycleStatus ClassLifecycleStatus @default(active)
-  profitabilityStatus ProfitabilityStatus @default(red)
-  expectedRevenue Float? @default(0)
-  expectedCost    Float? @default(0)
-  expectedMargin  Float? @default(0)
-  marginThresholdPct Float? @default(0)
-  confirmedAt DateTime?
-  confirmedById String?
-  confirmedBy   User? @relation("ClassConfirmedBy", fields: [confirmedById], references: [id])
-  confirmReason String?
-  capacity     Int
-  minCapacity  Int?
-  maxCapacity  Int?
-  code         String?
-  logoUrl      String?
-  ageMin       Int?
-  ageMax       Int?
-  price        Float?
-  levelNumber  Int?
-  plannedSessions Int?
-  description  String?
-  instructorId String?
-  instructor   Instructor? @relation(fields: [instructorId], references: [id])
+  locationName        String?
+  roomId              String?
+  room                Room?                @relation(fields: [roomId], references: [id])
+  teachingSlotId      String?
+  teachingSlot        TeachingSlot?        @relation(fields: [teachingSlotId], references: [id])
+  lifecycleStatus     ClassLifecycleStatus @default(active)
+  profitabilityStatus ProfitabilityStatus  @default(red)
+  expectedRevenue     Float?               @default(0)
+  expectedCost        Float?               @default(0)
+  expectedMargin      Float?               @default(0)
+  marginThresholdPct  Float?               @default(0)
+  confirmedAt         DateTime?
+  confirmedById       String?
+  confirmedBy         User?                @relation("ClassConfirmedBy", fields: [confirmedById], references: [id])
+  confirmReason       String?
+  capacity            Int
+  minCapacity         Int?
+  maxCapacity         Int?
+  code                String?
+  logoUrl             String?
+  ageMin              Int?
+  ageMax              Int?
+  price               Float?
+  levelNumber         Int?
+  plannedSessions     Int?
+  description         String?
+  instructorId        String?
+  instructor          Instructor?          @relation(fields: [instructorId], references: [id])
 
   // Link to Course Level (Course -> Level -> Class group)
   courseLevelId String?
   courseLevel   CourseLevel? @relation(fields: [courseLevelId], references: [id])
 
   // Schedule (recurring pattern)
+  // DB_AUDIT B2: when teachingSlotId is set, TeachingSlot is the source of truth —
+  // these fields are a denormalized cache and must be written atomically with the slot.
   dayOfWeek Int // 0 = Sunday, 1 = Monday, etc.
   startTime String // HH:mm format
   endTime   String // HH:mm format
@@ -705,12 +730,12 @@ model Class {
   customData Json?
 
   // Relations
-  students Student[]
-  sessions Session[]
-  enrollments StudentEnrollment[]
-  defaultForGroups Group[] @relation("GroupDefaultClass")
-  confirmedCandidateGroups CandidateGroup[] @relation("CandidateGroupConfirmedClass")
-  slotCurrentFor TeachingSlot[] @relation("TeachingSlotCurrentClass")
+  students                 Student[]
+  sessions                 Session[]
+  enrollments              StudentEnrollment[]
+  defaultForGroups         Group[]             @relation("GroupDefaultClass")
+  confirmedCandidateGroups CandidateGroup[]    @relation("CandidateGroupConfirmedClass")
+  slotCurrentFor           TeachingSlot[]      @relation("TeachingSlotCurrentClass")
 
   // Auto-calculated (cached)
   avgStudentsPerSession Float?  @default(0)
@@ -743,16 +768,20 @@ model Session {
   instructorId String?
   instructor   Instructor? @relation(fields: [instructorId], references: [id])
 
-  room String?
-  notes String?
+  // DB_AUDIT B4: typed room override. `room` string kept for legacy reads — do not write.
+  roomId  String?
+  roomRef Room?   @relation("SessionRoomOverride", fields: [roomId], references: [id])
+  room    String? // DEPRECATED: use roomId
+  notes   String?
 
   // Status
-  status              String  @default("scheduled") // scheduled, completed, cancelled
-  instructorConfirmed Boolean @default(false)
+  status              SessionStatus @default(scheduled)
+  instructorConfirmed Boolean       @default(false)
 
   // Relations
-  attendances SessionAttendance[]
+  attendances       SessionAttendance[]
   instructorSession InstructorSession?
+  report            SessionReport?
 
   // Audit
   createdAt DateTime  @default(now())
@@ -775,6 +804,10 @@ model SessionAttendance {
   attended Boolean @default(false)
   notes    String?
 
+  // DB_AUDIT B7: who marked attendance and when (payroll/dispute audit trail)
+  markedById String?
+  markedAt   DateTime?
+
   // Audit
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -783,6 +816,42 @@ model SessionAttendance {
   @@index([sessionId])
   @@index([studentId])
   @@map("session_attendances")
+}
+
+// DB_AUDIT A3: structured session report (mirrors the Google Form fields).
+// Written by the instructor (app) after each session — feeds parent updates,
+// payroll gating, compliance board, and InstructorFeedbackSummary aggregation.
+enum ReportRating {
+  needs_improvement
+  good
+  excellent
+}
+
+model SessionReport {
+  id        String  @id @default(uuid())
+  sessionId String  @unique
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  instructorId String
+  instructor   Instructor @relation(fields: [instructorId], references: [id])
+
+  engagementLevel     Int // 1-5
+  clarityRating       ReportRating
+  paceRating          ReportRating
+  activitiesRating    ReportRating
+  difficultyRating    ReportRating
+  materialSuitability Int // 1-5 (age-group fit)
+  issues              String?
+  followUps           String? // shown to instructor at next session start
+  submittedAt         DateTime     @default(now())
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([instructorId])
+  @@index([submittedAt])
+  @@map("session_reports")
 }
 
 // ============================================
@@ -804,25 +873,26 @@ model Instructor {
   costAmount Float // hourly rate or monthly salary
 
   // Profile (optional)
-  age           Int?
+  age            Int?
   educationLevel String? // "undergraduate" | "graduate" | "other"
-  livingArea    String?
+  livingArea     String?
 
   // Relations
-  classes  Class[]
-  sessions Session[]
-  expenses Expense[]
-  skills   InstructorSkill[]
-  contracts InstructorContract[]
-  availability InstructorAvailability[]
-  blackoutDates InstructorBlackoutDate[]
-  costModels InstructorCostModel[]
+  classes            Class[]
+  sessions           Session[]
+  expenses           Expense[]
+  skills             InstructorSkill[]
+  contracts          InstructorContract[]
+  availability       InstructorAvailability[]
+  blackoutDates      InstructorBlackoutDate[]
+  costModels         InstructorCostModel[]
   instructorSessions InstructorSession[]
-  payrolls InstructorPayroll[]
-  feedbackSummaries InstructorFeedbackSummary[]
-  documents InstructorDocument[]
-  candidateGroups CandidateGroup[]
-  teachingSlots  TeachingSlot[]
+  payrolls           InstructorPayroll[]
+  feedbackSummaries  InstructorFeedbackSummary[]
+  documents          InstructorDocument[]
+  candidateGroups    CandidateGroup[]
+  teachingSlots      TeachingSlot[]
+  sessionReports     SessionReport[]
 
   // Audit
   createdAt DateTime  @default(now())
@@ -840,7 +910,7 @@ enum InstructorSkillLevel {
 }
 
 model InstructorSkill {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
@@ -848,8 +918,8 @@ model InstructorSkill {
   level InstructorSkillLevel @default(beginner)
   notes String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([instructorId])
@@ -858,7 +928,7 @@ model InstructorSkill {
 }
 
 model InstructorContract {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
@@ -867,8 +937,8 @@ model InstructorContract {
   endDate      DateTime?
   terms        Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([instructorId])
@@ -878,20 +948,20 @@ model InstructorContract {
 }
 
 model InstructorAvailability {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
-  dayOfWeek Int // 0=Sun ... 6=Sat (Cairo local time)
-  startTime String // HH:mm
-  endTime   String // HH:mm
-  location  Location?
-  isActive  Boolean @default(true)
+  dayOfWeek     Int // 0=Sun ... 6=Sat (Cairo local time)
+  startTime     String // HH:mm
+  endTime       String // HH:mm
+  location      Location?
+  isActive      Boolean   @default(true)
   effectiveFrom DateTime?
   effectiveTo   DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([instructorId])
@@ -903,7 +973,7 @@ model InstructorAvailability {
 }
 
 model InstructorBlackoutDate {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
@@ -911,8 +981,8 @@ model InstructorBlackoutDate {
   endDate   DateTime
   reason    String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([instructorId])
@@ -928,19 +998,19 @@ enum InstructorCostModelType {
 }
 
 model InstructorCostModel {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
-  type         InstructorCostModelType
-  amount       Float
-  currency     String @default("EGP")
+  type          InstructorCostModelType
+  amount        Float
+  currency      String                  @default("EGP")
   effectiveFrom DateTime
   effectiveTo   DateTime?
   notes         String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   sessions InstructorSession[]
@@ -952,26 +1022,26 @@ model InstructorCostModel {
 }
 
 model InstructorSession {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
-  sessionId    String @unique
-  session      Session @relation(fields: [sessionId], references: [id])
+  sessionId    String     @unique
+  session      Session    @relation(fields: [sessionId], references: [id])
 
   costModelId String?
   costModel   InstructorCostModel? @relation(fields: [costModelId], references: [id])
 
-  costAmount Float @default(0)
-  currency   String @default("EGP")
-  durationMinutes Int @default(0)
-  attendanceComplete Boolean @default(false)
-  calculatedAt DateTime @default(now())
+  costAmount         Float    @default(0)
+  currency           String   @default("EGP")
+  durationMinutes    Int      @default(0)
+  attendanceComplete Boolean  @default(false)
+  calculatedAt       DateTime @default(now())
 
   payrollId String?
   payroll   InstructorPayroll? @relation(fields: [payrollId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([instructorId])
@@ -989,14 +1059,14 @@ enum InstructorPayrollStatus {
 }
 
 model InstructorPayroll {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
   periodYear  Int
   periodMonth Int
   status      InstructorPayrollStatus @default(draft)
-  currency    String @default("EGP")
+  currency    String                  @default("EGP")
 
   totalAmount Float @default(0)
   snapshot    Json // immutable snapshot of sessions + calculations
@@ -1011,8 +1081,8 @@ model InstructorPayroll {
 
   sessions InstructorSession[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@unique([instructorId, periodYear, periodMonth])
@@ -1022,18 +1092,18 @@ model InstructorPayroll {
 }
 
 model InstructorFeedbackSummary {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
-  periodYear  Int
-  periodMonth Int
-  avgRating   Float?
-  totalFeedback Int @default(0)
-  notes       String?
+  periodYear    Int
+  periodMonth   Int
+  avgRating     Float?
+  totalFeedback Int     @default(0)
+  notes         String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@unique([instructorId, periodYear, periodMonth])
@@ -1043,7 +1113,7 @@ model InstructorFeedbackSummary {
 }
 
 model InstructorDocument {
-  id           String @id @default(uuid())
+  id           String     @id @default(uuid())
   instructorId String
   instructor   Instructor @relation(fields: [instructorId], references: [id])
 
@@ -1054,8 +1124,8 @@ model InstructorDocument {
   expiresAt DateTime?
   metadata  Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([instructorId])
@@ -1181,7 +1251,7 @@ model Payment {
 
   referenceNumber String? // Bank reference, transaction ID, receipt number
   receivedBy      String? // User ID who recorded the payment
-  recordedBy      User?   @relation("PaymentRecordedBy", fields: [receivedBy], references: [id])
+  recordedBy      User?         @relation("PaymentRecordedBy", fields: [receivedBy], references: [id])
   status          PaymentStatus @default(received)
 
   reversedAt     DateTime?
@@ -1192,7 +1262,7 @@ model Payment {
   // Who this payment is for:
   // - "student": must have studentId
   // - "school": B2B payments (must have schoolName)
-  payerType  String @default("student")
+  payerType  String  @default("student")
   schoolName String?
 
   // Relations
@@ -1314,8 +1384,8 @@ model CashAccount {
   notes String?
 
   // Relations
-  payments Payment[]
-  expenses Expense[]
+  payments     Payment[]
+  expenses     Expense[]
   bankSyncRuns BankSyncRun[]
 
   // Audit
@@ -1328,17 +1398,17 @@ model CashAccount {
 }
 
 model BankSyncRun {
-  id            String         @id @default(uuid())
+  id            String      @id @default(uuid())
   cashAccountId String
-  cashAccount   CashAccount    @relation(fields: [cashAccountId], references: [id])
+  cashAccount   CashAccount @relation(fields: [cashAccountId], references: [id])
 
   source        BankSyncSource
   asOfDate      DateTime
   endingBalance Float
 
-  fileName String?
-  rowCount Int?
-  notes    String?
+  fileName  String?
+  rowCount  Int?
+  notes     String?
   createdBy String?
 
   createdAt DateTime @default(now())
@@ -1739,7 +1809,7 @@ model Lead {
   // Conversion
   convertedToStudentId String?
   convertedToParentId  String?
-  convertedParent      Parent?    @relation("LeadConvertedParent", fields: [convertedToParentId], references: [id])
+  convertedParent      Parent?   @relation("LeadConvertedParent", fields: [convertedToParentId], references: [id])
   convertedAt          DateTime?
 
   // Marketing Attribution (from Marketing module)
@@ -1792,6 +1862,46 @@ enum NotificationChannel {
   email
   sms
   whatsapp
+  push // DB_AUDIT A4: mobile push (FCM)
+}
+
+// DB_AUDIT A4: mobile push + OTP login support
+enum PushPlatform {
+  ios
+  android
+}
+
+model PushDevice {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+  token      String       @unique // FCM token
+  platform   PushPlatform
+  isActive   Boolean      @default(true)
+  lastSeenAt DateTime     @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("push_devices")
+}
+
+model OtpCode {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String
+  purpose    String    @default("login") // login, verify_phone
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone, purpose])
+  @@index([expiresAt])
+  @@map("otp_codes")
 }
 
 enum NotificationStatus {

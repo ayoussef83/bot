@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsEnum,
 } from 'class-validator';
+import { SessionStatus } from '@prisma/client';
 
 export class CreateSessionDto {
   @IsString()
@@ -32,8 +33,8 @@ export class CreateSessionDto {
   notes?: string;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(SessionStatus)
+  status?: SessionStatus;
 
   @IsOptional()
   @IsBoolean()

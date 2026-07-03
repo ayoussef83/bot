@@ -12,6 +12,8 @@
 5. Scope filters: helper `applyScope(query, user, {location?, ownership?})` used by services; document usage in `RBAC_USAGE.md`.
 6. Wire existing endpoints minimally: add `@Permissions()` to students, groups, finance controllers as reference implementations (3 controllers is enough — the rest follow in their own sessions).
 
+> **Update 2026-07-03:** integrator already added `PushDevice`, `OtpCode`, `SessionReport`, `SessionStatus`/`EnrollmentStatus` enums, `Session.roomId`, and extended the `Location` enum (migration `20260703120000_db_audit_fixes`). CONSUME these — do not recreate. Your Location work = enum→table conversion + code refactor of the 9 files importing the enum. See `DB_AUDIT.md` fix status.
+
 ## Part B — Mobile API
 
 1. New module `backend/src/mobile/` with controllers namespaced `/mobile/*`:

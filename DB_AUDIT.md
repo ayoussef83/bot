@@ -57,3 +57,17 @@ Solid core. The allocation chain and finance domain are genuinely well-modeled (
 6. **C invoice dangles + D dedupe** — decide at S2 kickoff
 
 Briefs updated? → S4 and S6 briefs already cover A1/A2/A4; A3 + B-items added here are NEW asks for S4/S5 and the integrator.
+
+## Fix status (2026-07-03, integrator commit)
+
+Implemented in schema + migration `20260703120000_db_audit_fixes` (backend type-check clean):
+- ✅ A1 (partial): Location enum extended with DOKKI/Maadi/Online — full table conversion stays with S4
+- ✅ A3: `SessionReport` model + `ReportRating` enum (Google Form fields, 1:1 Session)
+- ✅ A4: `push` notification channel, `PushDevice`, `OtpCode` models
+- ✅ B4: `Session.roomId` FK added (`room` string kept read-only, deprecated)
+- ✅ B5: `SessionStatus` + `EnrollmentStatus` enums replace bare strings (DTOs updated)
+- ✅ B7: `SessionAttendance.markedById/markedAt`
+- 📝 B1/B2: deprecation + source-of-truth comments in schema; backfill/drop scheduled post-Wave 1
+- ⏳ B3 (Float→Decimal), B6 (partial unique email), A2 (RBAC tables), C/D decisions — unchanged, owners as above
+
+**Migration not yet applied to any DB** — run `npx prisma migrate deploy` on dev/staging before next backend build.
